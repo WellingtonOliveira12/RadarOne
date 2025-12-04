@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: radarone-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: radarone
+      POSTGRES_PASSWORD: radarone123
+      POSTGRES_DB: radarone
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - radarone-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: radarone-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://radarone:radarone123@postgres:5432/radarone?schema=public
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this}
+      JWT_EXPIRES_IN: 7d
+      KIWIFY_API_KEY: ${KIWIFY_API_KEY}
+      KIWIFY_WEBHOOK_SECRET: ${KIWIFY_WEBHOOK_SECRET}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+    ports:
+      - "3000:3000"
+    networks:
+      - radarone-network
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  # Worker (Scraping)
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: radarone-worker
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://radarone:radarone123@postgres:5432/radarone?schema=public
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      CHECK_INTERVAL_MINUTES: ${CHECK_INTERVAL_MINUTES:-5}
+      MONITOR_DELAY_MS: 2000
+      REQUEST_DELAY_MS: 3000
+      REQUEST_TIMEOUT_MS: 30000
+      MAX_RETRIES: 3
+    networks:
+      - radarone-network
+
+  # Frontend (Nginx serving static files)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    container_name: radarone-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - radarone-network
+
+networks:
+  radarone-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
