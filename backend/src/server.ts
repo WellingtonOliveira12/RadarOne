@@ -7,7 +7,9 @@ import { PrismaClient } from '@prisma/client';
 dotenv.config();
 
 // Inicializa o Prisma Client
-export const prisma = new PrismaClient();
+export const prisma = new PrismaClient({
+  log: ['error', 'warn'], // só para termos algo explícito nas opções
+});
 
 // Importa rotas
 import authRoutes from './routes/auth.routes';
