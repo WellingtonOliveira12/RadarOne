@@ -13,4 +13,5 @@ export default defineConfig({
   datasource: {
     url: env('DATABASE_URL'),
   },
+  engineType: 'library', // ← Força o modo correto e impede o erro no Render
 });
