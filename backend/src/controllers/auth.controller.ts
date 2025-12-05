@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { prisma } from '../server';
 
 /**
@@ -117,10 +117,15 @@ export class AuthController {
         throw new Error('JWT_SECRET não configurado');
       }
 
+      const expiresIn = (process.env.JWT_EXPIRES_IN || '7d') as any;
+      const options: SignOptions = {
+        expiresIn
+      };
+
       const token = jwt.sign(
         { userId: user.id },
         secret,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        options
       );
 
       // Remove senha do objeto
