@@ -13,4 +13,5 @@ export default defineConfig({
   datasource: {
     url: env('DATABASE_URL'),
   },
+  // engineType: 'library', // Comentado - usando adapter Postgres
 });

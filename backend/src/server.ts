@@ -2,13 +2,18 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
 // Carrega variáveis de ambiente
 dotenv.config();
 
-// Inicializa o Prisma Client
+// Inicializa o Prisma Client com adapter Postgres
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
 export const prisma = new PrismaClient({
-  log: ['error', 'warn'], // só para termos algo explícito nas opções
+  adapter,
+  log: ['error', 'warn'],
 });
 
 // Importa rotas
