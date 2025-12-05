@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authService } from '../services/api';
+import { login as authLogin, register as authRegister } from '../services/auth';
+import { saveToken, clearToken, getToken } from '../services/tokenStorage';
 
 /**
  * Contexto de Autenticação
@@ -43,27 +44,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const loadUser = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       if (token) {
-        const response = await authService.getMe();
-        setUser(response.user);
+        // TODO: implementar getMe endpoint se necessário
+        // Por ora, apenas verifica se tem token
       }
     } catch (error) {
       console.error('Erro ao carregar usuário:', error);
-      localStorage.removeItem('token');
+      clearToken();
     } finally {
       setLoading(false);
     }
   };
 
   const login = async (email: string, password: string) => {
-    const response = await authService.login(email, password);
+    const response = await authLogin(email, password);
+    saveToken(response.token);
     setUser(response.user);
   };
 
   const logout = () => {
     setUser(null);
-    authService.logout();
+    clearToken();
+    window.location.href = '/login';
   };
 
   const register = async (data: {
@@ -72,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     name: string;
     phone?: string;
   }) => {
-    await authService.register(data);
+    await authRegister(data.name, data.email, data.password);
     // Após registrar, fazer login automaticamente
     await login(data.email, data.password);
   };

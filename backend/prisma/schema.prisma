@@ -152,17 +152,18 @@ model CouponUsage {
 // ============================================
 
 // Enum de sites de monitores (CRUD API)
-// Scrapers implementados: MERCADO_LIVRE (placeholder), OLX (placeholder)
-// Scrapers pendentes: LEILAO, WEBMOTORS, ICARROS, ZAP_IMOVEIS, VIVA_REAL, IMOVELWEB
+// Scrapers implementados: MERCADO_LIVRE, OLX, FACEBOOK_MARKETPLACE
+// Scrapers pendentes: WEBMOTORS, ICARROS, ZAP_IMOVEIS, VIVA_REAL, IMOVELWEB, OUTRO
 enum MonitorSite {
   MERCADO_LIVRE
   OLX
-  LEILAO
+  FACEBOOK_MARKETPLACE
   WEBMOTORS       // Portal de veículos
   ICARROS         // Portal de veículos
   ZAP_IMOVEIS     // Portal de imóveis
   VIVA_REAL       // Portal de imóveis
   IMOVELWEB       // Portal de imóveis
+  OUTRO           // Outros sites
 }
 
 model Monitor {
