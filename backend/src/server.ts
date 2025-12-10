@@ -34,7 +34,7 @@ import { authenticateToken } from './middlewares/auth.middleware';
 import { startScheduler } from './jobs/scheduler';
 
 const app: Application = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // ============================================
 // MIDDLEWARES

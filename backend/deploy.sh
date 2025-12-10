@@ -12,31 +12,20 @@ echo ""
 
 # Verificar se há alterações não commitadas
 if [[ -n $(git status -s) ]]; then
-    echo "⚠️  Há alterações não commitadas. Fazendo commit..."
+    echo "⚠️  ATENÇÃO: Há alterações não commitadas!"
     echo ""
-
-    # Adicionar arquivos alterados
-    git add backend/src/server.ts
-    git add backend/.env.example
-    git add backend/DEPLOY_RENDER.md
-
-    # Fazer commit
-    git commit -m "fix: Corrigir servidor para aceitar webhooks da Kiwify na Render
-
-- Servidor agora ouve em 0.0.0.0 (aceita conexões externas)
-- Adicionada variável PUBLIC_URL para produção
-- Log do endpoint do webhook em produção
-- Documentação de deploy criada (DEPLOY_RENDER.md)
-
-Correções necessárias para que a Render possa receber webhooks da Kiwify:
-1. app.listen() agora usa '0.0.0.0' como host
-2. PUBLIC_URL configurável via env var
-3. Log do endpoint do webhook quando NODE_ENV=production"
-
-    echo "✅ Commit realizado com sucesso!"
+    git status -s
     echo ""
+    echo "❌ Por favor, faça commit das suas alterações antes de fazer deploy."
+    echo ""
+    echo "Comandos sugeridos:"
+    echo "  git add ."
+    echo "  git commit -m \"Sua mensagem de commit\""
+    echo "  ./deploy.sh"
+    echo ""
+    exit 1
 else
-    echo "ℹ️  Não há alterações para commitar."
+    echo "✅ Não há alterações não commitadas."
     echo ""
 fi
 
@@ -74,14 +63,24 @@ if [[ $REPLY =~ ^[Ss]$ ]]; then
     echo "📋 PRÓXIMOS PASSOS:"
     echo ""
     echo "1. Aguardar deploy automático na Render (3-5 minutos)"
-    echo "2. Verificar logs da Render para confirmar:"
-    echo "   - 'Servidor rodando na porta 3000'"
-    echo "   - 'Webhook Kiwify: https://radarone.onrender.com/api/webhooks/kiwify'"
     echo ""
-    echo "3. Testar health check:"
+    echo "2. Verificar logs da Render para confirmar:"
+    echo "   ✓ 'Conectado ao banco de dados'"
+    echo "   ✓ 'Servidor rodando na porta 3000'"
+    echo "   ✓ 'URL: https://radarone.onrender.com'"
+    echo "   ✓ 'Webhook Kiwify: https://radarone.onrender.com/api/webhooks/kiwify'"
+    echo ""
+    echo "3. Testar endpoints:"
+    echo "   # Health check"
     echo "   curl https://radarone.onrender.com/health"
     echo ""
-    echo "4. Fazer compra de teste na Kiwify para testar webhook"
+    echo "   # Teste do webhook (deve retornar 401 sem signature válida)"
+    echo "   curl -X POST https://radarone.onrender.com/api/webhooks/kiwify"
+    echo ""
+    echo "4. Configurar webhook na Kiwify com a URL:"
+    echo "   https://radarone.onrender.com/api/webhooks/kiwify"
+    echo ""
+    echo "5. Fazer compra de teste na Kiwify para validar integração"
     echo ""
     echo "════════════════════════════════════════════════════════════════"
 else

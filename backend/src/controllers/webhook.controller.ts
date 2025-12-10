@@ -28,7 +28,12 @@ export class WebhookController {
     const secret = process.env.KIWIFY_WEBHOOK_SECRET;
 
     if (!secret) {
-      console.warn('[WEBHOOK] KIWIFY_WEBHOOK_SECRET não configurado - pulando validação');
+      const isProduction = process.env.NODE_ENV === 'production';
+      if (isProduction) {
+        console.error('[WEBHOOK] KIWIFY_WEBHOOK_SECRET não configurado em produção - REJEITANDO');
+        return false; // Em produção, REJEITAR sem secret
+      }
+      console.warn('[WEBHOOK] KIWIFY_WEBHOOK_SECRET não configurado - pulando validação (dev only)');
       return true; // Em dev, aceitar sem validação
     }
 
