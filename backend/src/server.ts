@@ -19,11 +19,19 @@ export const prisma = new PrismaClient({
 // Importa rotas
 import authRoutes from './routes/auth.routes';
 import monitorRoutes from './routes/monitorRoutes';
-// import userRoutes from './routes/user.routes';
-// import planRoutes from './routes/plan.routes';
-// import subscriptionRoutes from './routes/subscription.routes';
+import userRoutes from './routes/user.routes';
+import planRoutes from './routes/plan.routes';
+import subscriptionRoutes from './routes/subscription.routes';
+import devRoutes from './routes/dev.routes';
+import webhookRoutes from './routes/webhook.routes';
+import adminRoutes from './routes/admin.routes';
 // import couponRoutes from './routes/coupon.routes';
-// import webhookRoutes from './routes/webhook.routes';
+
+// Importa middleware de autenticação
+import { authenticateToken } from './middlewares/auth.middleware';
+
+// Importa scheduler de jobs
+import { startScheduler } from './jobs/scheduler';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -62,11 +70,13 @@ app.get('/health', (req: Request, res: Response) => {
 // Rotas principais
 app.use('/api/auth', authRoutes);
 app.use('/api/monitors', monitorRoutes);
-// app.use('/api/users', userRoutes);
-// app.use('/api/plans', planRoutes);
-// app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/plans', planRoutes); // Rota pública
+app.use('/api/subscriptions', authenticateToken, subscriptionRoutes); // Protegida
+app.use('/api/me', authenticateToken, userRoutes); // Protegida
+app.use('/api/admin', authenticateToken, adminRoutes); // Protegida (auth + admin)
+app.use('/api/dev', devRoutes); // Rotas de desenvolvimento (apenas em dev)
+app.use('/api/webhooks', webhookRoutes); // Webhooks (SEM autenticação JWT - usa HMAC)
 // app.use('/api/coupons', couponRoutes);
-// app.use('/api/webhooks', webhookRoutes);
 
 // Rota de teste
 app.get('/api/test', (req: Request, res: Response) => {
@@ -107,11 +117,22 @@ const startServer = async () => {
     await prisma.$connect();
     console.log('✅ Conectado ao banco de dados');
 
-    // Inicia o servidor
-    app.listen(PORT, () => {
+    // Define URL pública para produção
+    const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    // Inicia o servidor (0.0.0.0 para aceitar conexões externas na Render)
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
-      console.log(`🌍 Ambiente: ${process.env.NODE_ENV}`);
-      console.log(`📍 URL: http://localhost:${PORT}`);
+      console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📍 URL: ${PUBLIC_URL}`);
+
+      if (isProduction) {
+        console.log(`🔗 Webhook Kiwify: ${PUBLIC_URL}/api/webhooks/kiwify`);
+      }
+
+      // Inicia o scheduler de jobs automáticos
+      startScheduler();
     });
   } catch (error) {
     console.error('❌ Erro ao iniciar servidor:', error);

@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { prisma } from '../server';
+import { validateCpf, encryptCpf } from '../utils/crypto';
+import { startTrialForUser } from '../services/billingService';
+import { sendWelcomeEmail } from '../services/emailService';
 
 /**
  * Controller de Autenticação
@@ -14,12 +17,20 @@ export class AuthController {
    */
   static async register(req: Request, res: Response): Promise<void> {
     try {
-      const { email, password, name, phone } = req.body;
+      const { email, password, name, phone, cpf, telegramUsername } = req.body;
 
-      // TODO: Adicionar validações (joi, zod, etc)
+      // Validações básicas
       if (!email || !password || !name) {
-        res.status(400).json({ error: 'Campos obrigatórios faltando' });
+        res.status(400).json({ error: 'Campos obrigatórios faltando (email, password, name)' });
         return;
+      }
+
+      // Validar CPF se fornecido
+      if (cpf) {
+        if (!validateCpf(cpf)) {
+          res.status(400).json({ error: 'CPF inválido' });
+          return;
+        }
       }
 
       // Verifica se usuário já existe
@@ -35,26 +46,61 @@ export class AuthController {
       // Hash da senha
       const hashedPassword = await bcrypt.hash(password, 10);
 
+      // Criptografar CPF se fornecido
+      let cpfEncrypted: string | undefined;
+      let cpfLast4: string | undefined;
+
+      if (cpf) {
+        const encrypted = encryptCpf(cpf);
+        cpfEncrypted = encrypted.encrypted;
+        cpfLast4 = encrypted.last4;
+      }
+
       // Cria usuário
       const user = await prisma.user.create({
         data: {
           email,
-          password: hashedPassword,
+          passwordHash: hashedPassword,
           name,
-          phone
+          phone,
+          cpfEncrypted,
+          cpfLast4
         },
         select: {
           id: true,
           email: true,
           name: true,
           phone: true,
+          cpfLast4: true,
           role: true,
           createdAt: true
         }
       });
 
-      // TODO: Criar assinatura trial automática se configurado
-      // TODO: Enviar email de boas-vindas
+      // Enviar e-mail de boas-vindas (não bloqueia o registro se falhar)
+      sendWelcomeEmail(user.email, user.name).catch((err) => {
+        console.error('Erro ao enviar e-mail de boas-vindas:', err);
+      });
+
+      // Criar assinatura trial automática (plano FREE por padrão)
+      try {
+        await startTrialForUser(user.id, 'free');
+      } catch (trialError) {
+        console.error('Erro ao criar trial automático:', trialError);
+        // Continua mesmo se falhar o trial (usuário já foi criado)
+      }
+
+      // Se tiver telegramUsername, criar TelegramAccount (precisa de chatId, então só cria placeholder)
+      // A vinculação real acontece quando o usuário conecta no bot do Telegram
+      if (telegramUsername) {
+        try {
+          // Por enquanto não criamos TelegramAccount sem chatId
+          // O usuário precisará conectar no bot do Telegram para vincular
+          console.log(`Telegram username fornecido: ${telegramUsername}, aguardando vinculação com bot`);
+        } catch (telegramError) {
+          console.error('Erro ao processar Telegram:', telegramError);
+        }
+      }
 
       res.status(201).json({
         message: 'Usuário criado com sucesso',
@@ -99,15 +145,15 @@ export class AuthController {
       }
 
       // Verifica senha
-      const isPasswordValid = await bcrypt.compare(password, user.password);
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
       if (!isPasswordValid) {
         res.status(401).json({ error: 'Credenciais inválidas' });
         return;
       }
 
-      // Verifica se usuário está ativo
-      if (!user.isActive) {
-        res.status(403).json({ error: 'Usuário inativo. Entre em contato com o suporte' });
+      // Verifica se usuário está ativo e não bloqueado
+      if (!user.isActive || user.blocked) {
+        res.status(403).json({ error: 'Usuário bloqueado. Entre em contato com o suporte' });
         return;
       }
 
@@ -129,7 +175,7 @@ export class AuthController {
       );
 
       // Remove senha do objeto
-      const { password: _, ...userWithoutPassword } = user;
+      const { passwordHash: _, ...userWithoutPassword } = user;
 
       res.json({
         message: 'Login realizado com sucesso',
@@ -161,13 +207,13 @@ export class AuthController {
           email: true,
           name: true,
           phone: true,
-          telegramChatId: true,
           role: true,
           isActive: true,
+          blocked: true,
           createdAt: true,
           subscriptions: {
             where: {
-              status: 'ACTIVE'
+              status: { in: ['ACTIVE', 'TRIAL'] }
             },
             include: {
               plan: true

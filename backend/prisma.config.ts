@@ -13,5 +13,8 @@ export default defineConfig({
   datasource: {
     url: env('DATABASE_URL'),
   },
+  migrations: {
+    seed: 'ts-node-dev prisma/seed.ts',
+  },
   // engineType: 'library', // usando adapter Postgres no server.ts
 });

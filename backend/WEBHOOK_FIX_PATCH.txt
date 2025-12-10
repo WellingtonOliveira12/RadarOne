@@ -1,0 +1,174 @@
+===============================================================================
+PATCH: CORREÇÃO DO WEBHOOK KIWIFY PARA PRODUÇÃO NA RENDER
+===============================================================================
+
+Data: 09/12/2025
+Objetivo: Corrigir o backend para aceitar webhooks da Kiwify na Render
+
+===============================================================================
+ARQUIVO 1: backend/src/server.ts
+===============================================================================
+
+MUDANÇAS (Linha 114-142):
+---------
+
+ANTES:
+------
+const startServer = async () => {
+  try {
+    await prisma.dollar_sign_connect();
+    console.log('Conectado ao banco de dados');
+    
+    app.listen(PORT, () => {
+      console.log('Servidor rodando na porta PORT');
+      console.log('Ambiente: NODE_ENV');
+      console.log('URL: http://localhost:PORT');
+      
+      startScheduler();
+    });
+  } catch (error) {
+    console.error('Erro ao iniciar servidor:', error);
+    await prisma.dollar_sign_disconnect();
+    process.exit(1);
+  }
+};
+
+DEPOIS:
+-------
+const startServer = async () => {
+  try {
+    await prisma.dollar_sign_connect();
+    console.log('Conectado ao banco de dados');
+    
+    // Define URL pública para produção
+    const PUBLIC_URL = process.env.PUBLIC_URL || 'http://localhost:PORT';
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // Inicia o servidor (0.0.0.0 para aceitar conexões externas na Render)
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log('Servidor rodando na porta PORT');
+      console.log('Ambiente: NODE_ENV || development');
+      console.log('URL: PUBLIC_URL');
+      
+      if (isProduction) {
+        console.log('Webhook Kiwify: PUBLIC_URL/api/webhooks/kiwify');
+      }
+      
+      startScheduler();
+    });
+  } catch (error) {
+    console.error('Erro ao iniciar servidor:', error);
+    await prisma.dollar_sign_disconnect();
+    process.exit(1);
+  }
+};
+
+CORREÇÕES APLICADAS:
+--------------------
+1. app.listen agora usa '0.0.0.0' como host (aceita conexões externas)
+2. Variável PUBLIC_URL para exibir URL correta em produção
+3. Log do endpoint do webhook quando em produção
+
+===============================================================================
+ARQUIVO 2: backend/.env.example
+===============================================================================
+
+ADICIONADO (após linha 15):
+
+# URL pública do backend (usado em produção para webhooks)
+# Desenvolvimento: http://localhost:3000
+# Produção (Render): https://radarone.onrender.com
+PUBLIC_URL=http://localhost:3000
+
+===============================================================================
+ARQUIVO 3: backend/DEPLOY_RENDER.md (NOVO)
+===============================================================================
+
+Criado arquivo com instruções completas de deploy na Render.
+
+===============================================================================
+RESUMO DAS CORREÇÕES
+===============================================================================
+
+✓ Servidor agora ouve em 0.0.0.0 (aceita conexões externas da Render)
+✓ PUBLIC_URL configurável via variável de ambiente  
+✓ Log do webhook endpoint exibido em produção
+✓ Documentação de deploy criada (DEPLOY_RENDER.md)
+✓ .env.example atualizado com PUBLIC_URL
+
+===============================================================================
+VARIÁVEIS DE AMBIENTE OBRIGATÓRIAS NA RENDER
+===============================================================================
+
+CRÍTICAS:
+---------
+PUBLIC_URL=https://radarone.onrender.com
+KIWIFY_WEBHOOK_SECRET=seu-secret-da-kiwify
+DATABASE_URL=postgresql://...conexao-neon...
+
+IMPORTANTES:
+------------
+NODE_ENV=production
+PORT=3000
+JWT_SECRET=...
+RESEND_API_KEY=...
+TELEGRAM_BOT_TOKEN=...
+FRONTEND_URL=https://seu-frontend.vercel.app
+CPF_ENCRYPTION_KEY=...
+
+===============================================================================
+CONFIGURAÇÃO DO WEBHOOK NA KIWIFY
+===============================================================================
+
+Após o deploy, configure:
+
+1. URL: https://radarone.onrender.com/api/webhooks/kiwify
+2. Secret: [mesmo valor de KIWIFY_WEBHOOK_SECRET do .env]
+3. Eventos: Marcar todos
+   - Compra aprovada
+   - Assinatura renovada  
+   - Assinatura cancelada
+   - Assinatura atrasada
+   - Compra reembolsada
+   - Chargeback
+
+===============================================================================
+COMANDOS PARA FAZER O DEPLOY
+===============================================================================
+
+# 1. Fazer commit das alterações
+git add backend/src/server.ts
+git add backend/.env.example
+git add backend/DEPLOY_RENDER.md
+git commit -m "fix: Corrigir servidor para aceitar webhooks da Kiwify na Render
+
+- Servidor agora ouve em 0.0.0.0 (aceita conexões externas)
+- Adicionada variável PUBLIC_URL para produção
+- Log do endpoint do webhook em produção
+- Documentação de deploy criada"
+
+# 2. Fazer push para o repositório
+git push origin main
+
+# A Render irá detectar automaticamente e fazer o deploy
+
+===============================================================================
+VERIFICAÇÃO PÓS-DEPLOY
+===============================================================================
+
+1. Health Check:
+   curl https://radarone.onrender.com/health
+   
+2. Verificar Logs da Render:
+   - Procurar: "Servidor rodando na porta 3000"
+   - Procurar: "Webhook Kiwify: https://radarone.onrender.com/api/webhooks/kiwify"
+   - Confirmar que NÃO aparece "localhost"
+
+3. Testar Webhook:
+   - Fazer compra de teste na Kiwify
+   - Verificar logs da Render para confirmar recebimento
+   - Confirmar criação de subscription no banco
+
+===============================================================================
+FIM DO PATCH
+===============================================================================

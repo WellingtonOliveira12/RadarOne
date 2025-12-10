@@ -22,6 +22,16 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return data;
 }
 
-export async function register(name: string, email: string, password: string) {
-  return api.post('/api/auth/register', { name, email, password });
+export interface RegisterData {
+  name: string;
+  email: string;
+  cpf: string;
+  phone?: string;
+  password: string;
+  notificationPreference?: 'TELEGRAM' | 'EMAIL';
+  telegramUsername?: string;
+}
+
+export async function register(data: RegisterData) {
+  return api.post('/api/auth/register', data);
 }

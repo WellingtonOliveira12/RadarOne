@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { getToken } from '../services/tokenStorage';
+import { useAuth } from '../context/AuthContext';
 
 type MonitorSite =
   | 'MERCADO_LIVRE'
@@ -13,11 +15,26 @@ type MonitorSite =
   | 'IMOVELWEB'
   | 'OUTRO';
 
+type MonitorMode = 'URL_ONLY' | 'STRUCTURED_FILTERS';
+
+interface StructuredFilters {
+  keywords?: string;
+  city?: string;
+  state?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minYear?: number;
+  maxYear?: number;
+  category?: string;
+}
+
 interface Monitor {
   id: string;
   name: string;
   site: MonitorSite;
   searchUrl: string;
+  mode?: MonitorMode;
+  filtersJson?: StructuredFilters;
   active: boolean;
 }
 
@@ -44,6 +61,8 @@ function getSiteLabel(site: MonitorSite): string {
 }
 
 export function MonitorsPage() {
+  const { logout } = useAuth();
+
   // Lista
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loadingLista, setLoadingLista] = useState(false);
@@ -52,10 +71,23 @@ export function MonitorsPage() {
   // Formulário
   const [name, setName] = useState('');
   const [site, setSite] = useState<MonitorSite>('MERCADO_LIVRE');
+  const [mode, setMode] = useState<MonitorMode>('URL_ONLY');
   const [searchUrl, setSearchUrl] = useState('');
   const [active, setActive] = useState(true);
   const [idSelecionado, setIdSelecionado] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Filtros estruturados
+  const [filters, setFilters] = useState<StructuredFilters>({
+    keywords: '',
+    city: '',
+    state: '',
+    minPrice: undefined,
+    maxPrice: undefined,
+    minYear: undefined,
+    maxYear: undefined,
+    category: '',
+  });
 
   useEffect(() => {
     fetchMonitors();
@@ -75,7 +107,15 @@ export function MonitorsPage() {
       const data = await api.get<MonitorsResponse>('/api/monitors', token);
       setMonitors(data.data);
     } catch (err: any) {
-      setError(err.message || 'Erro ao buscar monitores');
+      // Tratar erro de limite excedido
+      if (err.response?.status === 403 || err.message?.includes('limite')) {
+        setError(
+          err.response?.data?.error ||
+            'Limite de monitores atingido. Faça upgrade do seu plano.'
+        );
+      } else {
+        setError(err.message || 'Erro ao buscar monitores');
+      }
     } finally {
       setLoadingLista(false);
     }
@@ -93,12 +133,23 @@ export function MonitorsPage() {
         return;
       }
 
-      const body = {
+      const body: any = {
         name,
         site,
-        searchUrl, // 👈 campo correto para o backend
+        mode,
         active,
       };
+
+      if (mode === 'URL_ONLY') {
+        body.searchUrl = searchUrl;
+      } else {
+        // STRUCTURED_FILTERS
+        body.filtersJson = filters;
+        // Pode incluir searchUrl como URL base (opcional)
+        if (searchUrl) {
+          body.searchUrl = searchUrl;
+        }
+      }
 
       if (idSelecionado) {
         await api.post(`/api/monitors/${idSelecionado}`, body, token);
@@ -109,13 +160,32 @@ export function MonitorsPage() {
       // reset
       setName('');
       setSite('MERCADO_LIVRE');
+      setMode('URL_ONLY');
       setSearchUrl('');
       setActive(true);
       setIdSelecionado(null);
+      setFilters({
+        keywords: '',
+        city: '',
+        state: '',
+        minPrice: undefined,
+        maxPrice: undefined,
+        minYear: undefined,
+        maxYear: undefined,
+        category: '',
+      });
 
       await fetchMonitors();
     } catch (err: any) {
-      setError(err.message || 'Erro ao salvar monitor');
+      // Tratar erro de limite excedido
+      if (err.response?.status === 403 || err.message?.includes('limite')) {
+        setError(
+          err.response?.data?.error ||
+            'Limite de monitores atingido. Faça upgrade do seu plano para adicionar mais.'
+        );
+      } else {
+        setError(err.message || 'Erro ao salvar monitor');
+      }
     } finally {
       setSaving(false);
     }
@@ -124,9 +194,26 @@ export function MonitorsPage() {
   function handleEdit(monitor: Monitor) {
     setName(monitor.name);
     setSite(monitor.site);
-    setSearchUrl(monitor.searchUrl);
+    setMode(monitor.mode || 'URL_ONLY');
+    setSearchUrl(monitor.searchUrl || '');
     setActive(monitor.active);
     setIdSelecionado(monitor.id);
+
+    if (monitor.mode === 'STRUCTURED_FILTERS' && monitor.filtersJson) {
+      setFilters(monitor.filtersJson);
+    } else {
+      setFilters({
+        keywords: '',
+        city: '',
+        state: '',
+        minPrice: undefined,
+        maxPrice: undefined,
+        minYear: undefined,
+        maxYear: undefined,
+        category: '',
+      });
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -152,192 +239,710 @@ export function MonitorsPage() {
   function handleCancelEdit() {
     setName('');
     setSite('MERCADO_LIVRE');
+    setMode('URL_ONLY');
     setSearchUrl('');
     setActive(true);
     setIdSelecionado(null);
+    setFilters({
+      keywords: '',
+      city: '',
+      state: '',
+      minPrice: undefined,
+      maxPrice: undefined,
+      minYear: undefined,
+      maxYear: undefined,
+      category: '',
+    });
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 900 }}>
-      <h1>Monitores</h1>
-
-      {error && <p style={{ color: 'red', marginBottom: 16 }}>{error}</p>}
-
-      {/* FORMULÁRIO */}
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          border: '1px solid #ccc',
-          padding: 16,
-          marginBottom: 24,
-          borderRadius: 4,
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>
-          {idSelecionado ? 'Editar Monitor' : 'Novo Monitor'}
-        </h2>
-
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>Nome</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            style={{ width: '100%', padding: 8 }}
-          />
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>Site</label>
-          <select
-            value={site}
-            onChange={(e) => setSite(e.target.value as MonitorSite)}
-            required
-            style={{ width: '100%', padding: 8 }}
-          >
-            {SITE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>URL de busca</label>
-          <input
-            type="url"
-            value={searchUrl}
-            onChange={(e) => setSearchUrl(e.target.value)}
-            required
-            style={{ width: '100%', padding: 8 }}
-          />
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={active}
-              onChange={(e) => setActive(e.target.checked)}
-            />
-            Ativo
-          </label>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="submit" disabled={saving} style={{ padding: '8px 16px' }}>
-            {saving ? 'Salvando...' : idSelecionado ? 'Atualizar' : 'Salvar monitor'}
-          </button>
-
-          {idSelecionado && (
-            <button
-              type="button"
-              onClick={handleCancelEdit}
-              style={{ padding: '8px 16px' }}
-            >
-              Cancelar
+    <div style={styles.container}>
+      {/* Header */}
+      <header style={styles.header}>
+        <div style={styles.headerContent}>
+          <h1 style={styles.logo}>RadarOne</h1>
+          <nav style={styles.nav}>
+            <Link to="/dashboard" style={styles.navLink}>
+              Dashboard
+            </Link>
+            <Link to="/monitors" style={styles.navLink}>
+              Monitores
+            </Link>
+            <button onClick={logout} style={styles.logoutButton}>
+              Sair
             </button>
-          )}
+          </nav>
         </div>
-      </form>
+      </header>
 
-      {/* LISTA */}
-      <h2>Lista de Monitores</h2>
+      <div style={styles.content}>
+        <div style={styles.breadcrumb}>
+          <Link to="/dashboard" style={styles.breadcrumbLink}>
+            Dashboard
+          </Link>
+          <span style={styles.breadcrumbSeparator}>/</span>
+          <span style={styles.breadcrumbCurrent}>Monitores</span>
+        </div>
 
-      {loadingLista && <p>Carregando monitores...</p>}
+        <h1 style={styles.title}>Monitores</h1>
+        <p style={styles.subtitle}>
+          Configure monitores para receber alertas de novos anúncios
+        </p>
 
-      {!loadingLista && !error && monitors.length === 0 && (
-        <p>Nenhum monitor cadastrado ainda.</p>
-      )}
+        {error && (
+          <div style={styles.error}>
+            {error}
+            {error.includes('limite') && (
+              <div style={styles.upgradeLink}>
+                <Link to="/plans" style={styles.link}>
+                  Ver planos
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
-      {!loadingLista && monitors.length > 0 && (
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            border: '1px solid #ccc',
-          }}
-        >
-          <thead>
-            <tr style={{ backgroundColor: '#f5f5f5' }}>
-              <th style={{ padding: 8, border: '1px solid #ccc', textAlign: 'left' }}>
-                Nome
-              </th>
-              <th style={{ padding: 8, border: '1px solid #ccc', textAlign: 'left' }}>
-                Site
-              </th>
-              <th style={{ padding: 8, border: '1px solid #ccc', textAlign: 'left' }}>
-                URL
-              </th>
-              <th style={{ padding: 8, border: '1px solid #ccc', textAlign: 'center' }}>
-                Status
-              </th>
-              <th style={{ padding: 8, border: '1px solid #ccc', textAlign: 'center' }}>
-                Ações
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {monitors.map((monitor) => (
-              <tr key={monitor.id}>
-                <td style={{ padding: 8, border: '1px solid #ccc' }}>{monitor.name}</td>
-                <td style={{ padding: 8, border: '1px solid #ccc' }}>
-                  {getSiteLabel(monitor.site)}
-                </td>
-                <td
-                  style={{
-                    padding: 8,
-                    border: '1px solid #ccc',
-                    maxWidth: 300,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  <a
-                    href={monitor.searchUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {monitor.searchUrl}
-                  </a>
-                </td>
-                <td
-                  style={{
-                    padding: 8,
-                    border: '1px solid #ccc',
-                    textAlign: 'center',
-                  }}
-                >
-                  {monitor.active ? '✅ Ativo' : '❌ Inativo'}
-                </td>
-                <td
-                  style={{
-                    padding: 8,
-                    border: '1px solid #ccc',
-                    textAlign: 'center',
-                  }}
-                >
-                  <button
-                    onClick={() => handleEdit(monitor)}
-                    style={{ marginRight: 8, padding: '4px 8px' }}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(monitor.id)}
-                    style={{ padding: '4px 8px', color: 'red' }}
-                  >
-                    Excluir
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+        {/* FORMULÁRIO */}
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <h2 style={styles.formTitle}>
+            {idSelecionado ? 'Editar Monitor' : 'Novo Monitor'}
+          </h2>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Nome do monitor</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              style={styles.input}
+              placeholder="Ex: iPhone 13 Pro usado"
+            />
+          </div>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Site</label>
+            <select
+              value={site}
+              onChange={(e) => setSite(e.target.value as MonitorSite)}
+              required
+              style={styles.input}
+            >
+              {SITE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Modo de monitoramento</label>
+            <div style={styles.radioGroup}>
+              <label style={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="mode"
+                  checked={mode === 'URL_ONLY'}
+                  onChange={() => setMode('URL_ONLY')}
+                  style={styles.radio}
+                />
+                <span>
+                  <strong>URL específica</strong> - Monitorar uma URL de busca exata
+                </span>
+              </label>
+              <label style={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="mode"
+                  checked={mode === 'STRUCTURED_FILTERS'}
+                  onChange={() => setMode('STRUCTURED_FILTERS')}
+                  style={styles.radio}
+                />
+                <span>
+                  <strong>Filtros personalizados</strong> - Usar filtros como
+                  palavra-chave, cidade, preço, etc.
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {mode === 'URL_ONLY' && (
+            <div style={styles.field}>
+              <label style={styles.label}>URL de busca</label>
+              <input
+                type="url"
+                value={searchUrl}
+                onChange={(e) => setSearchUrl(e.target.value)}
+                required
+                style={styles.input}
+                placeholder="https://www.olx.com.br/..."
+              />
+              <p style={styles.helpText}>
+                Cole aqui a URL completa da busca que você quer monitorar.
+              </p>
+            </div>
+          )}
+
+          {mode === 'STRUCTURED_FILTERS' && (
+            <div style={styles.filtersBox}>
+              <h3 style={styles.filtersTitle}>Filtros personalizados</h3>
+
+              <div style={styles.filtersGrid}>
+                <div style={styles.field}>
+                  <label style={styles.labelSmall}>Palavras-chave</label>
+                  <input
+                    type="text"
+                    value={filters.keywords || ''}
+                    onChange={(e) =>
+                      setFilters({ ...filters, keywords: e.target.value })
+                    }
+                    style={styles.input}
+                    placeholder="iPhone 13 Pro"
+                  />
+                </div>
+
+                <div style={styles.field}>
+                  <label style={styles.labelSmall}>Cidade</label>
+                  <input
+                    type="text"
+                    value={filters.city || ''}
+                    onChange={(e) => setFilters({ ...filters, city: e.target.value })}
+                    style={styles.input}
+                    placeholder="São Paulo"
+                  />
+                </div>
+
+                <div style={styles.field}>
+                  <label style={styles.labelSmall}>Estado</label>
+                  <input
+                    type="text"
+                    value={filters.state || ''}
+                    onChange={(e) => setFilters({ ...filters, state: e.target.value })}
+                    style={styles.input}
+                    placeholder="SP"
+                  />
+                </div>
+
+                <div style={styles.field}>
+                  <label style={styles.labelSmall}>Categoria</label>
+                  <input
+                    type="text"
+                    value={filters.category || ''}
+                    onChange={(e) =>
+                      setFilters({ ...filters, category: e.target.value })
+                    }
+                    style={styles.input}
+                    placeholder="Eletrônicos"
+                  />
+                </div>
+
+                <div style={styles.field}>
+                  <label style={styles.labelSmall}>Preço mínimo (R$)</label>
+                  <input
+                    type="number"
+                    value={filters.minPrice || ''}
+                    onChange={(e) =>
+                      setFilters({
+                        ...filters,
+                        minPrice: e.target.value ? Number(e.target.value) : undefined,
+                      })
+                    }
+                    style={styles.input}
+                    placeholder="1000"
+                  />
+                </div>
+
+                <div style={styles.field}>
+                  <label style={styles.labelSmall}>Preço máximo (R$)</label>
+                  <input
+                    type="number"
+                    value={filters.maxPrice || ''}
+                    onChange={(e) =>
+                      setFilters({
+                        ...filters,
+                        maxPrice: e.target.value ? Number(e.target.value) : undefined,
+                      })
+                    }
+                    style={styles.input}
+                    placeholder="5000"
+                  />
+                </div>
+
+                <div style={styles.field}>
+                  <label style={styles.labelSmall}>Ano mínimo</label>
+                  <input
+                    type="number"
+                    value={filters.minYear || ''}
+                    onChange={(e) =>
+                      setFilters({
+                        ...filters,
+                        minYear: e.target.value ? Number(e.target.value) : undefined,
+                      })
+                    }
+                    style={styles.input}
+                    placeholder="2020"
+                  />
+                </div>
+
+                <div style={styles.field}>
+                  <label style={styles.labelSmall}>Ano máximo</label>
+                  <input
+                    type="number"
+                    value={filters.maxYear || ''}
+                    onChange={(e) =>
+                      setFilters({
+                        ...filters,
+                        maxYear: e.target.value ? Number(e.target.value) : undefined,
+                      })
+                    }
+                    style={styles.input}
+                    placeholder="2024"
+                  />
+                </div>
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.labelSmall}>URL base (opcional)</label>
+                <input
+                  type="url"
+                  value={searchUrl}
+                  onChange={(e) => setSearchUrl(e.target.value)}
+                  style={styles.input}
+                  placeholder="https://www.olx.com.br/"
+                />
+                <p style={styles.helpText}>
+                  Opcional: URL base do site para facilitar a busca
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div style={styles.field}>
+            <label style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={(e) => setActive(e.target.checked)}
+              />
+              <span>Monitor ativo</span>
+            </label>
+          </div>
+
+          <div style={styles.buttons}>
+            <button type="submit" disabled={saving} style={styles.saveButton}>
+              {saving ? 'Salvando...' : idSelecionado ? 'Atualizar' : 'Criar monitor'}
+            </button>
+
+            {idSelecionado && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                style={styles.cancelButton}
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        </form>
+
+        {/* LISTA */}
+        <h2 style={styles.sectionTitle}>Seus Monitores</h2>
+
+        {loadingLista && <p style={styles.loading}>Carregando monitores...</p>}
+
+        {!loadingLista && !error && monitors.length === 0 && (
+          <div style={styles.emptyState}>
+            <p>Nenhum monitor cadastrado ainda.</p>
+            <p>Crie seu primeiro monitor acima para começar!</p>
+          </div>
+        )}
+
+        {!loadingLista && monitors.length > 0 && (
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Nome</th>
+                  <th style={styles.th}>Site</th>
+                  <th style={styles.th}>Modo</th>
+                  <th style={styles.th}>URL</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monitors.map((monitor) => (
+                  <tr key={monitor.id} style={styles.tr}>
+                    <td style={styles.td}>{monitor.name}</td>
+                    <td style={styles.td}>{getSiteLabel(monitor.site)}</td>
+                    <td style={styles.td}>
+                      {monitor.mode === 'STRUCTURED_FILTERS' ? (
+                        <span style={styles.badgeFilters}>Filtros</span>
+                      ) : (
+                        <span style={styles.badgeUrl}>URL</span>
+                      )}
+                    </td>
+                    <td style={styles.tdUrl}>
+                      {monitor.searchUrl ? (
+                        <a
+                          href={monitor.searchUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={styles.link}
+                        >
+                          {monitor.searchUrl}
+                        </a>
+                      ) : (
+                        <span style={styles.noUrl}>-</span>
+                      )}
+                    </td>
+                    <td style={styles.tdCenter}>
+                      {monitor.active ? (
+                        <span style={styles.badgeActive}>✅ Ativo</span>
+                      ) : (
+                        <span style={styles.badgeInactive}>❌ Inativo</span>
+                      )}
+                    </td>
+                    <td style={styles.tdCenter}>
+                      <button onClick={() => handleEdit(monitor)} style={styles.editBtn}>
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDelete(monitor.id)}
+                        style={styles.deleteBtn}
+                      >
+                        Excluir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+const styles = {
+  container: {
+    minHeight: '100vh',
+    backgroundColor: '#f9fafb',
+  },
+  header: {
+    backgroundColor: 'white',
+    borderBottom: '1px solid #e5e7eb',
+    padding: '16px 0',
+  },
+  headerContent: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '0 20px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  logo: {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+    margin: 0,
+  },
+  nav: {
+    display: 'flex',
+    gap: '16px',
+    alignItems: 'center',
+  },
+  navLink: {
+    color: '#4b5563',
+    textDecoration: 'none',
+    fontSize: '14px',
+    fontWeight: '500' as const,
+  },
+  logoutButton: {
+    backgroundColor: '#ef4444',
+    color: 'white',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500' as const,
+    cursor: 'pointer',
+  },
+  content: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '40px 20px',
+  },
+  breadcrumb: {
+    marginBottom: '24px',
+    fontSize: '14px',
+  },
+  breadcrumbLink: {
+    color: '#3b82f6',
+    textDecoration: 'none',
+  },
+  breadcrumbSeparator: {
+    margin: '0 8px',
+    color: '#9ca3af',
+  },
+  breadcrumbCurrent: {
+    color: '#6b7280',
+  },
+  title: {
+    fontSize: '32px',
+    fontWeight: 'bold' as const,
+    color: '#1f2937',
+    marginBottom: '8px',
+  },
+  subtitle: {
+    fontSize: '16px',
+    color: '#6b7280',
+    marginBottom: '32px',
+  },
+  error: {
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    marginBottom: '16px',
+  },
+  upgradeLink: {
+    marginTop: '8px',
+  },
+  link: {
+    color: '#3b82f6',
+    textDecoration: 'underline',
+    fontWeight: '600' as const,
+  },
+  form: {
+    backgroundColor: 'white',
+    padding: '32px',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    marginBottom: '32px',
+  },
+  formTitle: {
+    fontSize: '20px',
+    fontWeight: '600' as const,
+    color: '#1f2937',
+    marginTop: 0,
+    marginBottom: '24px',
+  },
+  field: {
+    marginBottom: '20px',
+  },
+  label: {
+    fontSize: '14px',
+    fontWeight: '500' as const,
+    color: '#374151',
+    display: 'block',
+    marginBottom: '6px',
+  },
+  labelSmall: {
+    fontSize: '13px',
+    fontWeight: '500' as const,
+    color: '#374151',
+    display: 'block',
+    marginBottom: '6px',
+  },
+  input: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '14px',
+    boxSizing: 'border-box' as const,
+  },
+  helpText: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '4px',
+    marginBottom: 0,
+  },
+  radioGroup: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '12px',
+  },
+  radioLabel: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '8px',
+    fontSize: '14px',
+    cursor: 'pointer',
+  },
+  radio: {
+    marginTop: '3px',
+    cursor: 'pointer',
+  },
+  filtersBox: {
+    backgroundColor: '#f9fafb',
+    padding: '20px',
+    borderRadius: '8px',
+    border: '1px solid #e5e7eb',
+    marginBottom: '20px',
+  },
+  filtersTitle: {
+    fontSize: '16px',
+    fontWeight: '600' as const,
+    color: '#1f2937',
+    marginTop: 0,
+    marginBottom: '16px',
+  },
+  filtersGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '16px',
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '14px',
+    cursor: 'pointer',
+  },
+  buttons: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '24px',
+  },
+  saveButton: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    border: 'none',
+    padding: '12px 24px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600' as const,
+    cursor: 'pointer',
+  },
+  cancelButton: {
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    border: 'none',
+    padding: '12px 24px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600' as const,
+    cursor: 'pointer',
+  },
+  sectionTitle: {
+    fontSize: '24px',
+    fontWeight: 'bold' as const,
+    color: '#1f2937',
+    marginBottom: '20px',
+  },
+  loading: {
+    textAlign: 'center' as const,
+    color: '#6b7280',
+  },
+  emptyState: {
+    textAlign: 'center' as const,
+    padding: '40px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    color: '#6b7280',
+  },
+  tableWrapper: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    overflow: 'hidden',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse' as const,
+  },
+  th: {
+    padding: '12px 16px',
+    textAlign: 'left' as const,
+    backgroundColor: '#f9fafb',
+    borderBottom: '2px solid #e5e7eb',
+    fontSize: '13px',
+    fontWeight: '600' as const,
+    color: '#374151',
+  },
+  tr: {
+    borderBottom: '1px solid #e5e7eb',
+  },
+  td: {
+    padding: '12px 16px',
+    fontSize: '14px',
+    color: '#1f2937',
+  },
+  tdUrl: {
+    padding: '12px 16px',
+    fontSize: '14px',
+    color: '#1f2937',
+    maxWidth: '300px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  tdCenter: {
+    padding: '12px 16px',
+    fontSize: '14px',
+    color: '#1f2937',
+    textAlign: 'center' as const,
+  },
+  badgeFilters: {
+    backgroundColor: '#dbeafe',
+    color: '#1e40af',
+    padding: '3px 10px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600' as const,
+  },
+  badgeUrl: {
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    padding: '3px 10px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600' as const,
+  },
+  badgeActive: {
+    backgroundColor: '#d1fae5',
+    color: '#065f46',
+    padding: '3px 10px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600' as const,
+  },
+  badgeInactive: {
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    padding: '3px 10px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600' as const,
+  },
+  noUrl: {
+    color: '#9ca3af',
+    fontSize: '13px',
+  },
+  editBtn: {
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    fontSize: '13px',
+    fontWeight: '500' as const,
+    cursor: 'pointer',
+    marginRight: '8px',
+  },
+  deleteBtn: {
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    fontSize: '13px',
+    fontWeight: '500' as const,
+    cursor: 'pointer',
+  },
+};

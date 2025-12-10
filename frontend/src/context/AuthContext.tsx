@@ -25,7 +25,10 @@ interface AuthContextData {
     email: string;
     password: string;
     name: string;
+    cpf: string;
     phone?: string;
+    notificationPreference?: 'TELEGRAM' | 'EMAIL';
+    telegramUsername?: string;
   }) => Promise<void>;
 }
 
@@ -73,9 +76,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     email: string;
     password: string;
     name: string;
+    cpf: string;
     phone?: string;
+    notificationPreference?: 'TELEGRAM' | 'EMAIL';
+    telegramUsername?: string;
   }) => {
-    await authRegister(data.name, data.email, data.password);
+    await authRegister(data);
     // Após registrar, fazer login automaticamente
     await login(data.email, data.password);
   };

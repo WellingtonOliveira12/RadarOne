@@ -1,24 +1,69 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import { HealthCheckPage } from './pages/HealthCheckPage';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+
+// Páginas públicas
+import { LandingPage } from './pages/LandingPage';
+import { PlansPage } from './pages/PlansPage';
 import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+
+// Páginas protegidas
+import { DashboardPage } from './pages/DashboardPage';
 import { MonitorsPage } from './pages/MonitorsPage';
+import { NotificationSettingsPage } from './pages/NotificationSettingsPage';
+import { SubscriptionSettingsPage } from './pages/SubscriptionSettingsPage';
+
+// Páginas de teste/debug
+import { HealthCheckPage } from './pages/HealthCheckPage';
 
 export function AppRouter() {
   return (
     <BrowserRouter>
-      <div style={{ padding: 16 }}>
-        <nav style={{ marginBottom: 16 }}>
-          <Link to="/" style={{ marginRight: 8 }}>Health</Link>
-          <Link to="/login" style={{ marginRight: 8 }}>Login</Link>
-          <Link to="/monitors">Monitores</Link>
-        </nav>
-
+      <AuthProvider>
         <Routes>
-          <Route path="/" element={<HealthCheckPage />} />
+          {/* Rotas públicas */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/plans" element={<PlansPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/monitors" element={<MonitorsPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/health" element={<HealthCheckPage />} />
+
+          {/* Rotas protegidas */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/monitors"
+            element={
+              <ProtectedRoute>
+                <MonitorsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings/subscription"
+            element={
+              <ProtectedRoute>
+                <SubscriptionSettingsPage />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-      </div>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

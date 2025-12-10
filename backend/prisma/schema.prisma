@@ -1,4 +1,5 @@
-// Schema do RadarOne - Sistema de Monitoramento de Anúncios
+// Schema do RadarOne - Sistema SaaS de Monitoramento de Anúncios
+// Pronto para comercialização
 
 generator client {
   provider = "prisma-client-js"
@@ -13,21 +14,28 @@ datasource db {
 // ============================================
 
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  password      String
-  name          String
-  phone         String?
-  telegramChatId String?      @map("telegram_chat_id")
-  role          UserRole       @default(USER)
-  isActive      Boolean        @default(true) @map("is_active")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  id              String              @id @default(cuid())
+  name            String
+  email           String              @unique
+  phone           String?
+  passwordHash    String              @map("password_hash")
+
+  // LGPD e Segurança
+  cpfEncrypted    String?             @map("cpf_encrypted") // CPF criptografado (AES-256-GCM)
+  cpfLast4        String?             @map("cpf_last4")     // Últimos 4 dígitos para conferência
+  blocked         Boolean             @default(false)       // Se true, usuário não pode acessar
+
+  // Controle
+  role            UserRole            @default(USER)
+  isActive        Boolean             @default(true) @map("is_active")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
 
   // Relações
-  subscriptions Subscription[]
-  monitors      Monitor[]
-  usageLogs     UsageLog[]
+  subscriptions   Subscription[]
+  monitors        Monitor[]
+  usageLogs       UsageLog[]
+  telegramAccounts TelegramAccount[]
 
   @@map("users")
 }
@@ -38,22 +46,56 @@ enum UserRole {
 }
 
 // ============================================
-// PLANOS E ASSINATURAS
+// TELEGRAM
+// ============================================
+
+model TelegramAccount {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  chatId    String   @unique @map("chat_id") // chat_id numérico do Telegram
+  username  String?                           // @username opcional
+  active    Boolean  @default(true)
+  linkedAt  DateTime @default(now()) @map("linked_at")
+
+  // Relações
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("telegram_accounts")
+}
+
+// ============================================
+// PLANOS E ASSINATURAS (SaaS)
 // ============================================
 
 model Plan {
-  id                String         @id @default(uuid())
-  name              String         @unique // Starter, Standard, Pro, Master, Ultra, Vitalicio
-  slug              String         @unique // starter, standard, pro, master, ultra, lifetime
+  id                String         @id @default(cuid())
+  name              String         @unique // FREE, STARTER, PRO, PREMIUM, ULTRA
+  slug              String         @unique // free, starter, pro, premium, ultra
   description       String?
-  price             Float          // Preço em reais
-  monthlyQueries    Int            @map("monthly_queries") // Quantidade de consultas por mês
-  maxMonitors       Int?           @map("max_monitors") // Quantidade máxima de monitores ativos (null = ilimitado)
-  multiSite         Boolean        @default(false) @map("multi_site") // Se permite monitores em múltiplos sites
+
+  // Preços e Períodos
+  priceCents        Int            @map("price_cents")      // Preço em centavos (ex: 2900 = R$29,00)
+  billingPeriod     String         @map("billing_period")   // MONTHLY, YEARLY, SEMIANNUAL
+  trialDays         Int            @default(7) @map("trial_days") // Duração do teste grátis
+
+  // Limites do Plano
+  maxMonitors       Int            @map("max_monitors")         // Quantidade máxima de monitores ativos
+  maxSites          Int            @map("max_sites")            // Quantidade de sites diferentes permitidos
+  maxAlertsPerDay   Int            @map("max_alerts_per_day")   // Máximo de alertas por dia
   checkInterval     Int            @default(60) @map("check_interval") // Intervalo de verificação em minutos
+
+  // Marketing e Ordem
+  isRecommended     Boolean        @default(false) @map("is_recommended") // Destacar em upsell
+  priority          Int            @default(0)                            // Ordenação em listagens (maior = mais importante)
+
+  // Controle
   isActive          Boolean        @default(true) @map("is_active")
-  isLifetime        Boolean        @default(false) @map("is_lifetime") // Plano vitalício
-  kiwifyProductId   String?        @map("kiwify_product_id") // ID do produto na Kiwify
+  isLifetime        Boolean        @default(false) @map("is_lifetime")
+
+  // Integração Kiwify (futura)
+  kiwifyProductId   String?        @map("kiwify_product_id")
+
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
@@ -65,19 +107,27 @@ model Plan {
 }
 
 model Subscription {
-  id                String             @id @default(uuid())
+  id                String             @id @default(cuid())
   userId            String             @map("user_id")
   planId            String             @map("plan_id")
-  status            SubscriptionStatus @default(ACTIVE)
+
+  // Status e Períodos
+  status            SubscriptionStatus @default(TRIAL)
   startDate         DateTime           @default(now()) @map("start_date")
-  endDate           DateTime?          @map("end_date")
-  queriesUsed       Int                @default(0) @map("queries_used") // Consultas usadas no período
-  queriesLimit      Int                @map("queries_limit") // Limite de consultas
+  validUntil        DateTime?          @map("valid_until")      // Fim do período pago ou trial
+  trialEndsAt       DateTime?          @map("trial_ends_at")    // Se estiver em período de teste
+
+  // Uso
+  queriesUsed       Int                @default(0) @map("queries_used")
+  queriesLimit      Int                @map("queries_limit")
+
+  // Flags
   isLifetime        Boolean            @default(false) @map("is_lifetime")
   isTrial           Boolean            @default(false) @map("is_trial")
-  trialEndsAt       DateTime?          @map("trial_ends_at")
 
-  // Integração Kiwify
+  // Integração com Provedor de Pagamento
+  externalProvider  String?            @map("external_provider")   // STRIPE, KIWIFY, ASAAS
+  externalSubId     String?            @map("external_sub_id")     // ID da assinatura no provedor
   kiwifyOrderId     String?            @unique @map("kiwify_order_id")
   kiwifyCustomerId  String?            @map("kiwify_customer_id")
 
@@ -90,15 +140,17 @@ model Subscription {
 
   @@index([userId])
   @@index([status])
+  @@index([validUntil])
   @@map("subscriptions")
 }
 
 enum SubscriptionStatus {
-  ACTIVE
-  SUSPENDED
-  CANCELLED
-  EXPIRED
-  TRIAL
+  TRIAL        // Período de teste
+  ACTIVE       // Ativa e paga
+  PAST_DUE     // Pagamento atrasado
+  CANCELLED    // Cancelada pelo usuário
+  EXPIRED      // Expirada por falta de pagamento
+  SUSPENDED    // Suspensa por violação
 }
 
 // ============================================
@@ -106,35 +158,34 @@ enum SubscriptionStatus {
 // ============================================
 
 model Coupon {
-  id              String        @id @default(uuid())
+  id              String        @id @default(cuid())
   code            String        @unique
-  type            CouponType
-  discount        Float?        // Desconto em % ou valor fixo
-  planId          String?       @map("plan_id") // Se for cupom de plano específico (ex: vitalício)
-  maxUses         Int?          @map("max_uses") // Máximo de usos (null = ilimitado)
-  currentUses     Int           @default(0) @map("current_uses")
-  expiresAt       DateTime?     @map("expires_at")
-  isActive        Boolean       @default(true) @map("is_active")
   description     String?
+
+  // Tipo e Valor do Desconto
+  discountType    String        @map("discount_type")  // PERCENT, FIXED
+  discountValue   Int           @map("discount_value") // Porcentagem (0-100) ou valor em centavos
+
+  // Restrições
+  appliesToPlanId String?       @map("applies_to_plan_id") // Se null, vale para qualquer plano
+  maxUses         Int?          @map("max_uses")           // Máximo de usos (null = ilimitado)
+  usedCount       Int           @default(0) @map("used_count")
+  expiresAt       DateTime?     @map("expires_at")
+
+  // Controle
+  isActive        Boolean       @default(true) @map("is_active")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
   // Relações
-  plan            Plan?         @relation(fields: [planId], references: [id])
+  plan            Plan?         @relation(fields: [appliesToPlanId], references: [id])
   usageLogs       CouponUsage[]
 
   @@map("coupons")
 }
 
-enum CouponType {
-  PERCENTAGE     // Desconto percentual
-  FIXED_AMOUNT   // Desconto fixo
-  FREE_TRIAL     // Teste grátis
-  LIFETIME       // Acesso vitalício
-}
-
 model CouponUsage {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   couponId  String   @map("coupon_id")
   userId    String   @map("user_id")
   usedAt    DateTime @default(now()) @map("used_at")
@@ -151,9 +202,6 @@ model CouponUsage {
 // MONITORES
 // ============================================
 
-// Enum de sites de monitores (CRUD API)
-// Scrapers implementados: MERCADO_LIVRE, OLX, FACEBOOK_MARKETPLACE
-// Scrapers pendentes: WEBMOTORS, ICARROS, ZAP_IMOVEIS, VIVA_REAL, IMOVELWEB, OUTRO
 enum MonitorSite {
   MERCADO_LIVRE
   OLX
@@ -166,22 +214,35 @@ enum MonitorSite {
   OUTRO           // Outros sites
 }
 
+enum MonitorMode {
+  URL_ONLY            // Apenas URL simples
+  STRUCTURED_FILTERS  // Filtros estruturados (leilões, imóveis)
+}
+
 model Monitor {
   id              String        @id @default(cuid())
   userId          String        @map("user_id")
-  name            String        // Nome do monitor (ex: "Apartamentos SP Centro")
-  site            MonitorSite   // Site a monitorar (enum simplificado)
-  searchUrl       String        @map("search_url") // URL de busca configurada
-  priceMin        Float?        @map("price_min") // Preço mínimo
-  priceMax        Float?        @map("price_max") // Preço máximo
-  active          Boolean       @default(true)    // Se o monitor está ativo
+  name            String
+  site            MonitorSite
 
-  // Campos adicionais (mantidos para compatibilidade com worker)
-  filters         Json?         // Filtros específicos (JSON)
-  keywords        String[]      @default([]) // Palavras-chave para buscar
-  excludeKeywords String[]      @default([]) @map("exclude_keywords") // Palavras para excluir
-  checkInterval   Int           @default(60) @map("check_interval") // Minutos entre verificações
+  // Modos de Busca
+  mode            MonitorMode   @default(URL_ONLY)
+  searchUrl       String?       @map("search_url")  // Obrigatório se mode = URL_ONLY
+  filtersJson     Json?         @map("filters_json") // Obrigatório se mode = STRUCTURED_FILTERS
+
+  // Filtros de Preço (comuns a todos)
+  priceMin        Float?        @map("price_min")
+  priceMax        Float?        @map("price_max")
+
+  // Campos adicionais (compatibilidade com worker)
+  keywords        String[]      @default([])
+  excludeKeywords String[]      @default([]) @map("exclude_keywords")
+  checkInterval   Int           @default(60) @map("check_interval")
+
+  // Controle de Estado
+  active          Boolean       @default(true)
   lastCheckedAt   DateTime?     @map("last_checked_at")
+  lastResultHash  String?       @map("last_result_hash") // Hash para detectar mudanças
   lastAlertAt     DateTime?     @map("last_alert_at")
   alertsEnabled   Boolean       @default(true) @map("alerts_enabled")
 
@@ -195,6 +256,7 @@ model Monitor {
 
   @@index([userId])
   @@index([active])
+  @@index([site])
   @@map("monitors")
 }
 
@@ -203,9 +265,9 @@ model Monitor {
 // ============================================
 
 model AdSeen {
-  id          String    @id @default(uuid())
+  id          String    @id @default(cuid())
   monitorId   String    @map("monitor_id")
-  externalId  String    @map("external_id") // ID do anúncio no site externo
+  externalId  String    @map("external_id")
   title       String
   description String?
   price       Float?
@@ -215,9 +277,9 @@ model AdSeen {
   publishedAt DateTime? @map("published_at")
   firstSeenAt DateTime  @default(now()) @map("first_seen_at")
   lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
-  alertSent   Boolean   @default(false) @map("alert_sent") // Se já foi enviado alerta
+  alertSent   Boolean   @default(false) @map("alert_sent")
   alertSentAt DateTime? @map("alert_sent_at")
-  metadata    Json?     // Outros dados específicos do site
+  metadata    Json?
 
   // Relações
   monitor     Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
@@ -232,14 +294,14 @@ model AdSeen {
 // ============================================
 
 model MonitorLog {
-  id            String      @id @default(uuid())
+  id            String      @id @default(cuid())
   monitorId     String      @map("monitor_id")
   status        LogStatus
-  adsFound      Int         @default(0) @map("ads_found") // Anúncios encontrados
-  newAds        Int         @default(0) @map("new_ads") // Anúncios novos
-  alertsSent    Int         @default(0) @map("alerts_sent") // Alertas enviados
-  error         String?     // Mensagem de erro, se houver
-  executionTime Int?        @map("execution_time") // Tempo de execução em ms
+  adsFound      Int         @default(0) @map("ads_found")
+  newAds        Int         @default(0) @map("new_ads")
+  alertsSent    Int         @default(0) @map("alerts_sent")
+  error         String?
+  executionTime Int?        @map("execution_time")
   createdAt     DateTime    @default(now()) @map("created_at")
 
   // Relações
@@ -253,7 +315,7 @@ model MonitorLog {
 enum LogStatus {
   SUCCESS
   ERROR
-  PARTIAL // Sucesso parcial
+  PARTIAL
 }
 
 // ============================================
@@ -261,11 +323,11 @@ enum LogStatus {
 // ============================================
 
 model UsageLog {
-  id          String    @id @default(uuid())
+  id          String    @id @default(cuid())
   userId      String    @map("user_id")
-  action      String    // Tipo de ação: "monitor_check", "alert_sent", etc
-  details     Json?     // Detalhes adicionais
-  queriesUsed Int       @default(1) @map("queries_used") // Consultas consumidas
+  action      String
+  details     Json?
+  queriesUsed Int       @default(1) @map("queries_used")
   createdAt   DateTime  @default(now()) @map("created_at")
 
   // Relações
@@ -281,9 +343,9 @@ model UsageLog {
 // ============================================
 
 model WebhookLog {
-  id          String    @id @default(uuid())
-  event       String    // Tipo de evento Kiwify
-  payload     Json      // Payload completo do webhook
+  id          String    @id @default(cuid())
+  event       String
+  payload     Json
   processed   Boolean   @default(false)
   error       String?
   createdAt   DateTime  @default(now()) @map("created_at")
