@@ -6,7 +6,7 @@ Configure estas variáveis no painel da Render (Settings → Environment):
 
 ```bash
 # Database (Neon ou outro PostgreSQL)
-DATABASE_URL=postgresql://neondb_owner:********@ep-xxx.sa-east-1.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=postgresql://neondb_owner:********@ep-xxx.sa-east-1.aws.neon.tech/radarone_prod?sslmode=require
 
 # Server
 NODE_ENV=production
