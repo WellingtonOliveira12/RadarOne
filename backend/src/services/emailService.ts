@@ -405,3 +405,221 @@ Equipe ${EMAIL_FROM_NAME}
 
   return sendEmail({ to: userEmail, subject, text, html });
 }
+
+/**
+ * E-mail: link de recuperação de senha
+ */
+export async function sendPasswordResetEmail(
+  userEmail: string,
+  userName: string,
+  resetToken: string
+): Promise<boolean> {
+  const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
+  const subject = `Recuperação de senha - ${EMAIL_FROM_NAME}`;
+
+  const text = `
+Olá ${userName}!
+
+Recebemos uma solicitação para redefinir a senha da sua conta no ${EMAIL_FROM_NAME}.
+
+Para criar uma nova senha, clique no link abaixo (válido por 30 minutos):
+
+${resetUrl}
+
+Se você não solicitou esta alteração, ignore este e-mail. Sua senha permanecerá a mesma.
+
+Por segurança, nunca compartilhe este link com outras pessoas.
+
+Equipe ${EMAIL_FROM_NAME}
+  `.trim();
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="color: #2563eb; text-align: center;">🔐 Recuperação de Senha</h1>
+
+      <p>Olá <strong>${userName}</strong>!</p>
+
+      <p>Recebemos uma solicitação para redefinir a senha da sua conta no <strong>${EMAIL_FROM_NAME}</strong>.</p>
+
+      <div style="background-color: #eff6ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0 0 15px 0;"><strong>Para criar uma nova senha:</strong></p>
+        <div style="text-align: center;">
+          <a href="${resetUrl}"
+             style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Redefinir Senha
+          </a>
+        </div>
+        <p style="margin: 15px 0 0 0; color: #6b7280; font-size: 14px;">
+          ⏰ <em>Este link é válido por 30 minutos</em>
+        </p>
+      </div>
+
+      <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0; color: #92400e;">
+          <strong>⚠️ Não solicitou esta alteração?</strong><br>
+          Ignore este e-mail. Sua senha permanecerá a mesma.
+        </p>
+      </div>
+
+      <p style="color: #6b7280; font-size: 14px;">
+        Por segurança, nunca compartilhe este link com outras pessoas.
+      </p>
+
+      <p style="color: #6b7280;">Equipe ${EMAIL_FROM_NAME}</p>
+
+      <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+      <p style="color: #9ca3af; font-size: 12px;">
+        Se o botão não funcionar, copie e cole este link no seu navegador:<br>
+        <a href="${resetUrl}" style="color: #2563eb; word-break: break-all;">${resetUrl}</a>
+      </p>
+    </div>
+  `;
+
+  return sendEmail({ to: userEmail, subject, text, html });
+}
+
+/**
+ * E-mail: confirmação de senha alterada
+ */
+export async function sendPasswordChangedEmail(
+  userEmail: string,
+  userName: string
+): Promise<boolean> {
+  const subject = `Senha alterada com sucesso - ${EMAIL_FROM_NAME}`;
+
+  const text = `
+Olá ${userName}!
+
+Sua senha foi alterada com sucesso!
+
+Se você realizou esta alteração, pode ignorar este e-mail.
+
+Se você NÃO alterou sua senha:
+⚠️ Entre em contato com nosso suporte IMEDIATAMENTE
+⚠️ Sua conta pode ter sido comprometida
+
+Acesse: ${FRONTEND_URL}
+
+Equipe ${EMAIL_FROM_NAME}
+  `.trim();
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="color: #10b981; text-align: center;">✅ Senha Alterada</h1>
+
+      <p>Olá <strong>${userName}</strong>!</p>
+
+      <div style="background-color: #d1fae5; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+        <p style="margin: 0; color: #065f46;">
+          <strong>✅ Sua senha foi alterada com sucesso!</strong>
+        </p>
+      </div>
+
+      <p>Se você realizou esta alteração, pode ignorar este e-mail.</p>
+
+      <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0; color: #991b1b;">
+          <strong>⚠️ Você NÃO alterou sua senha?</strong><br>
+          Entre em contato com nosso suporte IMEDIATAMENTE.<br>
+          Sua conta pode ter sido comprometida.
+        </p>
+      </div>
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${FRONTEND_URL}"
+           style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+          Acessar ${EMAIL_FROM_NAME}
+        </a>
+      </div>
+
+      <p style="color: #6b7280;">Equipe ${EMAIL_FROM_NAME}</p>
+    </div>
+  `;
+
+  return sendEmail({ to: userEmail, subject, text, html });
+}
+
+/**
+ * E-mail: relatório mensal de reset de queries
+ */
+export async function sendMonthlyQueriesResetReport(options: {
+  totalUpdated: number;
+  runAt: Date;
+}): Promise<boolean> {
+  const adminEmail = process.env.ADMIN_NOTIFICATIONS_EMAIL || process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM || '';
+
+  if (!adminEmail) {
+    console.log('[EMAIL] ADMIN_NOTIFICATIONS_EMAIL não configurado. Pulando envio de relatório.');
+    return false;
+  }
+
+  const { totalUpdated, runAt } = options;
+  const runAtFormatted = runAt.toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    dateStyle: 'short',
+    timeStyle: 'short'
+  });
+
+  const subject = `[RadarOne] Reset mensal de queries executado`;
+
+  const text = `
+Relatório de Execução - Reset Mensal de Queries
+
+Data/Hora: ${runAtFormatted} (America/Sao_Paulo)
+Assinaturas atualizadas: ${totalUpdated}
+
+${totalUpdated === 0 ? '⚠️ Atenção: Nenhuma assinatura ativa foi encontrada no momento da execução.' : '✅ Reset executado com sucesso!'}
+
+O contador de queries (queriesUsed) foi zerado para todas as assinaturas com status ACTIVE.
+
+--
+Este é um e-mail automático do sistema de jobs do RadarOne.
+  `.trim();
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="color: #2563eb; text-align: center;">📊 Reset Mensal de Queries</h1>
+
+      <div style="background-color: ${totalUpdated > 0 ? '#d1fae5' : '#fef3c7'}; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2 style="margin: 0 0 10px 0; color: ${totalUpdated > 0 ? '#065f46' : '#92400e'};">
+          ${totalUpdated > 0 ? '✅' : '⚠️'} Execução Concluída
+        </h2>
+        <p style="margin: 5px 0; color: #374151;"><strong>Data/Hora:</strong> ${runAtFormatted}</p>
+        <p style="margin: 5px 0; color: #374151;"><strong>Assinaturas atualizadas:</strong> ${totalUpdated}</p>
+      </div>
+
+      ${totalUpdated === 0 ? `
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400e;">
+            <strong>⚠️ Atenção:</strong> Nenhuma assinatura ativa foi encontrada no momento da execução.
+          </p>
+        </div>
+      ` : `
+        <div style="background-color: #d1fae5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #065f46;">
+            <strong>✅ Reset executado com sucesso!</strong><br>
+            O contador de queries foi zerado para todas as assinaturas ativas.
+          </p>
+        </div>
+      `}
+
+      <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0; color: #6b7280; font-size: 14px;">
+          <strong>Detalhes técnicos:</strong><br>
+          • Tabela: <code>subscriptions</code><br>
+          • Campo resetado: <code>queriesUsed → 0</code><br>
+          • Filtro: <code>status = 'ACTIVE'</code><br>
+          • Job: <code>resetMonthlyQueries</code><br>
+          • Frequência: Todo dia 1 às 3h (America/Sao_Paulo)
+        </p>
+      </div>
+
+      <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+      <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+        Este é um e-mail automático do sistema de jobs do RadarOne.
+      </p>
+    </div>
+  `;
+
+  return sendEmail({ to: adminEmail, subject, text, html });
+}

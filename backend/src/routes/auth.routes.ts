@@ -17,9 +17,13 @@ router.post('/login', AuthController.login);
 // GET /api/auth/me - Obter dados do usuário autenticado
 router.get('/me', authenticateToken, AuthController.me);
 
-// TODO: Implementar outras rotas
 // POST /api/auth/forgot-password - Solicitar reset de senha
+router.post('/forgot-password', AuthController.requestPasswordReset);
+
 // POST /api/auth/reset-password - Resetar senha
+router.post('/reset-password', AuthController.resetPassword);
+
+// TODO: Implementar outras rotas
 // POST /api/auth/refresh-token - Renovar token
 // POST /api/auth/logout - Logout (invalidar token)
 

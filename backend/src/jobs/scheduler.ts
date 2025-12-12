@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { checkTrialExpiring } from './checkTrialExpiring';
 import { checkSubscriptionExpired } from './checkSubscriptionExpired';
+import { resetMonthlyQueries } from './resetMonthlyQueries';
 
 /**
  * Scheduler de Jobs Automáticos
@@ -58,9 +59,28 @@ export function startScheduler() {
     timezone: 'America/Sao_Paulo'
   });
 
+  // ============================================
+  // JOB 3: Reset mensal de queries
+  // ============================================
+  // Executa no dia 1 de cada mês às 3h da manhã
+  // - Reseta o contador queriesUsed para 0
+  // - Apenas para assinaturas com status ACTIVE
+  cron.schedule('0 3 1 * *', async () => {
+    console.log('[SCHEDULER] ⏰ Executando resetMonthlyQueries...');
+    try {
+      await resetMonthlyQueries();
+      console.log('[SCHEDULER] ✅ resetMonthlyQueries executado com sucesso');
+    } catch (error) {
+      console.error('[SCHEDULER] ❌ Erro ao executar resetMonthlyQueries:', error);
+    }
+  }, {
+    timezone: 'America/Sao_Paulo'
+  });
+
   console.log('[SCHEDULER] ✅ Jobs agendados:');
   console.log('[SCHEDULER]    📧 checkTrialExpiring - Diariamente às 9h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    💳 checkSubscriptionExpired - Diariamente às 10h (America/Sao_Paulo)');
+  console.log('[SCHEDULER]    🔄 resetMonthlyQueries - Mensalmente no dia 1 às 3h (America/Sao_Paulo)');
 }
 
 /**
@@ -81,7 +101,7 @@ export async function runJobsNow() {
   console.log('[SCHEDULER] 🔥 Executando todos os jobs AGORA (modo debug)...');
 
   try {
-    console.log('[SCHEDULER] 1/2 Executando checkTrialExpiring...');
+    console.log('[SCHEDULER] 1/3 Executando checkTrialExpiring...');
     await checkTrialExpiring();
     console.log('[SCHEDULER] ✅ checkTrialExpiring OK');
   } catch (error) {
@@ -89,11 +109,19 @@ export async function runJobsNow() {
   }
 
   try {
-    console.log('[SCHEDULER] 2/2 Executando checkSubscriptionExpired...');
+    console.log('[SCHEDULER] 2/3 Executando checkSubscriptionExpired...');
     await checkSubscriptionExpired();
     console.log('[SCHEDULER] ✅ checkSubscriptionExpired OK');
   } catch (error) {
     console.error('[SCHEDULER] ❌ Erro checkSubscriptionExpired:', error);
+  }
+
+  try {
+    console.log('[SCHEDULER] 3/3 Executando resetMonthlyQueries...');
+    await resetMonthlyQueries();
+    console.log('[SCHEDULER] ✅ resetMonthlyQueries OK');
+  } catch (error) {
+    console.error('[SCHEDULER] ❌ Erro resetMonthlyQueries:', error);
   }
 
   console.log('[SCHEDULER] 🎉 Todos os jobs executados');

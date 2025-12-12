@@ -22,4 +22,7 @@ router.get('/stats', requireAdmin, AdminController.getSystemStats);
 router.get('/webhooks', requireAdmin, AdminController.listWebhookLogs);
 router.get('/monitors', requireAdmin, AdminController.listMonitors);
 
+// Jobs
+router.get('/jobs', requireAdmin, AdminController.listJobRuns);
+
 export default router;

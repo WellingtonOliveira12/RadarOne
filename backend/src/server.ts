@@ -8,6 +8,10 @@ import { Pool } from 'pg';
 // Carrega variáveis de ambiente
 dotenv.config();
 
+// Inicializa Sentry para monitoramento de erros
+import { initSentry } from './monitoring/sentry';
+initSentry();
+
 // Inicializa o Prisma Client com adapter Postgres
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);

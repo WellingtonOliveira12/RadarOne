@@ -35,3 +35,16 @@ export interface RegisterData {
 export async function register(data: RegisterData) {
   return api.post('/api/auth/register', data);
 }
+
+export interface ResetPasswordData {
+  token: string;
+  password: string;
+}
+
+export async function resetPassword(data: ResetPasswordData) {
+  return api.post('/api/auth/reset-password', data);
+}
+
+export async function forgotPassword(email: string) {
+  return api.post('/api/auth/forgot-password', { email });
+}

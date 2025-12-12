@@ -1,5 +1,7 @@
 import { prisma } from '../server';
 import { sendTrialEndingEmail, sendTrialExpiredEmail } from '../services/emailService';
+import { captureJobException } from '../monitoring/sentry';
+import { retryAsync } from '../utils/retry';
 
 /**
  * Job: Verificar trials expirando e expirados
@@ -7,6 +9,7 @@ import { sendTrialEndingEmail, sendTrialExpiredEmail } from '../services/emailSe
  * COMO EXECUTAR:
  * - Manualmente: npx ts-node src/jobs/checkTrialExpiring.ts
  * - Cron: Agendar para rodar diariamente às 9h
+ * - Possui retry automático em caso de falhas transientes
  */
 
 const DAYS_BEFORE_WARNING = 3; // Avisar 3 dias antes de expirar
@@ -15,6 +18,8 @@ async function checkTrialExpiring() {
   console.log('[JOB] 🔍 Verificando trials expirando...');
 
   try {
+    // Envolver operação principal com retry
+    await retryAsync(async () => {
     const now = new Date();
     const threeDaysFromNow = new Date();
     threeDaysFromNow.setDate(now.getDate() + DAYS_BEFORE_WARNING);
@@ -97,9 +102,17 @@ async function checkTrialExpiring() {
       }
     }
 
-    console.log('[JOB] ✅ Verificação de trials concluída!');
+      console.log('[JOB] ✅ Verificação de trials concluída!');
+    }, {
+      retries: 3,
+      delayMs: 1000,
+      factor: 2,
+      jobName: 'checkTrialExpiring'
+    });
+
   } catch (error) {
     console.error('[JOB] ❌ Erro ao verificar trials:', error);
+    captureJobException(error, { jobName: 'checkTrialExpiring' });
     throw error;
   }
 }

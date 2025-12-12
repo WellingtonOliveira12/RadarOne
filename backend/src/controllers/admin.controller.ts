@@ -733,4 +733,104 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao listar monitores' });
     }
   }
+
+  /**
+   * 10. Listar execuções de jobs (dashboard de monitoramento)
+   * GET /api/admin/jobs
+   */
+  static async listJobRuns(req: Request, res: Response) {
+    try {
+      const {
+        page = '1',
+        pageSize = '20',
+        event,
+        status
+      } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const pageSizeNum = parseInt(pageSize as string);
+      const skip = (pageNum - 1) * pageSizeNum;
+
+      // Construir filtros
+      const where: any = {};
+
+      // Filtrar apenas eventos de jobs (começam com prefixos específicos ou são conhecidos)
+      const jobEvents = [
+        'MONTHLY_QUERIES_RESET',
+        'TRIAL_CHECK',
+        'SUBSCRIPTION_CHECK'
+      ];
+
+      if (event) {
+        where.event = event;
+      } else {
+        // Se não especificar event, mostrar apenas jobs conhecidos
+        where.event = {
+          in: jobEvents
+        };
+      }
+
+      // Filtrar por status se fornecido
+      // Status é derivado do campo 'error' e do payload
+      if (status === 'ERROR') {
+        where.error = {
+          not: null
+        };
+      } else if (status === 'SUCCESS') {
+        where.error = null;
+      }
+
+      // Buscar logs de jobs
+      const [logs, total] = await Promise.all([
+        prisma.webhookLog.findMany({
+          where,
+          skip,
+          take: pageSizeNum,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            event: true,
+            createdAt: true,
+            processed: true,
+            error: true,
+            payload: true
+          }
+        }),
+        prisma.webhookLog.count({ where })
+      ]);
+
+      // Transformar logs para formato mais amigável
+      const data = logs.map(log => {
+        const payload = typeof log.payload === 'object' ? log.payload : {};
+        const hasError = log.error !== null && log.error !== undefined;
+
+        return {
+          id: log.id,
+          event: log.event,
+          createdAt: log.createdAt,
+          status: hasError ? 'ERROR' : (payload as any)?.status || 'SUCCESS',
+          updatedCount: (payload as any)?.updatedCount,
+          executedAt: (payload as any)?.executedAt,
+          error: log.error,
+          processed: log.processed
+        };
+      });
+
+      const totalPages = Math.ceil(total / pageSizeNum);
+
+      return res.json({
+        data,
+        pagination: {
+          page: pageNum,
+          pageSize: pageSizeNum,
+          total,
+          totalPages
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao listar execuções de jobs:', error);
+      return res.status(500).json({ error: 'Erro ao listar execuções de jobs' });
+    }
+  }
 }
