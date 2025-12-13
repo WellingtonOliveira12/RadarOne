@@ -32,10 +32,11 @@ model User {
   updatedAt       DateTime            @updatedAt @map("updated_at")
 
   // Relações
-  subscriptions   Subscription[]
-  monitors        Monitor[]
-  usageLogs       UsageLog[]
-  telegramAccounts TelegramAccount[]
+  subscriptions     Subscription[]
+  monitors          Monitor[]
+  usageLogs         UsageLog[]
+  telegramAccounts  TelegramAccount[]
+  notificationLogs  NotificationLog[]
 
   @@map("users")
 }
@@ -354,4 +355,38 @@ model WebhookLog {
   @@index([event])
   @@index([processed])
   @@map("webhook_logs")
+}
+
+// ============================================
+// HISTÓRICO DE NOTIFICAÇÕES
+// ============================================
+
+enum NotificationChannel {
+  EMAIL
+  TELEGRAM
+}
+
+enum NotificationStatus {
+  SUCCESS
+  FAILED
+}
+
+model NotificationLog {
+  id        String              @id @default(cuid())
+  userId    String              @map("user_id")
+  channel   NotificationChannel
+  title     String
+  message   String              @db.Text  // Texto resumido da notificação
+  target    String              // Email ou chatId mascarado (ex: "w***@gmail.com" ou "***1234")
+  status    NotificationStatus
+  error     String?             @db.Text  // Mensagem de erro, se houver
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  // Relações
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([status])
+  @@map("notification_logs")
 }

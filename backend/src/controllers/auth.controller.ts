@@ -5,6 +5,7 @@ import { prisma } from '../server';
 import { validateCpf, encryptCpf } from '../utils/crypto';
 import { startTrialForUser } from '../services/billingService';
 import { sendWelcomeEmail } from '../services/emailService';
+import logger from '../logger';
 
 /**
  * Controller de Autenticação
@@ -88,14 +89,14 @@ export class AuthController {
 
       // Enviar e-mail de boas-vindas (não bloqueia o registro se falhar)
       sendWelcomeEmail(user.email, user.name).catch((err) => {
-        console.error('Erro ao enviar e-mail de boas-vindas:', err);
+        logger.error({ err, email: sanitizeEmail(user.email) }, 'Failed to send welcome email');
       });
 
       // Criar assinatura trial automática (plano FREE por padrão)
       try {
         await startTrialForUser(user.id, 'free');
       } catch (trialError) {
-        console.error('Erro ao criar trial automático:', trialError);
+        logger.error({ err: trialError, userId: user.id }, 'Failed to create automatic trial');
         // Continua mesmo se falhar o trial (usuário já foi criado)
       }
 
@@ -105,18 +106,20 @@ export class AuthController {
         try {
           // Por enquanto não criamos TelegramAccount sem chatId
           // O usuário precisará conectar no bot do Telegram para vincular
-          console.log(`Telegram username fornecido: ${telegramUsername}, aguardando vinculação com bot`);
+          logger.info({ telegramUsername }, 'Telegram username provided, awaiting bot connection');
         } catch (telegramError) {
-          console.error('Erro ao processar Telegram:', telegramError);
+          logger.error({ err: telegramError }, 'Failed to process Telegram');
         }
       }
+
+      logger.info({ userId: user.id, email: sanitizeEmail(user.email) }, 'User registered successfully');
 
       res.status(201).json({
         message: 'Usuário criado com sucesso',
         user
       });
     } catch (error) {
-      console.error('Erro ao registrar usuário:', error);
+      logger.error({ err: error, requestId: req.requestId }, 'Failed to register user');
       res.status(500).json({ error: 'Erro ao criar usuário' });
     }
   }
@@ -186,13 +189,15 @@ export class AuthController {
       // Remove senha do objeto
       const { passwordHash: _, ...userWithoutPassword } = user;
 
+      logger.info({ userId: user.id, email: sanitizeEmail(user.email) }, 'User logged in successfully');
+
       res.json({
         message: 'Login realizado com sucesso',
         token,
         user: userWithoutPassword
       });
     } catch (error) {
-      console.error('Erro ao fazer login:', error);
+      logger.error({ err: error, requestId: req.requestId }, 'Failed to login');
       res.status(500).json({ error: 'Erro ao fazer login' });
     }
   }

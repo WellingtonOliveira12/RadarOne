@@ -17,6 +17,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MonitorsPage } from './pages/MonitorsPage';
 import { NotificationSettingsPage } from './pages/NotificationSettingsPage';
+import { NotificationHistoryPage } from './pages/NotificationHistoryPage';
 import { SubscriptionSettingsPage } from './pages/SubscriptionSettingsPage';
 
 // Páginas admin
@@ -78,6 +79,14 @@ export function AppRouter() {
             element={
               <ProtectedRoute>
                 <NotificationSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationHistoryPage />
               </ProtectedRoute>
             }
           />
