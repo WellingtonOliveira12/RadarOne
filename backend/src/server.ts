@@ -29,10 +29,13 @@ import subscriptionRoutes from './routes/subscription.routes';
 import devRoutes from './routes/dev.routes';
 import webhookRoutes from './routes/webhook.routes';
 import adminRoutes from './routes/admin.routes';
-// import couponRoutes from './routes/coupon.routes';
+import couponRoutes from './routes/coupon.routes';
 
 // Importa middleware de autenticação
 import { authenticateToken } from './middlewares/auth.middleware';
+
+// Importa rate limiting
+import { apiRateLimiter } from './middlewares/rateLimit.middleware';
 
 // Importa scheduler de jobs
 import { startScheduler } from './jobs/scheduler';
@@ -51,6 +54,9 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting global (120 req/min por IP)
+app.use(apiRateLimiter);
 
 // Middleware de log
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -80,7 +86,7 @@ app.use('/api/me', authenticateToken, userRoutes); // Protegida
 app.use('/api/admin', authenticateToken, adminRoutes); // Protegida (auth + admin)
 app.use('/api/dev', devRoutes); // Rotas de desenvolvimento (apenas em dev)
 app.use('/api/webhooks', webhookRoutes); // Webhooks (SEM autenticação JWT - usa HMAC)
-// app.use('/api/coupons', couponRoutes);
+app.use('/api/coupons', couponRoutes); // Cupons (validate público, apply protegido)
 
 // Rota de teste
 app.get('/api/test', (req: Request, res: Response) => {

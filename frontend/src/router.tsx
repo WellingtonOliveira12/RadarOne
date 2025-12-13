@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AdminProtectedRoute } from './components/AdminProtectedRoute';
 import { initAnalytics, trackPageView } from './lib/analytics';
 
 // Páginas públicas
@@ -93,9 +94,9 @@ export function AppRouter() {
           <Route
             path="/admin/jobs"
             element={
-              <ProtectedRoute>
+              <AdminProtectedRoute>
                 <AdminJobsPage />
-              </ProtectedRoute>
+              </AdminProtectedRoute>
             }
           />
         </Routes>
