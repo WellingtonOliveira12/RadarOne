@@ -1,6 +1,8 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { initAnalytics, trackPageView } from './lib/analytics';
 
 // Páginas públicas
 import { LandingPage } from './pages/LandingPage';
@@ -22,9 +24,26 @@ import { AdminJobsPage } from './pages/AdminJobsPage';
 // Páginas de teste/debug
 import { HealthCheckPage } from './pages/HealthCheckPage';
 
+// Componente para rastrear pageviews automaticamente
+function PageViewTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    trackPageView(location.pathname + location.search);
+  }, [location]);
+
+  return null;
+}
+
 export function AppRouter() {
+  // Inicializa analytics uma única vez
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+
   return (
     <BrowserRouter>
+      <PageViewTracker />
       <AuthProvider>
         <Routes>
           {/* Rotas públicas */}

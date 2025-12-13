@@ -11,6 +11,15 @@ import { sendWelcomeEmail } from '../services/emailService';
  * TODO: Implementar validações completas
  */
 
+/**
+ * Sanitiza email para logs (oculta parte do email)
+ */
+function sanitizeEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return '***';
+  return `${local.charAt(0)}***@${domain}`;
+}
+
 export class AuthController {
   /**
    * Registro de novo usuário
@@ -258,14 +267,14 @@ export class AuthController {
 
       // Se o usuário não existir, retorna sucesso mas não envia email
       if (!user) {
-        console.log(`[AUTH] Tentativa de reset para email não cadastrado: ${email}`);
+        console.log(`[AUTH] Tentativa de reset para email não cadastrado: ${sanitizeEmail(email)}`);
         res.json({ message: genericMessage });
         return;
       }
 
       // Verificar se usuário está bloqueado
       if (user.blocked) {
-        console.log(`[AUTH] Tentativa de reset para usuário bloqueado: ${email}`);
+        console.log(`[AUTH] Tentativa de reset para usuário bloqueado: ${sanitizeEmail(email)}`);
         res.json({ message: genericMessage });
         return;
       }
@@ -293,7 +302,7 @@ export class AuthController {
         console.error('[AUTH] Erro ao enviar e-mail de reset de senha:', err);
       });
 
-      console.log(`[AUTH] Email de reset enviado para: ${user.email}`);
+      console.log(`[AUTH] Email de reset enviado para: ${sanitizeEmail(user.email)}`);
 
       // Retorna sempre a mesma mensagem genérica
       res.json({ message: genericMessage });
@@ -378,7 +387,7 @@ export class AuthController {
         data: { passwordHash: newPasswordHash }
       });
 
-      console.log(`[AUTH] Senha redefinida com sucesso para usuário: ${user.email}`);
+      console.log(`[AUTH] Senha redefinida com sucesso para usuário: ${sanitizeEmail(user.email)}`);
 
       // Enviar email de confirmação (não bloqueia a resposta se falhar)
       const emailService = await import('../services/emailService');

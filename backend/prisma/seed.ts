@@ -46,6 +46,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: null, // TODO: preencher após criar produto na Kiwify
+      checkoutUrl: null, // FREE não tem checkout
     },
     create: {
       name: 'Free',
@@ -63,6 +64,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: null,
+      checkoutUrl: null,
     },
   });
   console.log('✅ FREE:', planFree.slug, '- GRÁTIS');
@@ -87,6 +89,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: 'qyvPYUx', // Checkout Kiwify: https://pay.kiwify.com.br/qyvPYUx
+      checkoutUrl: 'https://pay.kiwify.com.br/qyvPYUx',
     },
     create: {
       name: 'Starter',
@@ -104,6 +107,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: 'qyvPYUx',
+      checkoutUrl: 'https://pay.kiwify.com.br/qyvPYUx',
     },
   });
   console.log('✅ STARTER:', planStarter.slug, '- R$ 29,00/mês - 7 dias de garantia');
@@ -128,6 +132,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: 'giCvSH0', // Checkout Kiwify: https://pay.kiwify.com.br/giCvSH0
+      checkoutUrl: 'https://pay.kiwify.com.br/giCvSH0',
     },
     create: {
       name: 'Pro',
@@ -145,6 +150,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: 'giCvSH0',
+      checkoutUrl: 'https://pay.kiwify.com.br/giCvSH0',
     },
   });
   console.log('✅ PRO ⭐:', planPro.slug, '- R$ 49,00/mês - 7 dias de garantia - RECOMENDADO');
@@ -169,6 +175,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: '76JoTEL', // Checkout Kiwify: https://pay.kiwify.com.br/76JoTEL
+      checkoutUrl: 'https://pay.kiwify.com.br/76JoTEL',
     },
     create: {
       name: 'Premium',
@@ -186,6 +193,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: '76JoTEL',
+      checkoutUrl: 'https://pay.kiwify.com.br/76JoTEL',
     },
   });
   console.log('✅ PREMIUM:', planPremium.slug, '- R$ 97,00/mês - 7 dias de garantia');
@@ -210,6 +218,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: '6MgOUyL', // Checkout Kiwify: https://pay.kiwify.com.br/6MgOUyL
+      checkoutUrl: 'https://pay.kiwify.com.br/6MgOUyL',
     },
     create: {
       name: 'Ultra',
@@ -227,6 +236,7 @@ async function main() {
       isActive: true,
       isLifetime: false,
       kiwifyProductId: '6MgOUyL',
+      checkoutUrl: 'https://pay.kiwify.com.br/6MgOUyL',
     },
   });
   console.log('✅ ULTRA:', planUltra.slug, '- R$ 149,00/mês - 7 dias de garantia');

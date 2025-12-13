@@ -29,15 +29,15 @@ export const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <section style={styles.hero}>
         <h1 style={styles.heroTitle}>
-          Monitore anúncios automaticamente
+          Encontre as melhores oportunidades antes da concorrência
         </h1>
         <p style={styles.heroSubtitle}>
-          Receba alertas em tempo real quando novos anúncios aparecerem em OLX,
-          Mercado Livre, Facebook Marketplace e muito mais.
+          Monitore anúncios de <strong>iPhone, carros, imóveis e muito mais</strong> no OLX,
+          Mercado Livre e Facebook. Receba alertas em tempo real e seja o primeiro a fechar negócio.
         </p>
         <div style={styles.heroButtons}>
           <Link to="/register" style={styles.primaryButton}>
-            Começar agora - 7 dias de garantia
+            Começar agora - 7 dias grátis
           </Link>
           <Link to="/plans" style={styles.secondaryButton}>
             Ver planos
@@ -47,32 +47,32 @@ export const LandingPage: React.FC = () => {
 
       {/* Features Section */}
       <section style={styles.features}>
-        <h2 style={styles.sectionTitle}>Como funciona</h2>
+        <h2 style={styles.sectionTitle}>Ideal para vendedores e revendedores</h2>
         <div style={styles.featuresGrid}>
           <div style={styles.featureCard}>
-            <div style={styles.featureIcon}>🔍</div>
-            <h3 style={styles.featureTitle}>1. Configure monitores</h3>
+            <div style={styles.featureIcon}>📱</div>
+            <h3 style={styles.featureTitle}>Revenda de iPhone</h3>
             <p style={styles.featureText}>
-              Defina o que você quer monitorar: URL específica ou filtros
-              personalizados (palavra-chave, cidade, faixa de preço, etc.)
+              Monitore anúncios de iPhone usados, pegue os melhores preços antes
+              da concorrência e revenda com lucro.
             </p>
           </div>
 
           <div style={styles.featureCard}>
-            <div style={styles.featureIcon}>⚡</div>
-            <h3 style={styles.featureTitle}>2. Receba alertas</h3>
+            <div style={styles.featureIcon}>🚗</div>
+            <h3 style={styles.featureTitle}>Carros e Motos</h3>
             <p style={styles.featureText}>
-              Assim que um novo anúncio aparecer, você recebe notificação
-              instantânea via Telegram ou e-mail.
+              Acompanhe anúncios de veículos na sua região. Receba alerta
+              instantâneo quando aparecer um bom negócio.
             </p>
           </div>
 
           <div style={styles.featureCard}>
-            <div style={styles.featureIcon}>🎯</div>
-            <h3 style={styles.featureTitle}>3. Seja o primeiro</h3>
+            <div style={styles.featureIcon}>🏠</div>
+            <h3 style={styles.featureTitle}>Imóveis e Terrenos</h3>
             <p style={styles.featureText}>
-              Saia na frente da concorrência e garanta as melhores
-              oportunidades antes de todo mundo.
+              Encontre imóveis abaixo do preço de mercado. Seja o primeiro
+              a entrar em contato com o vendedor.
             </p>
           </div>
         </div>
@@ -80,43 +80,44 @@ export const LandingPage: React.FC = () => {
 
       {/* Benefits Section */}
       <section style={styles.benefits}>
-        <h2 style={styles.sectionTitle}>Por que escolher o RadarOne?</h2>
+        <h2 style={styles.sectionTitle}>Por que vendedores escolhem o RadarOne?</h2>
         <div style={styles.benefitsList}>
           <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>✅</span>
-            <span>Notificações em tempo real via Telegram ou e-mail</span>
+            <span style={styles.benefitIcon}>⚡</span>
+            <span><strong>Alertas em segundos</strong> - Receba notificação via Telegram assim que o anúncio for publicado</span>
+          </div>
+          <div style={styles.benefitItem}>
+            <span style={styles.benefitIcon}>📱</span>
+            <span><strong>Todos os marketplaces</strong> - OLX, Mercado Livre, Facebook Marketplace, Webmotors e mais</span>
+          </div>
+          <div style={styles.benefitItem}>
+            <span style={styles.benefitIcon}>🎯</span>
+            <span><strong>Filtros inteligentes</strong> - Monitore por cidade, faixa de preço, palavra-chave e muito mais</span>
+          </div>
+          <div style={styles.benefitItem}>
+            <span style={styles.benefitIcon}>💰</span>
+            <span><strong>Aumente seu lucro</strong> - Chegue primeiro nos melhores negócios e negocie melhor</span>
           </div>
           <div style={styles.benefitItem}>
             <span style={styles.benefitIcon}>✅</span>
-            <span>Suporte para OLX, Mercado Livre, Facebook e outros sites</span>
+            <span><strong>7 dias grátis</strong> - Teste sem compromisso. Cancele quando quiser</span>
           </div>
           <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>✅</span>
-            <span>Monitore múltiplos sites e buscas simultaneamente</span>
-          </div>
-          <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>✅</span>
-            <span>Filtros avançados: cidade, preço, ano, palavra-chave</span>
-          </div>
-          <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>✅</span>
-            <span>7 dias de garantia em todos os planos pagos</span>
-          </div>
-          <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>✅</span>
-            <span>Cancele quando quiser, sem burocracia</span>
+            <span style={styles.benefitIcon}>🔒</span>
+            <span><strong>Sem pegadinhas</strong> - Cancele pelo app, sem ligar pra ninguém</span>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
       <section style={styles.cta}>
-        <h2 style={styles.ctaTitle}>Pronto para começar?</h2>
+        <h2 style={styles.ctaTitle}>Comece a vender mais hoje mesmo</h2>
         <p style={styles.ctaSubtitle}>
-          Experimente sem risco com 7 dias de garantia. Cancele e receba reembolso total se não gostar.
+          Junte-se a centenas de vendedores que já usam o RadarOne para encontrar as melhores
+          oportunidades. <strong>7 dias grátis</strong>, sem pedir cartão de crédito.
         </p>
         <Link to="/register" style={styles.ctaButton}>
-          Começar agora
+          Criar conta grátis
         </Link>
       </section>
 

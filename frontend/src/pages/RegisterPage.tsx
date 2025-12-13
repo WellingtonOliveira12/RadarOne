@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { trackSignUp } from '../lib/analytics';
 
 /**
  * Página de Cadastro com CPF e preferências de notificação
@@ -72,6 +73,12 @@ export const RegisterPage: React.FC = () => {
     setError('');
 
     // Validações
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Email inválido');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('As senhas não coincidem');
       return;
@@ -79,6 +86,14 @@ export const RegisterPage: React.FC = () => {
 
     if (formData.password.length < 6) {
       setError('A senha deve ter no mínimo 6 caracteres');
+      return;
+    }
+
+    // Validação de força da senha (opcional mas recomendado)
+    const hasLetter = /[a-zA-Z]/.test(formData.password);
+    const hasNumber = /[0-9]/.test(formData.password);
+    if (!hasLetter || !hasNumber) {
+      setError('A senha deve conter letras e números');
       return;
     }
 
@@ -103,6 +118,9 @@ export const RegisterPage: React.FC = () => {
             ? formData.telegramUsername
             : undefined,
       });
+
+      // Track sign up
+      trackSignUp('email');
 
       // Se veio de uma escolha de plano, redirecionar para planos
       // Caso contrário, ir direto para dashboard

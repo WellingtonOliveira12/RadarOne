@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { trackViewPlans, trackSelectPlan } from '../lib/analytics';
 
 /**
  * Página de Planos - Mostra os 5 planos comerciais
@@ -20,6 +21,7 @@ interface Plan {
   checkInterval: number;
   isRecommended: boolean;
   priority: number;
+  checkoutUrl?: string | null;
 }
 
 export const PlansPage: React.FC = () => {
@@ -36,12 +38,14 @@ export const PlansPage: React.FC = () => {
   const loadPlans = async () => {
     try {
       // Buscar planos da API
-      const response = await fetch('http://localhost:3000/api/plans');
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_URL}/api/plans`);
       if (!response.ok) {
         throw new Error('Erro ao buscar planos');
       }
       const data = await response.json();
       setPlans(data);
+      trackViewPlans();
     } catch (err: any) {
       setError('Erro ao carregar planos');
     } finally {
@@ -50,16 +54,30 @@ export const PlansPage: React.FC = () => {
   };
 
   const handleChoosePlan = async (planSlug: string) => {
+    // Encontra o plano selecionado para tracking
+    const selectedPlan = plans.find(p => p.slug === planSlug);
+    if (selectedPlan) {
+      trackSelectPlan(selectedPlan.name, selectedPlan.priceCents / 100);
+    }
+
+    // Se o plano tem checkoutUrl, redireciona para checkout externo (Kiwify)
+    if (selectedPlan?.checkoutUrl) {
+      // Redirecionar para checkout Kiwify
+      window.location.href = selectedPlan.checkoutUrl;
+      return;
+    }
+
     // Se não está logado, redirecionar para registro com plano selecionado
     if (!user) {
       navigate(`/register?plan=${planSlug}`);
       return;
     }
 
-    // Se está logado, iniciar trial/assinatura
+    // Se está logado E não tem checkoutUrl, iniciar trial interno
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/subscriptions/start-trial', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_URL}/api/subscriptions/start-trial`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,10 +91,10 @@ export const PlansPage: React.FC = () => {
         throw new Error(error.error || 'Erro ao iniciar trial');
       }
 
-      alert(`Trial do plano ${planSlug} iniciado com sucesso!`);
+      // Redirecionar para dashboard (usuário verá trial ativo lá)
       navigate('/dashboard');
     } catch (err: any) {
-      alert('Erro ao iniciar trial: ' + err.message);
+      setError('Erro ao iniciar trial: ' + err.message);
     }
   };
 
@@ -115,9 +133,9 @@ export const PlansPage: React.FC = () => {
 
       {/* Plans Section */}
       <section style={styles.plansSection}>
-        <h1 style={styles.title}>Escolha seu plano</h1>
+        <h1 style={styles.title}>Escolha o plano ideal para você</h1>
         <p style={styles.subtitle}>
-          Todos os planos incluem <strong>7 dias de garantia</strong>. Cancele e receba reembolso total se não gostar.
+          <strong>7 dias grátis</strong> em todos os planos. Cancele quando quiser, sem complicação.
         </p>
 
         {error && <div style={styles.error}>{error}</div>}

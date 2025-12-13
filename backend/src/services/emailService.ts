@@ -22,15 +22,26 @@ const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || 'RadarOne';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 /**
+ * Sanitiza email para logs (oculta parte do email)
+ * Exemplo: user@example.com -> u***@example.com
+ */
+function sanitizeEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return '***';
+  const sanitizedLocal = local.charAt(0) + '***';
+  return `${sanitizedLocal}@${domain}`;
+}
+
+/**
  * Função genérica para enviar e-mail
  */
 export async function sendEmail(params: EmailParams): Promise<boolean> {
   try {
     // Em desenvolvimento, apenas loga (se não tiver API key)
     if (!process.env.RESEND_API_KEY) {
-      console.log('[EMAIL DEV] Para:', params.to);
+      console.log('[EMAIL DEV] Para:', sanitizeEmail(params.to));
       console.log('[EMAIL DEV] Assunto:', params.subject);
-      console.log('[EMAIL DEV] Texto:', params.text);
+      // NÃO loga texto/html para evitar expor tokens/senhas
       return true;
     }
 
@@ -47,7 +58,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       return false;
     }
 
-    console.log('[EMAIL SENT] Para:', params.to, '- ID:', result.data?.id);
+    console.log('[EMAIL SENT] Para:', sanitizeEmail(params.to), '- ID:', result.data?.id);
     return true;
   } catch (error: any) {
     console.error('[EMAIL ERROR]', error.message);

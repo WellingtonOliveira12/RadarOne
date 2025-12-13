@@ -8,6 +8,15 @@ import { Monitor } from '@prisma/client';
  * Estratégia: SEMPRE enviar Telegram E Email (ambos, não fallback)
  */
 
+/**
+ * Sanitiza email para logs (oculta parte do email)
+ */
+function sanitizeEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return '***';
+  return `${local.charAt(0)}***@${domain}`;
+}
+
 export interface ListingPayload {
   title: string;
   price?: number;
@@ -72,9 +81,9 @@ export async function notifyNewListing(
       )
         .then((sent) => {
           if (sent) {
-            console.log('[NOTIFY] ✅ Email enviado para', user.email);
+            console.log('[NOTIFY] ✅ Email enviado para', sanitizeEmail(user.email));
           } else {
-            console.log('[NOTIFY] ❌ Email falhou para', user.email);
+            console.log('[NOTIFY] ❌ Email falhou para', sanitizeEmail(user.email));
           }
           return { channel: 'email', sent };
         })

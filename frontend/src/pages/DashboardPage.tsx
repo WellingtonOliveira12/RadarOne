@@ -41,9 +41,10 @@ export const DashboardPage: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       const token = localStorage.getItem('token');
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
       // Carregar subscription
-      const subResponse = await fetch('http://localhost:3000/api/subscriptions/my', {
+      const subResponse = await fetch(`${API_URL}/api/subscriptions/my`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

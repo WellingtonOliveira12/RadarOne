@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { getToken } from '../services/tokenStorage';
 import { useAuth } from '../context/AuthContext';
+import { trackMonitorCreated } from '../lib/analytics';
 
 type MonitorSite =
   | 'MERCADO_LIVRE'
@@ -133,6 +134,17 @@ export function MonitorsPage() {
         return;
       }
 
+      // Validação de URL
+      if (mode === 'URL_ONLY' && searchUrl) {
+        try {
+          new URL(searchUrl);
+        } catch {
+          setError('URL inválida. Exemplo: https://www.mercadolivre.com.br/...');
+          setSaving(false);
+          return;
+        }
+      }
+
       const body: any = {
         name,
         site,
@@ -155,6 +167,8 @@ export function MonitorsPage() {
         await api.post(`/api/monitors/${idSelecionado}`, body, token);
       } else {
         await api.post('/api/monitors', body, token);
+        // Track monitor creation
+        trackMonitorCreated(site, mode);
       }
 
       // reset
@@ -441,6 +455,8 @@ export function MonitorsPage() {
                   <label style={styles.labelSmall}>Preço mínimo (R$)</label>
                   <input
                     type="number"
+                    min="0"
+                    max="999999999"
                     value={filters.minPrice || ''}
                     onChange={(e) =>
                       setFilters({
@@ -457,6 +473,8 @@ export function MonitorsPage() {
                   <label style={styles.labelSmall}>Preço máximo (R$)</label>
                   <input
                     type="number"
+                    min="0"
+                    max="999999999"
                     value={filters.maxPrice || ''}
                     onChange={(e) =>
                       setFilters({
@@ -473,6 +491,8 @@ export function MonitorsPage() {
                   <label style={styles.labelSmall}>Ano mínimo</label>
                   <input
                     type="number"
+                    min="1900"
+                    max="2026"
                     value={filters.minYear || ''}
                     onChange={(e) =>
                       setFilters({
@@ -489,6 +509,8 @@ export function MonitorsPage() {
                   <label style={styles.labelSmall}>Ano máximo</label>
                   <input
                     type="number"
+                    min="1900"
+                    max="2026"
                     value={filters.maxYear || ''}
                     onChange={(e) =>
                       setFilters({

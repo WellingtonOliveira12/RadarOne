@@ -43,9 +43,10 @@ export const SubscriptionSettingsPage: React.FC = () => {
   const loadData = async () => {
     try {
       const token = localStorage.getItem('token');
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
       // Carregar subscription atual
-      const subResponse = await fetch('http://localhost:3000/api/subscriptions/my', {
+      const subResponse = await fetch(`${API_URL}/api/subscriptions/my`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -64,7 +65,7 @@ export const SubscriptionSettingsPage: React.FC = () => {
       }
 
       // Carregar todos os planos
-      const plansResponse = await fetch('http://localhost:3000/api/plans');
+      const plansResponse = await fetch(`${API_URL}/api/plans`);
       if (plansResponse.ok) {
         const plansData = await plansResponse.json();
         setAllPlans(plansData);
@@ -81,7 +82,8 @@ export const SubscriptionSettingsPage: React.FC = () => {
     // Em produção futura: redirecionar para URL de checkout externa
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/subscriptions/change-plan', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_URL}/api/subscriptions/change-plan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

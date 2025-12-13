@@ -95,6 +95,7 @@ model Plan {
 
   // Integração Kiwify (futura)
   kiwifyProductId   String?        @map("kiwify_product_id")
+  checkoutUrl       String?        @map("checkout_url") // URL do checkout Kiwify/Stripe
 
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")

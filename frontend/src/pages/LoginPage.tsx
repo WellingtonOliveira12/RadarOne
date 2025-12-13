@@ -17,10 +17,11 @@ import {
 import { login } from '../services/auth';
 import { saveToken } from '../services/tokenStorage';
 import { showSuccess, showError } from '../lib/toast';
+import { trackLogin } from '../lib/analytics';
 
 export function LoginPage() {
-  const [email, setEmail] = useState('well+radarone@test.com');
-  const [password, setPassword] = useState('senha123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [userName, setUserName] = useState('');
@@ -31,11 +32,28 @@ export function LoginPage() {
     setError('');
     setUserName('');
 
+    // Validações básicas
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Email inválido');
+      showError('Email inválido');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('A senha deve ter no mínimo 6 caracteres');
+      showError('A senha deve ter no mínimo 6 caracteres');
+      setLoading(false);
+      return;
+    }
+
     try {
       const data = await login(email, password);
       saveToken(data.token);
       setUserName(data.user.name);
       showSuccess(`Bem-vindo, ${data.user.name}!`);
+      trackLogin('email');
     } catch (err: any) {
       const errorMessage = err.message || 'Erro ao fazer login';
       setError(errorMessage);

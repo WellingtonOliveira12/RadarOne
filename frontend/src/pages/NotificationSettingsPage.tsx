@@ -37,7 +37,8 @@ export const NotificationSettingsPage: React.FC = () => {
   const loadSettings = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/me', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_URL}/api/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -87,7 +88,8 @@ export const NotificationSettingsPage: React.FC = () => {
         // updateData.telegramChatId = '...';
       }
 
-      const response = await fetch('http://localhost:3000/api/me/notifications', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_URL}/api/me/notifications`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

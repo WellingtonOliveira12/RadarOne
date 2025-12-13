@@ -1,0 +1,379 @@
+{
+  "$schema": "https://docs.sentry.io/api/alert-rules/",
+  "version": "1.0.0",
+  "project": "radarone",
+  "alerts": [
+    {
+      "name": "[RadarOne] Job Failure - Critical",
+      "description": "Alerta quando qualquer job automático falha",
+      "environment": "production",
+      "conditions": [
+        {
+          "id": "sentry.rules.conditions.tagged_event.TaggedEventCondition",
+          "key": "source",
+          "match": "eq",
+          "value": "automated_job"
+        },
+        {
+          "id": "sentry.rules.conditions.level.LevelCondition",
+          "match": "gte",
+          "level": "40"
+        }
+      ],
+      "filters": [],
+      "actions": [
+        {
+          "id": "sentry.mail.actions.NotifyEmailAction",
+          "targetType": "IssueOwners",
+          "targetIdentifier": ""
+        },
+        {
+          "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+          "workspace": "radarone-team",
+          "channel": "#alerts",
+          "tags": "job,source,level"
+        }
+      ],
+      "actionMatch": "all",
+      "frequency": 30
+    },
+    {
+      "name": "[RadarOne] Job: resetMonthlyQueries Failed",
+      "description": "Alerta específico para falha no job de reset mensal de queries",
+      "environment": "production",
+      "conditions": [
+        {
+          "id": "sentry.rules.conditions.tagged_event.TaggedEventCondition",
+          "key": "job",
+          "match": "eq",
+          "value": "resetMonthlyQueries"
+        },
+        {
+          "id": "sentry.rules.conditions.level.LevelCondition",
+          "match": "gte",
+          "level": "40"
+        }
+      ],
+      "actions": [
+        {
+          "id": "sentry.mail.actions.NotifyEmailAction",
+          "targetType": "IssueOwners"
+        },
+        {
+          "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+          "workspace": "radarone-team",
+          "channel": "#critical-alerts",
+          "tags": "job,result"
+        }
+      ],
+      "actionMatch": "all",
+      "frequency": 5
+    },
+    {
+      "name": "[RadarOne] Job: checkTrialExpiring Failed",
+      "description": "Alerta quando job de verificação de trials expirando falha",
+      "environment": "production",
+      "conditions": [
+        {
+          "id": "sentry.rules.conditions.tagged_event.TaggedEventCondition",
+          "key": "job",
+          "match": "eq",
+          "value": "checkTrialExpiring"
+        },
+        {
+          "id": "sentry.rules.conditions.level.LevelCondition",
+          "match": "gte",
+          "level": "40"
+        }
+      ],
+      "actions": [
+        {
+          "id": "sentry.mail.actions.NotifyEmailAction",
+          "targetType": "Team",
+          "targetIdentifier": "backend-team"
+        }
+      ],
+      "actionMatch": "all",
+      "frequency": 30
+    },
+    {
+      "name": "[RadarOne] Job: checkSubscriptionExpired Failed",
+      "description": "Alerta quando job de verificação de assinaturas expiradas falha",
+      "environment": "production",
+      "conditions": [
+        {
+          "id": "sentry.rules.conditions.tagged_event.TaggedEventCondition",
+          "key": "job",
+          "match": "eq",
+          "value": "checkSubscriptionExpired"
+        },
+        {
+          "id": "sentry.rules.conditions.level.LevelCondition",
+          "match": "gte",
+          "level": "40"
+        }
+      ],
+      "actions": [
+        {
+          "id": "sentry.mail.actions.NotifyEmailAction",
+          "targetType": "Team",
+          "targetIdentifier": "backend-team"
+        }
+      ],
+      "actionMatch": "all",
+      "frequency": 30
+    },
+    {
+      "name": "[RadarOne] High Error Rate - Frontend",
+      "description": "Alerta quando há mais de 10 erros em 5 minutos no frontend",
+      "environment": "production",
+      "conditions": [
+        {
+          "id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+          "value": 10,
+          "interval": "5m"
+        },
+        {
+          "id": "sentry.rules.conditions.tagged_event.TaggedEventCondition",
+          "key": "app.section",
+          "match": "eq",
+          "value": "frontend"
+        }
+      ],
+      "actions": [
+        {
+          "id": "sentry.mail.actions.NotifyEmailAction",
+          "targetType": "IssueOwners"
+        },
+        {
+          "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+          "workspace": "radarone-team",
+          "channel": "#alerts"
+        }
+      ],
+      "actionMatch": "all",
+      "frequency": 60
+    },
+    {
+      "name": "[RadarOne] High Error Rate - Backend",
+      "description": "Alerta quando há mais de 15 erros em 5 minutos no backend",
+      "environment": "production",
+      "conditions": [
+        {
+          "id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+          "value": 15,
+          "interval": "5m"
+        },
+        {
+          "id": "sentry.rules.conditions.tagged_event.TaggedEventCondition",
+          "key": "app.section",
+          "match": "eq",
+          "value": "backend"
+        }
+      ],
+      "actions": [
+        {
+          "id": "sentry.mail.actions.NotifyEmailAction",
+          "targetType": "IssueOwners"
+        },
+        {
+          "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+          "workspace": "radarone-team",
+          "channel": "#critical-alerts"
+        }
+      ],
+      "actionMatch": "all",
+      "frequency": 60
+    },
+    {
+      "name": "[RadarOne] Database Connection Error",
+      "description": "Alerta quando há erros de conexão com o banco de dados",
+      "environment": "production",
+      "conditions": [
+        {
+          "id": "sentry.rules.conditions.event_attribute.EventAttributeCondition",
+          "attribute": "message",
+          "match": "co",
+          "value": "database"
+        },
+        {
+          "id": "sentry.rules.conditions.event_attribute.EventAttributeCondition",
+          "attribute": "message",
+          "match": "co",
+          "value": "connection"
+        }
+      ],
+      "actions": [
+        {
+          "id": "sentry.mail.actions.NotifyEmailAction",
+          "targetType": "IssueOwners"
+        },
+        {
+          "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+          "workspace": "radarone-team",
+          "channel": "#critical-alerts",
+          "notes": "@channel Database connection issues detected!"
+        }
+      ],
+      "actionMatch": "all",
+      "frequency": 5
+    },
+    {
+      "name": "[RadarOne] Payment Integration Error (Kiwify)",
+      "description": "Alerta quando há erro na integração com Kiwify",
+      "environment": "production",
+      "conditions": [
+        {
+          "id": "sentry.rules.conditions.tagged_event.TaggedEventCondition",
+          "key": "integration",
+          "match": "eq",
+          "value": "kiwify"
+        },
+        {
+          "id": "sentry.rules.conditions.level.LevelCondition",
+          "match": "gte",
+          "level": "40"
+        }
+      ],
+      "actions": [
+        {
+          "id": "sentry.mail.actions.NotifyEmailAction",
+          "targetType": "Member",
+          "targetIdentifier": "finance-team@radarone.com"
+        },
+        {
+          "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+          "workspace": "radarone-team",
+          "channel": "#payments"
+        }
+      ],
+      "actionMatch": "all",
+      "frequency": 10
+    }
+  ],
+  "issue_alert_settings": {
+    "digest_frequency": 300,
+    "digest_maximum": 10
+  },
+  "metric_alert_rules": [
+    {
+      "name": "[RadarOne] API Response Time > 2s",
+      "description": "Alerta quando tempo de resposta da API ultrapassa 2 segundos",
+      "environment": "production",
+      "query": "transaction.duration:>2000",
+      "aggregate": "avg(transaction.duration)",
+      "time_window": 5,
+      "threshold": 2000,
+      "comparison_delta": null,
+      "triggers": [
+        {
+          "label": "critical",
+          "alert_threshold": 3000,
+          "actions": [
+            {
+              "type": "email",
+              "target_type": "team",
+              "target_identifier": "backend-team"
+            },
+            {
+              "type": "slack",
+              "target_identifier": "#performance"
+            }
+          ]
+        },
+        {
+          "label": "warning",
+          "alert_threshold": 2000,
+          "actions": [
+            {
+              "type": "email",
+              "target_type": "team",
+              "target_identifier": "backend-team"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "[RadarOne] Error Rate > 1%",
+      "description": "Alerta quando taxa de erro ultrapassa 1%",
+      "environment": "production",
+      "query": "!event.type:transaction",
+      "aggregate": "percentage(sessions_crashed, sessions)",
+      "time_window": 60,
+      "threshold": 1,
+      "triggers": [
+        {
+          "label": "critical",
+          "alert_threshold": 5,
+          "actions": [
+            {
+              "type": "email",
+              "target_type": "team",
+              "target_identifier": "all"
+            },
+            {
+              "type": "slack",
+              "target_identifier": "#critical-alerts"
+            }
+          ]
+        },
+        {
+          "label": "warning",
+          "alert_threshold": 1,
+          "actions": [
+            {
+              "type": "slack",
+              "target_identifier": "#alerts"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "notification_settings": {
+    "email": {
+      "enabled": true,
+      "default_recipients": ["team@radarone.com"]
+    },
+    "slack": {
+      "enabled": true,
+      "workspace": "radarone-team",
+      "default_channel": "#alerts"
+    }
+  },
+  "instructions": {
+    "setup": [
+      "1. Acesse Sentry Dashboard > Seu Projeto > Alerts",
+      "2. Clique em 'Create Alert Rule'",
+      "3. Copie as configurações de cada alerta deste arquivo",
+      "4. Configure as integrações (Email, Slack) nas Settings",
+      "5. Teste cada alerta com 'Send Test Notification'",
+      "6. Monitore alertas na aba 'Alert Rules' e ajuste thresholds conforme necessário"
+    ],
+    "tags_required": {
+      "backend_jobs": [
+        "source: automated_job",
+        "job: checkTrialExpiring | checkSubscriptionExpired | resetMonthlyQueries"
+      ],
+      "apps": [
+        "app.section: frontend | backend | worker"
+      ],
+      "integrations": [
+        "integration: kiwify | telegram | resend"
+      ]
+    },
+    "testing": [
+      "Para testar alertas, force erros em ambiente de staging:",
+      "",
+      "Frontend:",
+      "  throw new Error('Test Sentry Frontend Alert');",
+      "",
+      "Backend:",
+      "  captureJobException(new Error('Test Job Alert'), 'testJob', { test: true });",
+      "",
+      "Database:",
+      "  await prisma.$disconnect(); // Force connection error"
+    ]
+  }
+}
