@@ -17,11 +17,29 @@ function getEncryptionKey(): Buffer {
   const key = process.env.CPF_ENCRYPTION_KEY;
 
   if (!key) {
-    throw new Error('CPF_ENCRYPTION_KEY não configurada no ambiente');
+    const errorMessage = [
+      '❌ CPF_ENCRYPTION_KEY não configurada no ambiente.',
+      '',
+      '📝 Para configurar no Render:',
+      '   1. Acesse: Dashboard → Seu serviço → Environment',
+      '   2. Clique em "Add Environment Variable"',
+      '   3. Key: CPF_ENCRYPTION_KEY',
+      '   4. Value: Execute no terminal para gerar:',
+      '      node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+      '   5. Salve e faça redeploy',
+      '',
+      '⚠️  A chave deve ter 64 caracteres hexadecimais (32 bytes)'
+    ].join('\n');
+
+    throw new Error(errorMessage);
   }
 
   if (key.length !== 64) { // 32 bytes em hex = 64 caracteres
-    throw new Error('CPF_ENCRYPTION_KEY deve ter 64 caracteres hexadecimais (32 bytes)');
+    throw new Error(
+      `CPF_ENCRYPTION_KEY inválida: deve ter 64 caracteres hexadecimais (32 bytes). ` +
+      `Atual: ${key.length} caracteres. ` +
+      `Gere uma nova com: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+    );
   }
 
   return Buffer.from(key, 'hex');

@@ -51,6 +51,13 @@ const app: Application = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 // ============================================
+// CONFIGURAÇÃO DE PROXY (RENDER/PRODUÇÃO)
+// ============================================
+// CRÍTICO: Deve vir ANTES de qualquer middleware
+// Necessário para rate-limit funcionar corretamente com X-Forwarded-For
+app.set('trust proxy', 1);
+
+// ============================================
 // MIDDLEWARES
 // ============================================
 
@@ -72,7 +79,21 @@ app.use(requestIdMiddleware);
 // ROTAS
 // ============================================
 
-// Health check
+// ============================================
+// ROTAS DE STATUS E HEALTH CHECK
+// ============================================
+
+// Rota raiz - evita 404 desnecessário
+app.get('/', (req: Request, res: Response) => {
+  res.json({
+    service: 'RadarOne API',
+    version: '1.0.0',
+    status: 'running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Health check detalhado (JSON)
 app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
@@ -81,7 +102,14 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
-// Rotas principais
+// Health check simples para Render (texto puro)
+app.get('/healthz', (req: Request, res: Response) => {
+  res.status(200).send('ok');
+});
+
+// ============================================
+// ROTAS PRINCIPAIS
+// ============================================
 app.use('/api/auth', authRoutes);
 app.use('/api/monitors', monitorRoutes);
 app.use('/api/plans', planRoutes); // Rota pública

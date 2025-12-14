@@ -29,8 +29,8 @@ export const apiRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Não aplicar rate limit em health checks
-    return req.path === '/api/test' || req.path === '/health';
+    // Não aplicar rate limit em health checks e rotas de status
+    return req.path === '/api/test' || req.path === '/health' || req.path === '/healthz' || req.path === '/';
   }
 });
 
