@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { trackViewPlans, trackSelectPlan } from '../lib/analytics';
 
@@ -25,6 +25,9 @@ interface Plan {
 }
 
 export const PlansPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const reason = searchParams.get('reason');
+
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -75,7 +78,7 @@ export const PlansPage: React.FC = () => {
 
     // Se está logado E não tem checkoutUrl, iniciar trial interno
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('radarone_token');
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const response = await fetch(`${API_URL}/api/subscriptions/start-trial`, {
         method: 'POST',
@@ -135,8 +138,17 @@ export const PlansPage: React.FC = () => {
       <section style={styles.plansSection}>
         <h1 style={styles.title}>Escolha o plano ideal para você</h1>
         <p style={styles.subtitle}>
-          <strong>7 dias grátis</strong> em todos os planos. Cancele quando quiser, sem complicação.
+          Use o RadarOne gratuitamente por 7 dias ou assine um plano com 7 dias de garantia.
         </p>
+
+        {/* Banner de trial expirado */}
+        {reason === 'trial_expired' && (
+          <div style={styles.trialExpiredBanner}>
+            <p style={styles.trialExpiredText}>
+              ⏰ Seu período grátis expirou. Assine um plano para continuar usando o RadarOne.
+            </p>
+          </div>
+        )}
 
         {error && <div style={styles.error}>{error}</div>}
 
@@ -159,7 +171,7 @@ export const PlansPage: React.FC = () => {
               <div style={styles.planPrice}>
                 {plan.priceCents === 0 ? (
                   <>
-                    <span style={styles.priceValue}>Grátis</span>
+                    <span style={styles.priceValue}>Grátis por 7 dias</span>
                   </>
                 ) : (
                   <>
@@ -179,12 +191,20 @@ export const PlansPage: React.FC = () => {
               )}
 
               <ul style={styles.planFeatures}>
-                <li>✅ {plan.maxMonitors} monitores</li>
-                <li>✅ {plan.maxSites} sites diferentes</li>
-                <li>✅ Até {plan.maxAlertsPerDay} alertas/dia</li>
+                <li>✅ {plan.maxMonitors === 999 ? 'Monitores ilimitados' : `${plan.maxMonitors} ${plan.maxMonitors === 1 ? 'monitor' : 'monitores'}`}</li>
+                <li>✅ {plan.maxSites === 999 ? 'Sites ilimitados' : `${plan.maxSites} ${plan.maxSites === 1 ? 'site' : 'sites diferentes'}`}</li>
+                <li>✅ {plan.maxAlertsPerDay === 999 ? 'Alertas ilimitados' : `Até ${plan.maxAlertsPerDay} alertas/dia`}</li>
                 <li>✅ Verificação a cada {plan.checkInterval} minutos</li>
                 <li>✅ Telegram + Email</li>
               </ul>
+
+              {plan.priceCents === 0 && (
+                <div style={styles.warningBox}>
+                  <p style={styles.warningText}>
+                    ⚠️ Após 7 dias, é necessário assinar um plano para continuar usando o RadarOne.
+                  </p>
+                </div>
+              )}
 
               <button
                 onClick={() => handleChoosePlan(plan.slug)}
@@ -194,7 +214,7 @@ export const PlansPage: React.FC = () => {
                 }}
               >
                 {plan.priceCents === 0
-                  ? 'Começar com plano FREE'
+                  ? 'Usar grátis por 7 dias'
                   : 'Assinar agora'}
               </button>
             </div>
@@ -203,8 +223,10 @@ export const PlansPage: React.FC = () => {
 
         <div style={styles.footer}>
           <p>
-            Todos os planos podem ser cancelados a qualquer momento, sem
-            burocracia.
+            Todos os planos podem ser cancelados a qualquer momento.
+          </p>
+          <p>
+            Planos pagos contam com 7 dias de garantia.
           </p>
         </div>
       </section>
@@ -360,6 +382,19 @@ const styles = {
     flexDirection: 'column' as const,
     gap: '12px',
   },
+  warningBox: {
+    backgroundColor: '#fef3c7',
+    border: '1px solid #fbbf24',
+    borderRadius: '6px',
+    padding: '12px',
+    marginBottom: '16px',
+  },
+  warningText: {
+    fontSize: '13px',
+    color: '#92400e',
+    margin: 0,
+    lineHeight: '1.5',
+  },
   planButton: {
     width: '100%',
     padding: '12px',
@@ -379,5 +414,19 @@ const styles = {
     color: '#6b7280',
     fontSize: '14px',
     marginTop: '48px',
+  },
+  trialExpiredBanner: {
+    backgroundColor: '#fef3c7',
+    border: '2px solid #fbbf24',
+    borderRadius: '8px',
+    padding: '16px',
+    marginBottom: '24px',
+    textAlign: 'center' as const,
+  },
+  trialExpiredText: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#92400e',
+    margin: 0,
   },
 };

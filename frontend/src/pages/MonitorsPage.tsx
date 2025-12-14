@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { getToken } from '../services/tokenStorage';
 import { useAuth } from '../context/AuthContext';
 import { trackMonitorCreated } from '../lib/analytics';
+import { TrialBanner } from '../components/TrialBanner';
 
 type MonitorSite =
   | 'MERCADO_LIVRE'
@@ -302,6 +303,9 @@ export function MonitorsPage() {
         <p style={styles.subtitle}>
           Configure monitores para receber alertas de novos anúncios
         </p>
+
+        {/* Banner de trial expirando */}
+        <TrialBanner />
 
         {error && (
           <div style={styles.error}>

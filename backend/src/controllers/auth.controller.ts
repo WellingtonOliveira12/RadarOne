@@ -43,14 +43,33 @@ export class AuthController {
         }
       }
 
-      // Verifica se usuário já existe
+      // Verifica se usuário já existe (email ou CPF)
       const existingUser = await prisma.user.findUnique({
         where: { email }
       });
 
       if (existingUser) {
-        res.status(409).json({ error: 'Email já cadastrado' });
+        res.status(409).json({
+          error: 'Você já tem cadastro. Faça login para entrar.',
+          errorCode: 'USER_ALREADY_EXISTS'
+        });
         return;
+      }
+
+      // Verifica CPF duplicado se fornecido
+      if (cpf) {
+        const encrypted = encryptCpf(cpf);
+        const existingCpf = await prisma.user.findFirst({
+          where: { cpfLast4: encrypted.last4 }
+        });
+
+        if (existingCpf) {
+          res.status(409).json({
+            error: 'Você já tem cadastro. Faça login para entrar.',
+            errorCode: 'USER_ALREADY_EXISTS'
+          });
+          return;
+        }
       }
 
       // Hash da senha

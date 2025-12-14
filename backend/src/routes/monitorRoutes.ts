@@ -1,17 +1,21 @@
 import { Router } from 'express';
 import * as monitorController from '../controllers/monitorController';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, checkTrialExpired } from '../middlewares/auth.middleware';
 
 /**
  * Rotas de Monitores - RadarOne
  *
  * Todas as rotas são protegidas com autenticação JWT
+ * E verificação de trial expirado (plano FREE de 7 dias)
  */
 
 const router = Router();
 
 // Aplicar middleware de autenticação em todas as rotas
 router.use(authenticateToken);
+
+// Verificar se trial FREE não expirou (bloqueia acesso se expirado)
+router.use(checkTrialExpired);
 
 /**
  * GET /api/monitors

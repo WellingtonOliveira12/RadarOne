@@ -9,6 +9,19 @@ export interface RequestOptions {
   token?: string | null;
 }
 
+/**
+ * Trata erro de trial expirado redirecionando para /plans
+ * Evita loop se já estiver em /plans
+ */
+function handleTrialExpiredError(errorCode?: string, status?: number): void {
+  if (status === 403 && errorCode === 'TRIAL_EXPIRED') {
+    // Evitar loop: não redirecionar se já estiver em /plans
+    if (window.location.pathname !== '/plans') {
+      window.location.href = '/plans?reason=trial_expired';
+    }
+  }
+}
+
 async function apiRequest<T = any>(
   path: string,
   options: RequestOptions = {}
@@ -42,7 +55,18 @@ async function apiRequest<T = any>(
     const msg =
       (data && (data.error || data.message)) ||
       `Erro na requisição (${res.status})`;
-    throw new Error(msg);
+
+    // Tratar erro de trial expirado
+    const errorCode = data && data.errorCode;
+    handleTrialExpiredError(errorCode, res.status);
+
+    // Criar erro com informações adicionais
+    const error: any = new Error(msg);
+    error.status = res.status;
+    error.errorCode = errorCode;
+    error.response = { status: res.status, data };
+
+    throw error;
   }
 
   return data as T;

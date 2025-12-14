@@ -7,8 +7,6 @@ import { trackSignUp } from '../lib/analytics';
  * Página de Cadastro com CPF e preferências de notificação
  */
 
-type NotificationPreference = 'TELEGRAM' | 'EMAIL';
-
 export const RegisterPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const selectedPlanFromUrl = searchParams.get('plan') || '';
@@ -20,7 +18,8 @@ export const RegisterPage: React.FC = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    notificationPreference: 'TELEGRAM' as NotificationPreference,
+    notifyEmail: true,  // Email sempre ativo
+    notifyTelegram: false,  // Telegram opcional
     telegramUsername: '',
   });
   const [error, setError] = useState('');
@@ -62,10 +61,8 @@ export const RegisterPage: React.FC = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleNotificationPreferenceChange = (
-    preference: NotificationPreference
-  ) => {
-    setFormData({ ...formData, notificationPreference: preference });
+  const handleTelegramCheckboxChange = (checked: boolean) => {
+    setFormData({ ...formData, notifyTelegram: checked });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,9 +109,9 @@ export const RegisterPage: React.FC = () => {
         cpf: cleanCpf,
         phone: formData.phone.replace(/\D/g, '') || undefined,
         password: formData.password,
-        notificationPreference: formData.notificationPreference,
+        notificationPreference: formData.notifyTelegram ? 'TELEGRAM' : 'EMAIL',
         telegramUsername:
-          formData.notificationPreference === 'TELEGRAM'
+          formData.notifyTelegram
             ? formData.telegramUsername
             : undefined,
       });
@@ -130,19 +127,36 @@ export const RegisterPage: React.FC = () => {
         navigate('/plans');
       }
     } catch (err: any) {
-      setError(
-        err.response?.data?.error || 'Erro ao criar conta. Tente novamente.'
-      );
+      const errorMessage = err.response?.data?.error || err.message || 'Erro ao criar conta. Tente novamente.';
+      const errorCode = err.response?.data?.errorCode;
+
+      // Se é erro de usuário já existente, mostrar mensagem especial
+      if (errorCode === 'USER_ALREADY_EXISTS' || err.response?.status === 409) {
+        setError('user_exists');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>RadarOne</h1>
-        <p style={styles.subtitle}>Crie sua conta - Planos com 7 dias de garantia</p>
+    <>
+      {/* Header com Logo Clicável */}
+      <div style={styles.header}>
+        <div style={styles.headerContent}>
+          <Link to="/" style={styles.logo}>
+            RadarOne
+          </Link>
+        </div>
+      </div>
+
+      {/* Container do Formulário */}
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <h1 style={styles.title}>Criar Conta</h1>
+          <p style={styles.subtitle}>Planos com 7 dias de garantia</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           {/* Nome */}
@@ -231,44 +245,51 @@ export const RegisterPage: React.FC = () => {
             />
           </div>
 
-          {/* Preferência de notificação */}
+          {/* Notificações */}
           <div style={styles.field}>
             <label style={styles.label}>
               Como você quer receber as notificações?
             </label>
-            <div style={styles.radioGroup}>
-              <label style={styles.radioLabel}>
+
+            {/* Email sempre ativo */}
+            <div style={styles.infoBoxEmail}>
+              <label style={styles.checkboxLabel}>
                 <input
-                  type="radio"
-                  name="notificationPreference"
-                  checked={formData.notificationPreference === 'TELEGRAM'}
-                  onChange={() =>
-                    handleNotificationPreferenceChange('TELEGRAM')
-                  }
-                  style={styles.radio}
+                  type="checkbox"
+                  checked={true}
+                  disabled={true}
+                  style={styles.checkbox}
                 />
                 <span>
-                  <strong>Telegram</strong> (recomendado)
+                  <strong>E-mail</strong> (sempre ativo)
                 </span>
               </label>
-              <label style={styles.radioLabel}>
+              <p style={styles.infoTextSmall}>
+                Você sempre receberá alertas por e-mail.
+              </p>
+            </div>
+
+            {/* Telegram opcional */}
+            <div style={styles.checkboxContainer}>
+              <label style={styles.checkboxLabel}>
                 <input
-                  type="radio"
-                  name="notificationPreference"
-                  checked={formData.notificationPreference === 'EMAIL'}
-                  onChange={() => handleNotificationPreferenceChange('EMAIL')}
-                  style={styles.radio}
+                  type="checkbox"
+                  checked={formData.notifyTelegram}
+                  onChange={(e) => handleTelegramCheckboxChange(e.target.checked)}
+                  style={styles.checkbox}
                 />
-                <span>E-mail</span>
+                <span>
+                  <strong>Receber também no Telegram</strong> (recomendado)
+                </span>
               </label>
             </div>
 
             {/* Instruções para Telegram */}
-            {formData.notificationPreference === 'TELEGRAM' && (
+            {formData.notifyTelegram && (
               <div style={styles.infoBox}>
-                <p style={styles.infoTitle}>✨ Recomendado</p>
+                <p style={styles.infoTitle}>✨ Ótima escolha!</p>
                 <p style={styles.infoText}>
-                  Você receberá alertas em tempo real no Telegram.
+                  Você receberá alertas em tempo real no Telegram + E-mail.
                 </p>
                 <ol style={styles.stepsList}>
                   <li>Instale o Telegram (se ainda não tiver)</li>
@@ -301,41 +322,63 @@ export const RegisterPage: React.FC = () => {
                 </div>
               </div>
             )}
-
-            {/* Informação para Email */}
-            {formData.notificationPreference === 'EMAIL' && (
-              <div style={styles.infoBoxEmail}>
-                <p style={styles.infoText}>
-                  Ok! Vamos enviar os alertas para o seu e-mail. Você pode
-                  trocar para Telegram depois nas configurações.
-                </p>
-              </div>
-            )}
           </div>
 
-          {error && <div style={styles.error}>{error}</div>}
+          {error && (
+            <div style={styles.error}>
+              {error === 'user_exists' ? (
+                <>
+                  <p style={{ margin: '0 0 12px 0' }}>
+                    Você já tem cadastro. Faça login para entrar.
+                  </p>
+                  <Link to="/login" style={styles.errorLink}>
+                    Ir para login →
+                  </Link>
+                </>
+              ) : (
+                error
+              )}
+            </div>
+          )}
 
           <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Criando conta...' : 'Criar conta grátis'}
+            {loading ? 'Criando conta...' : 'Criar conta e usar 7 dias grátis'}
           </button>
         </form>
 
-        <p style={styles.footer}>
-          Já tem conta? <Link to="/login">Entre aqui</Link>
-        </p>
+          <p style={styles.footer}>
+            Já tem conta? <Link to="/login">Entre aqui</Link>
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
 const styles = {
+  header: {
+    backgroundColor: 'white',
+    borderBottom: '1px solid #e5e7eb',
+    padding: '16px 0',
+  },
+  headerContent: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '0 20px',
+  },
+  logo: {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textDecoration: 'none',
+  },
   container: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: '100vh',
+    minHeight: 'calc(100vh - 60px)',
     backgroundColor: '#f5f5f5',
-    padding: '20px',
+    padding: '40px 20px',
   },
   card: {
     backgroundColor: 'white',
@@ -384,20 +427,20 @@ const styles = {
     borderRadius: '4px',
     fontSize: '14px',
   },
-  radioGroup: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '12px',
+  checkboxContainer: {
+    marginTop: '8px',
   },
-  radioLabel: {
+  checkboxLabel: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     fontSize: '14px',
     cursor: 'pointer',
   },
-  radio: {
+  checkbox: {
     cursor: 'pointer',
+    width: '18px',
+    height: '18px',
   },
   infoBox: {
     backgroundColor: '#e0f2fe',
@@ -423,6 +466,11 @@ const styles = {
     fontSize: '13px',
     color: '#475569',
     margin: '0 0 12px 0',
+  },
+  infoTextSmall: {
+    fontSize: '12px',
+    color: '#64748b',
+    margin: '4px 0 0 0',
   },
   stepsList: {
     fontSize: '13px',
@@ -452,6 +500,12 @@ const styles = {
     color: '#c33',
     borderRadius: '4px',
     fontSize: '14px',
+  },
+  errorLink: {
+    display: 'inline-block',
+    color: '#c33',
+    fontWeight: '600',
+    textDecoration: 'underline',
   },
   footer: {
     marginTop: '24px',

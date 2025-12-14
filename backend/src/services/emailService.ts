@@ -209,12 +209,15 @@ export async function sendTrialEndingEmail(
   const text = `
 Olá ${userName}!
 
-Seu trial do plano ${planName} está terminando em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}.
+Seu teste do RadarOne termina em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}.
 
 Para continuar aproveitando todos os recursos:
 1. Acesse ${FRONTEND_URL}/plans
-2. Escolha seu plano
+2. Escolha seu plano ideal
 3. Finalize a assinatura
+
+✅ Planos pagos contam com 7 dias de garantia
+💡 Se não gostar, devolvemos seu dinheiro
 
 Não perca acesso aos seus monitores!
 
@@ -225,11 +228,11 @@ Equipe ${EMAIL_FROM_NAME}
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h1 style="color: #f59e0b; text-align: center;">⏰ Trial Terminando</h1>
+      <h1 style="color: #f59e0b; text-align: center;">⏰ Seu teste termina em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}!</h1>
 
       <p>Olá <strong>${userName}</strong>!</p>
 
-      <p>Seu trial do plano <strong>${planName}</strong> está terminando em <strong style="color: #dc2626;">${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}</strong>.</p>
+      <p>Seu teste do <strong>RadarOne</strong> está terminando em <strong style="color: #dc2626;">${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}</strong>.</p>
 
       <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0;"><strong>Para continuar aproveitando todos os recursos:</strong></p>
@@ -239,6 +242,11 @@ Equipe ${EMAIL_FROM_NAME}
           <li>Finalize a assinatura</li>
         </ol>
         <p style="margin: 10px 0 0 0; color: #92400e;">⚠️ Não perca acesso aos seus monitores!</p>
+      </div>
+
+      <div style="background-color: #d1fae5; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+        <p style="margin: 0 0 8px 0; color: #065f46;"><strong>✅ 7 dias de garantia</strong></p>
+        <p style="margin: 0; color: #065f46;">Planos pagos contam com 7 dias de garantia. Se não gostar, devolvemos seu dinheiro.</p>
       </div>
 
       <div style="text-align: center; margin: 30px 0;">

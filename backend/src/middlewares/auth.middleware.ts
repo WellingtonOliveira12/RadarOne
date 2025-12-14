@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { prisma } from '../server';
 
 // Estende o tipo Request para incluir userId
 declare global {
@@ -74,5 +75,67 @@ export const requireAdmin = async (
     next();
   } catch (error) {
     res.status(500).json({ error: 'Erro ao verificar permissões' });
+  }
+};
+
+/**
+ * Middleware para verificar se o trial FREE expirou
+ * Bloqueia acesso aos recursos se:
+ * 1. Usuário tem plano FREE (trial)
+ * 2. Trial já expirou (trialEndsAt < now)
+ *
+ * Deve ser usado APÓS authenticateToken
+ */
+export const checkTrialExpired = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ error: 'Não autenticado' });
+      return;
+    }
+
+    // Buscar assinatura ativa ou trial do usuário
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        userId: req.userId,
+        status: { in: ['ACTIVE', 'TRIAL'] }
+      },
+      include: {
+        plan: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Se não tem assinatura, bloquear acesso
+    if (!subscription) {
+      res.status(403).json({
+        error: 'Você precisa assinar um plano para acessar este recurso.',
+        errorCode: 'NO_SUBSCRIPTION'
+      });
+      return;
+    }
+
+    // Se é trial e já expirou, bloquear acesso
+    if (subscription.status === 'TRIAL' && subscription.trialEndsAt) {
+      const now = new Date();
+      if (subscription.trialEndsAt < now) {
+        res.status(403).json({
+          error: 'Seu período de teste gratuito expirou. Assine um plano para continuar.',
+          errorCode: 'TRIAL_EXPIRED'
+        });
+        return;
+      }
+    }
+
+    // Se passou por todas as verificações, permitir acesso
+    next();
+  } catch (error) {
+    console.error('Erro ao verificar trial:', error);
+    res.status(500).json({ error: 'Erro ao verificar acesso' });
   }
 };
