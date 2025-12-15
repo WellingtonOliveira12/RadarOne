@@ -1,3 +1,5 @@
+import { trackRedirectToPlans } from '../lib/analytics';
+
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com';
 
@@ -17,6 +19,9 @@ function handleTrialExpiredError(errorCode?: string, status?: number): void {
   if (status === 403 && errorCode === 'TRIAL_EXPIRED') {
     // Evitar loop: não redirecionar se já estiver em /plans
     if (window.location.pathname !== '/plans') {
+      // Track redirecionamento para analytics
+      trackRedirectToPlans('trial_expired');
+
       window.location.href = '/plans?reason=trial_expired';
     }
   }

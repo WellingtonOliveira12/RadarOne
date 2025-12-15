@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { trackViewPlans, trackSelectPlan } from '../lib/analytics';
+import { trackViewPlans, trackSelectPlan, trackTrialExpiredToastShown } from '../lib/analytics';
 import { showInfo } from '../lib/toast';
+import { getABMessage, trackABVariantShown } from '../lib/abtest';
 
 /**
  * Página de Planos - Mostra os 5 planos comerciais
@@ -46,8 +47,14 @@ export const PlansPage: React.FC = () => {
       const toastShown = sessionStorage.getItem('trial_expired_toast_shown');
 
       if (!toastShown) {
-        showInfo('Seu período grátis expirou. Escolha um plano para continuar.');
+        // Obter mensagem via A/B testing
+        const message = getABMessage('trialExpiredToast');
+        showInfo(message);
         sessionStorage.setItem('trial_expired_toast_shown', 'true');
+
+        // Track toast shown para analytics + variante
+        trackTrialExpiredToastShown();
+        trackABVariantShown('trialExpiredToast', 'plans_page_toast');
       }
     }
   }, [reason]);
@@ -159,7 +166,7 @@ export const PlansPage: React.FC = () => {
         {reason === 'trial_expired' && (
           <div style={styles.trialExpiredBanner}>
             <p style={styles.trialExpiredText}>
-              ⏰ Seu período grátis expirou. Assine um plano para continuar usando o RadarOne.
+              ⏰ {getABMessage('trialExpiredBanner')}
             </p>
           </div>
         )}
