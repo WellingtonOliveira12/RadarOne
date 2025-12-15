@@ -279,6 +279,18 @@ Para dúvidas ou suporte, entre em contato via:
 
 ---
 
-**Status do Projeto**: 🟡 Em Desenvolvimento Ativo
+**Status do Projeto**: 🟢 Em Produção com CI/CD Ativo
 
-Última atualização: 2025
+Última atualização: Dezembro 2025
+
+---
+
+## 🧪 CI/CD & Qualidade
+
+O projeto possui pipeline automatizado de CI/CD com GitHub Actions:
+- ✅ Testes E2E com Playwright (5 browsers)
+- ✅ Backend + PostgreSQL em ambiente de teste
+- ✅ Mock automático de emails
+- ✅ Artifacts e screenshots em falhas
+
+Ver: [TESTING_GUIDE.md](./TESTING_GUIDE.md) para mais detalhes
