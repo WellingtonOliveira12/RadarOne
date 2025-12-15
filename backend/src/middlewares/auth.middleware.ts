@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../server';
+import { logWithUser } from '../logger';
 
 // Estende o tipo Request para incluir userId
 declare global {
@@ -124,6 +125,20 @@ export const checkTrialExpired = async (
     if (subscription.status === 'TRIAL' && subscription.trialEndsAt) {
       const now = new Date();
       if (subscription.trialEndsAt < now) {
+        // Calcular quantos dias expirou
+        const daysExpired = Math.ceil((now.getTime() - subscription.trialEndsAt.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Logar evento TRIAL_EXPIRED para analytics/monitoramento
+        logWithUser(req.userId, 'warn', 'Trial expirado - acesso bloqueado', {
+          eventType: 'TRIAL_EXPIRED',
+          planName: subscription.plan.name,
+          planSlug: subscription.plan.slug,
+          trialEndedAt: subscription.trialEndsAt.toISOString(),
+          daysExpired,
+          endpoint: `${req.method} ${req.path}`,
+          userAgent: req.headers['user-agent'],
+        });
+
         res.status(403).json({
           error: 'Seu período de teste gratuito expirou. Assine um plano para continuar.',
           errorCode: 'TRIAL_EXPIRED'

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { trackViewPlans, trackSelectPlan } from '../lib/analytics';
+import { showInfo } from '../lib/toast';
 
 /**
  * Página de Planos - Mostra os 5 planos comerciais
@@ -37,6 +38,19 @@ export const PlansPage: React.FC = () => {
   useEffect(() => {
     loadPlans();
   }, []);
+
+  // Mostrar toast ao redirecionar por TRIAL_EXPIRED
+  useEffect(() => {
+    if (reason === 'trial_expired') {
+      // Verificar se já mostrou o toast nesta sessão (evitar mostrar múltiplas vezes)
+      const toastShown = sessionStorage.getItem('trial_expired_toast_shown');
+
+      if (!toastShown) {
+        showInfo('Seu período grátis expirou. Escolha um plano para continuar.');
+        sessionStorage.setItem('trial_expired_toast_shown', 'true');
+      }
+    }
+  }, [reason]);
 
   const loadPlans = async () => {
     try {
