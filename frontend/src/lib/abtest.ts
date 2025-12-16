@@ -68,13 +68,18 @@ export function getABVariant(testKey: ABTestKey): ABVariant {
 /**
  * Obtém a mensagem correta baseada no teste A/B
  */
+// Function overloads para tipagem segura
+export function getABMessage(testKey: 'trialExpiredToast'): string;
+export function getABMessage(testKey: 'trialExpiredBanner'): string;
+export function getABMessage(testKey: 'trialExpiringBanner', days: number): string;
 export function getABMessage(testKey: ABTestKey, ...args: any[]): string {
   const variant = getABVariant(testKey);
   const message = AB_TEST_VARIANTS[testKey][variant];
 
-  // Se for função, executar com argumentos
+  // Se for função, executar com argumentos usando type assertion segura
   if (typeof message === 'function') {
-    return message(...args);
+    // TypeScript-safe: sabemos que se message é function, args vem dos overloads
+    return (message as (arg: number) => string)(args[0]);
   }
 
   return message;
