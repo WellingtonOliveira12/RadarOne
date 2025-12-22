@@ -135,6 +135,7 @@ const styles = {
   container: {
     minHeight: '100vh',
     backgroundColor: '#f9fafb',
+    width: '100%',
   },
   header: {
     backgroundColor: 'white',
@@ -144,10 +145,12 @@ const styles = {
   headerContent: {
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '0 20px',
+    padding: '0 clamp(16px, 4vw, 20px)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap' as const,
+    gap: '12px',
   },
   logo: {
     fontSize: '24px',
@@ -157,8 +160,9 @@ const styles = {
   },
   nav: {
     display: 'flex',
-    gap: '16px',
+    gap: 'clamp(8px, 2vw, 16px)',
     alignItems: 'center',
+    flexWrap: 'wrap' as const,
   },
   navLink: {
     color: '#4b5563',
@@ -178,8 +182,10 @@ const styles = {
   hero: {
     maxWidth: '800px',
     margin: '0 auto',
-    padding: 'clamp(40px, 10vw, 80px) 20px', // Padding responsivo
+    padding: 'clamp(40px, 10vw, 80px) clamp(16px, 4vw, 20px)',
     textAlign: 'center' as const,
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   heroTitle: {
     fontSize: 'clamp(28px, 6vw, 48px)', // Responsivo: 28px (mobile) até 48px (desktop)
@@ -224,7 +230,9 @@ const styles = {
   features: {
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '60px 20px',
+    padding: 'clamp(40px, 8vw, 60px) clamp(16px, 4vw, 20px)',
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   sectionTitle: {
     fontSize: 'clamp(24px, 5vw, 36px)', // Responsivo: 24px (mobile) até 36px (desktop)
@@ -263,7 +271,9 @@ const styles = {
   benefits: {
     maxWidth: '800px',
     margin: '0 auto',
-    padding: '60px 20px',
+    padding: 'clamp(40px, 8vw, 60px) clamp(16px, 4vw, 20px)',
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   benefitsList: {
     display: 'flex',
@@ -282,8 +292,10 @@ const styles = {
   },
   cta: {
     backgroundColor: '#3b82f6',
-    padding: '80px 20px',
+    padding: 'clamp(50px, 10vw, 80px) clamp(16px, 4vw, 20px)',
     textAlign: 'center' as const,
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   ctaTitle: {
     fontSize: 'clamp(24px, 5vw, 36px)', // Responsivo
@@ -292,9 +304,11 @@ const styles = {
     marginBottom: '16px',
   },
   ctaSubtitle: {
-    fontSize: 'clamp(16px, 3vw, 18px)', // Responsivo
+    fontSize: 'clamp(16px, 3vw, 18px)',
     color: 'rgba(255,255,255,0.9)',
     marginBottom: '32px',
+    maxWidth: '600px',
+    margin: '0 auto 32px auto',
   },
   ctaButton: {
     backgroundColor: 'white',
