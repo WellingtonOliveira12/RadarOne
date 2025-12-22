@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 
 /**
  * Dashboard - Página principal após login
@@ -40,21 +41,9 @@ export const DashboardPage: React.FC = () => {
 
   const loadDashboardData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      // Usar client API que lida com token automaticamente
+      const subData = await api.get('/api/subscriptions/my');
 
-      // Carregar subscription
-      const subResponse = await fetch(`${API_URL}/api/subscriptions/my`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!subResponse.ok) {
-        throw new Error('Erro ao carregar assinatura');
-      }
-
-      const subData = await subResponse.json();
       setSubscription({
         id: subData.subscription.id,
         status: subData.subscription.status,
@@ -70,7 +59,20 @@ export const DashboardPage: React.FC = () => {
         sitesCount: 0 // API não retorna sitesCount ainda
       });
     } catch (err: any) {
-      setError('Erro ao carregar dados');
+      // Diagnóstico melhorado em DEV
+      const isDev = import.meta.env.DEV;
+      if (isDev) {
+        console.error('Dashboard: Erro ao carregar dados', {
+          endpoint: '/api/subscriptions/my',
+          status: err.status,
+          errorCode: err.errorCode,
+          message: err.message,
+          data: err.data
+        });
+        setError(`Erro ao carregar dados (${err.status || 'Network'} - ${err.errorCode || 'UNKNOWN'}). Ver console.`);
+      } else {
+        setError('Erro ao carregar dados. Tente novamente mais tarde.');
+      }
     } finally {
       setLoading(false);
     }
@@ -168,7 +170,20 @@ export const DashboardPage: React.FC = () => {
           </p>
         </section>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <div style={styles.error}>
+            {error}
+            <button
+              onClick={() => {
+                setError('');
+                loadDashboardData();
+              }}
+              style={styles.retryButton}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         {/* Subscription Card */}
         {subscription && (
@@ -361,6 +376,21 @@ const styles = {
     padding: '16px',
     borderRadius: '8px',
     marginBottom: '24px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  retryButton: {
+    backgroundColor: '#991b1b',
+    color: 'white',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
   },
   subscriptionCard: {
     backgroundColor: 'white',

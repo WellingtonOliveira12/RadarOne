@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 
 /**
  * Configurações de Notificações
@@ -36,19 +37,8 @@ export const NotificationSettingsPage: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_URL}/api/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar configurações');
-      }
-
-      const data = await response.json();
+      // Usar client API que lida com token automaticamente
+      const data = await api.get('/api/me');
       const telegramAccount = data.user.telegramAccounts?.[0];
 
       const loadedSettings: NotificationSettings = {
@@ -65,7 +55,20 @@ export const NotificationSettingsPage: React.FC = () => {
         telegramUsername: loadedSettings.telegramUsername || '',
       });
     } catch (err: any) {
-      setError('Erro ao carregar configurações');
+      // Diagnóstico melhorado em DEV
+      const isDev = import.meta.env.DEV;
+      if (isDev) {
+        console.error('NotificationSettings: Erro ao carregar configurações', {
+          endpoint: '/api/me',
+          status: err.status,
+          errorCode: err.errorCode,
+          message: err.message,
+          data: err.data
+        });
+        setError(`Erro ao carregar configurações (${err.status || 'Network'} - ${err.errorCode || 'UNKNOWN'}). Ver console.`);
+      } else {
+        setError('Erro ao carregar configurações. Tente novamente mais tarde.');
+      }
     } finally {
       setLoading(false);
     }
@@ -77,8 +80,6 @@ export const NotificationSettingsPage: React.FC = () => {
     setSuccess('');
 
     try {
-      const token = localStorage.getItem('token');
-
       // Por enquanto, apenas salvar se tiver telegram username
       // A vinculação real do chatId acontece quando o usuário conecta no bot
       const updateData: any = {};
@@ -88,25 +89,24 @@ export const NotificationSettingsPage: React.FC = () => {
         // updateData.telegramChatId = '...';
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_URL}/api/me/notifications`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(updateData)
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao salvar');
-      }
+      // Usar client API que lida com token automaticamente
+      await api.post('/api/me/notifications', updateData);
 
       setSuccess('Configurações salvas com sucesso!');
       setEditing(false);
       loadSettings();
     } catch (err: any) {
+      // Diagnóstico melhorado em DEV
+      const isDev = import.meta.env.DEV;
+      if (isDev) {
+        console.error('NotificationSettings: Erro ao salvar', {
+          endpoint: '/api/me/notifications',
+          status: err.status,
+          errorCode: err.errorCode,
+          message: err.message,
+          data: err.data
+        });
+      }
       setError(err.message || 'Erro ao salvar configurações');
     } finally {
       setSaving(false);
@@ -168,7 +168,20 @@ export const NotificationSettingsPage: React.FC = () => {
           Escolha como você quer receber os alertas de novos anúncios
         </p>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <div style={styles.error}>
+            {error}
+            <button
+              onClick={() => {
+                setError('');
+                loadSettings();
+              }}
+              style={styles.retryButton}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
         {success && <div style={styles.success}>{success}</div>}
 
         {settings && (
@@ -397,6 +410,21 @@ const styles = {
     padding: '12px 16px',
     borderRadius: '8px',
     marginBottom: '16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  retryButton: {
+    backgroundColor: '#991b1b',
+    color: 'white',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
   },
   success: {
     backgroundColor: '#d1fae5',
