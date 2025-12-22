@@ -80,6 +80,7 @@ async function apiRequest<T = any>(
     const error: any = new Error(msg);
     error.status = res.status;
     error.errorCode = errorCode;
+    error.data = data;
     error.response = { status: res.status, data };
 
     throw error;
