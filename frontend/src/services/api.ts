@@ -1,4 +1,5 @@
 import { trackRedirectToPlans } from '../lib/analytics';
+import { getToken, clearToken } from './tokenStorage';
 
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com';
@@ -37,8 +38,10 @@ async function apiRequest<T = any>(
     'Content-Type': 'application/json',
   };
 
-  if (options.token) {
-    headers['Authorization'] = `Bearer ${options.token}`;
+  // Ler token automaticamente se não fornecido manualmente
+  const token = options.token !== undefined ? options.token : getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const res = await fetch(url, {
@@ -64,6 +67,14 @@ async function apiRequest<T = any>(
     // Tratar erro de trial expirado
     const errorCode = data && data.errorCode;
     handleTrialExpiredError(errorCode, res.status);
+
+    // Tratar token inválido ou expirado (401/403)
+    if (res.status === 401 || (res.status === 403 && msg.toLowerCase().includes('token'))) {
+      clearToken();
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login?reason=session_expired';
+      }
+    }
 
     // Criar erro com informações adicionais
     const error: any = new Error(msg);
