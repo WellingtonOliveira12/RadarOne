@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { api } from '../services/api';
 import { getToken } from '../services/tokenStorage';
 import { useAuth } from '../context/AuthContext';
@@ -287,12 +287,24 @@ export function MonitorsPage() {
         <div style={styles.headerContent}>
           <h1 style={styles.logo}>RadarOne</h1>
           <nav style={styles.nav}>
-            <Link to="/dashboard" style={styles.navLink}>
+            <NavLink
+              to="/dashboard"
+              style={({ isActive }) => ({
+                ...styles.navLink,
+                ...(isActive ? styles.navLinkActive : {})
+              })}
+            >
               Dashboard
-            </Link>
-            <Link to="/monitors" style={styles.navLink}>
+            </NavLink>
+            <NavLink
+              to="/monitors"
+              style={({ isActive }) => ({
+                ...styles.navLink,
+                ...(isActive ? styles.navLinkActive : {})
+              })}
+            >
               Monitores
-            </Link>
+            </NavLink>
             <button onClick={logout} style={styles.logoutButton}>
               Sair
             </button>
@@ -716,6 +728,10 @@ const styles = {
     textDecoration: 'none',
     fontSize: '14px',
     fontWeight: '500' as const,
+  },
+  navLinkActive: {
+    color: '#2563eb',
+    fontWeight: '600' as const,
   },
   logoutButton: {
     backgroundColor: '#ef4444',

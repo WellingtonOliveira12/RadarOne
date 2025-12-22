@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -128,12 +128,24 @@ export const NotificationSettingsPage: React.FC = () => {
         <div style={styles.headerContent}>
           <h1 style={styles.logo}>RadarOne</h1>
           <nav style={styles.nav}>
-            <Link to="/dashboard" style={styles.navLink}>
+            <NavLink
+              to="/dashboard"
+              style={({ isActive }) => ({
+                ...styles.navLink,
+                ...(isActive ? styles.navLinkActive : {})
+              })}
+            >
               Dashboard
-            </Link>
-            <Link to="/monitors" style={styles.navLink}>
+            </NavLink>
+            <NavLink
+              to="/monitors"
+              style={({ isActive }) => ({
+                ...styles.navLink,
+                ...(isActive ? styles.navLinkActive : {})
+              })}
+            >
               Monitores
-            </Link>
+            </NavLink>
             <button onClick={logout} style={styles.logoutButton}>
               Sair
             </button>
@@ -333,6 +345,10 @@ const styles = {
     textDecoration: 'none',
     fontSize: '14px',
     fontWeight: '500',
+  },
+  navLinkActive: {
+    color: '#2563eb',
+    fontWeight: '600',
   },
   logoutButton: {
     backgroundColor: '#ef4444',
