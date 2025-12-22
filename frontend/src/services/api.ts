@@ -38,8 +38,8 @@ async function apiRequest<T = any>(
     'Content-Type': 'application/json',
   };
 
-  // Ler token automaticamente se não fornecido manualmente
-  const token = options.token !== undefined ? options.token : getToken();
+  // Ler token automaticamente se não fornecido manualmente (fallback robusto para null/undefined)
+  const token = options.token ?? getToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
