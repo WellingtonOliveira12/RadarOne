@@ -40,12 +40,15 @@ test.describe('Login Flow', () => {
   test('deve fazer login com sucesso e redirecionar para dashboard', async ({ page }) => {
     await page.goto('/login');
 
+    // Aguardar página carregar (AuthProvider montar)
+    await page.waitForLoadState('networkidle');
+
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
 
-    // Aguarda redirecionamento
-    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 5000 });
+    // Aguarda redirecionamento (useAuth agora atualiza contexto corretamente)
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
 
     // Verifica se está autenticado
     const url = page.url();

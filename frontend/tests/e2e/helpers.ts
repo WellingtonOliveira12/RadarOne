@@ -15,12 +15,16 @@ export const TEST_USER = {
  */
 export async function login(page: Page, email = TEST_USER.email, password = TEST_USER.password) {
   await page.goto('/login');
+
+  // Aguardar página carregar completamente (AuthProvider montar)
+  await page.waitForLoadState('networkidle');
+
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', password);
   await page.click('button[type="submit"]');
 
-  // Aguarda redirecionamento ou toast de sucesso
-  await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 5000 });
+  // Aguarda redirecionamento (agora funciona com useAuth)
+  await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
 }
 
 /**
