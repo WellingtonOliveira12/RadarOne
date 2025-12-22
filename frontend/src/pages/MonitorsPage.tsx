@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { getToken } from '../services/tokenStorage';
 import { useAuth } from '../context/AuthContext';
 import { trackMonitorCreated } from '../lib/analytics';
 import { TrialBanner } from '../components/TrialBanner';
+import { AppLayout } from '../components/AppLayout';
 
 type MonitorSite =
   | 'MERCADO_LIVRE'
@@ -63,7 +64,7 @@ function getSiteLabel(site: MonitorSite): string {
 }
 
 export function MonitorsPage() {
-  const { logout } = useAuth();
+  useAuth(); // Required for protected route
 
   // Lista
   const [monitors, setMonitors] = useState<Monitor[]>([]);
@@ -281,38 +282,7 @@ export function MonitorsPage() {
   }
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <h1 style={styles.logo}>RadarOne</h1>
-          <nav style={styles.nav}>
-            <NavLink
-              to="/dashboard"
-              style={({ isActive }) => ({
-                ...styles.navLink,
-                ...(isActive ? styles.navLinkActive : {})
-              })}
-            >
-              Dashboard
-            </NavLink>
-            <NavLink
-              to="/monitors"
-              style={({ isActive }) => ({
-                ...styles.navLink,
-                ...(isActive ? styles.navLinkActive : {})
-              })}
-            >
-              Monitores
-            </NavLink>
-            <button onClick={logout} style={styles.logoutButton}>
-              Sair
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      <div style={styles.content}>
+    <AppLayout>
         <div style={styles.breadcrumb}>
           <Link to="/dashboard" style={styles.breadcrumbLink}>
             Dashboard
@@ -689,65 +659,11 @@ export function MonitorsPage() {
             </table>
           </div>
         )}
-      </div>
-    </div>
+    </AppLayout>
   );
 }
 
 const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '16px 0',
-  },
-  headerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    margin: 0,
-  },
-  nav: {
-    display: 'flex',
-    gap: '16px',
-    alignItems: 'center',
-  },
-  navLink: {
-    color: '#4b5563',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '500' as const,
-  },
-  navLinkActive: {
-    color: '#2563eb',
-    fontWeight: '600' as const,
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    border: 'none',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500' as const,
-    cursor: 'pointer',
-  },
-  content: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
   breadcrumb: {
     marginBottom: '24px',
     fontSize: '14px',

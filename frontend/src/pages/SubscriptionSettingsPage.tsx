@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AppLayout } from '../components/AppLayout';
 
 /**
  * Gerenciamento de Assinatura
@@ -29,7 +30,7 @@ interface Subscription {
 }
 
 export const SubscriptionSettingsPage: React.FC = () => {
-  const { logout } = useAuth();
+  useAuth(); // Required for protected route
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [allPlans, setAllPlans] = useState<Plan[]>([]);
@@ -145,9 +146,9 @@ export const SubscriptionSettingsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={styles.container}>
+      <AppLayout>
         <p>Carregando...</p>
-      </div>
+      </AppLayout>
     );
   }
 
@@ -155,39 +156,7 @@ export const SubscriptionSettingsPage: React.FC = () => {
   const showExpiryWarning = daysLeft <= 5 && daysLeft > 0;
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <h1 style={styles.logo}>RadarOne</h1>
-          <nav style={styles.nav}>
-            <NavLink
-              to="/dashboard"
-              style={({ isActive }) => ({
-                ...styles.navLink,
-                ...(isActive ? styles.navLinkActive : {})
-              })}
-            >
-              Dashboard
-            </NavLink>
-            <NavLink
-              to="/monitors"
-              style={({ isActive }) => ({
-                ...styles.navLink,
-                ...(isActive ? styles.navLinkActive : {})
-              })}
-            >
-              Monitores
-            </NavLink>
-            <button onClick={logout} style={styles.logoutButton}>
-              Sair
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Content */}
-      <div style={styles.content}>
+    <AppLayout>
         <div style={styles.breadcrumb}>
           <Link to="/dashboard" style={styles.breadcrumbLink}>
             Dashboard
@@ -330,65 +299,11 @@ export const SubscriptionSettingsPage: React.FC = () => {
             para o checkout seguro.
           </p>
         </div>
-      </div>
-    </div>
+    </AppLayout>
   );
 };
 
 const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '16px 0',
-  },
-  headerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    margin: 0,
-  },
-  nav: {
-    display: 'flex',
-    gap: '16px',
-    alignItems: 'center',
-  },
-  navLink: {
-    color: '#4b5563',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '500',
-  },
-  navLinkActive: {
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    border: 'none',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-  },
-  content: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
   breadcrumb: {
     marginBottom: '24px',
     fontSize: '14px',

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
+import { AppLayout } from '../components/AppLayout';
 
 /**
  * Dashboard - Página principal após login
@@ -28,7 +29,7 @@ interface UserStats {
 }
 
 export const DashboardPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [stats, setStats] = useState<UserStats>({ monitorsCount: 0, sitesCount: 0 });
@@ -119,9 +120,9 @@ export const DashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={styles.container}>
+      <AppLayout>
         <p>Carregando...</p>
-      </div>
+      </AppLayout>
     );
   }
 
@@ -129,39 +130,7 @@ export const DashboardPage: React.FC = () => {
   const showExpiryWarning = daysLeft <= 5 && daysLeft > 0;
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <h1 style={styles.logo}>RadarOne</h1>
-          <nav style={styles.nav}>
-            <NavLink
-              to="/dashboard"
-              style={({ isActive }) => ({
-                ...styles.navLink,
-                ...(isActive ? styles.navLinkActive : {})
-              })}
-            >
-              Dashboard
-            </NavLink>
-            <NavLink
-              to="/monitors"
-              style={({ isActive }) => ({
-                ...styles.navLink,
-                ...(isActive ? styles.navLinkActive : {})
-              })}
-            >
-              Monitores
-            </NavLink>
-            <button onClick={logout} style={styles.logoutButton}>
-              Sair
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div style={styles.content}>
+    <AppLayout>
         {/* Welcome Section */}
         <section style={styles.welcomeSection}>
           <h1 style={styles.welcomeTitle}>Olá, {user?.name || 'Usuário'}! 👋</h1>
@@ -298,65 +267,11 @@ export const DashboardPage: React.FC = () => {
               </Link>
             </div>
           )}
-      </div>
-    </div>
+    </AppLayout>
   );
 };
 
 const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '16px 0',
-  },
-  headerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    margin: 0,
-  },
-  nav: {
-    display: 'flex',
-    gap: '16px',
-    alignItems: 'center',
-  },
-  navLink: {
-    color: '#4b5563',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '500',
-  },
-  navLinkActive: {
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    border: 'none',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-  },
-  content: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
   welcomeSection: {
     marginBottom: '32px',
   },
@@ -455,8 +370,8 @@ const styles = {
   },
   limitsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '20px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
+    gap: 'clamp(16px, 3vw, 20px)',
   },
   limitCard: {
     textAlign: 'center' as const,
@@ -486,8 +401,8 @@ const styles = {
   },
   actionsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '24px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))',
+    gap: 'clamp(16px, 4vw, 24px)',
     marginBottom: '32px',
   },
   actionCard: {
