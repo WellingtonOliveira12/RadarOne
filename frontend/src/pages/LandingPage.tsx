@@ -178,18 +178,18 @@ const styles = {
   hero: {
     maxWidth: '800px',
     margin: '0 auto',
-    padding: '80px 20px',
+    padding: 'clamp(40px, 10vw, 80px) 20px', // Padding responsivo
     textAlign: 'center' as const,
   },
   heroTitle: {
-    fontSize: '48px',
+    fontSize: 'clamp(28px, 6vw, 48px)', // Responsivo: 28px (mobile) até 48px (desktop)
     fontWeight: 'bold',
     color: '#1f2937',
     marginBottom: '16px',
     lineHeight: '1.2',
   },
   heroSubtitle: {
-    fontSize: '20px',
+    fontSize: 'clamp(16px, 3.5vw, 20px)', // Responsivo: 16px (mobile) até 20px (desktop)
     color: '#6b7280',
     marginBottom: '32px',
     lineHeight: '1.6',
@@ -227,7 +227,7 @@ const styles = {
     padding: '60px 20px',
   },
   sectionTitle: {
-    fontSize: '36px',
+    fontSize: 'clamp(24px, 5vw, 36px)', // Responsivo: 24px (mobile) até 36px (desktop)
     fontWeight: 'bold',
     color: '#1f2937',
     textAlign: 'center' as const,
@@ -286,13 +286,13 @@ const styles = {
     textAlign: 'center' as const,
   },
   ctaTitle: {
-    fontSize: '36px',
+    fontSize: 'clamp(24px, 5vw, 36px)', // Responsivo
     fontWeight: 'bold',
     color: 'white',
     marginBottom: '16px',
   },
   ctaSubtitle: {
-    fontSize: '18px',
+    fontSize: 'clamp(16px, 3vw, 18px)', // Responsivo
     color: 'rgba(255,255,255,0.9)',
     marginBottom: '32px',
   },
