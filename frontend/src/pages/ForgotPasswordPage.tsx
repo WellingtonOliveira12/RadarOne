@@ -48,7 +48,13 @@ export function ForgotPasswordPage() {
     }
 
     try {
-      await forgotPassword(email);
+      // Adicionar timeout de 30 segundos para evitar loading infinito
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Tempo limite excedido. Tente novamente.')), 30000)
+      );
+
+      await Promise.race([forgotPassword(email), timeoutPromise]);
+
       setSuccess(true);
       showSuccess('Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.');
       trackEvent('forgot_password_requested', { email: maskEmail(email) });
