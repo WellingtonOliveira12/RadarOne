@@ -53,8 +53,18 @@ export function ForgotPasswordPage() {
       showSuccess('Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.');
       trackEvent('forgot_password_requested', { email: maskEmail(email) });
     } catch (err: any) {
-      const errorMessage = err.message || 'Não foi possível enviar o email de redefinição. Tente novamente.';
+      // Tratar erro específico de email não cadastrado (apenas em DEV)
+      const isEmailNotFound = err.response?.status === 404 && err.response?.data?.errorCode === 'EMAIL_NOT_FOUND';
+
+      let errorMessage: string;
+      if (isEmailNotFound) {
+        errorMessage = 'E-mail não cadastrado. Verifique se digitou corretamente ou crie uma conta.';
+      } else {
+        errorMessage = err.message || 'Não foi possível enviar o email de redefinição. Tente novamente.';
+      }
+
       showError(errorMessage);
+      setErrors({ email: errorMessage });
       trackEvent('forgot_password_failed', { error: errorMessage });
     } finally {
       setLoading(false);
