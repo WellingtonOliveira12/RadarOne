@@ -69,6 +69,7 @@ export function MonitorsPage() {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loadingLista, setLoadingLista] = useState(false);
   const [error, setError] = useState('');
+  const [hasSubscription, setHasSubscription] = useState(true);
 
   // Formulário
   const [name, setName] = useState('');
@@ -108,7 +109,16 @@ export function MonitorsPage() {
 
       const data = await api.get<MonitorsResponse>('/api/monitors', token);
       setMonitors(data.data);
+      setHasSubscription(true);
     } catch (err: any) {
+      // Tratar erro de sem assinatura
+      const errorCode = err.errorCode || err.response?.data?.errorCode;
+      if (errorCode === 'NO_SUBSCRIPTION' || err.message?.includes('precisa assinar')) {
+        setHasSubscription(false);
+        setError('Você precisa assinar um plano para criar monitores.');
+        return;
+      }
+
       // Tratar erro de limite excedido
       if (err.response?.status === 403 || err.message?.includes('limite')) {
         setError(
@@ -307,7 +317,23 @@ export function MonitorsPage() {
         {/* Banner de trial expirando */}
         <TrialBanner />
 
-        {error && (
+        {/* Banner de bloqueio sem assinatura */}
+        {!hasSubscription && (
+          <div style={styles.subscriptionWarning}>
+            <div style={styles.warningIcon}>⚠️</div>
+            <div style={styles.warningContent}>
+              <strong>Você precisa assinar um plano para criar monitores.</strong>
+              <p style={styles.warningText}>
+                Escolha um plano para começar a monitorar anúncios e receber alertas em tempo real.
+              </p>
+            </div>
+            <Link to="/settings/subscription" style={styles.upgradeButton}>
+              Ver planos
+            </Link>
+          </div>
+        )}
+
+        {error && hasSubscription && (
           <div style={styles.error}>
             {error}
             {error.includes('limite') && (
@@ -325,6 +351,8 @@ export function MonitorsPage() {
           <h2 style={styles.formTitle}>
             {idSelecionado ? 'Editar Monitor' : 'Novo Monitor'}
           </h2>
+
+          <fieldset disabled={!hasSubscription} style={styles.fieldset}>
 
           <div style={styles.field}>
             <label style={styles.label}>Nome do monitor</label>
@@ -555,8 +583,10 @@ export function MonitorsPage() {
             </label>
           </div>
 
+          </fieldset>
+
           <div style={styles.buttons}>
-            <button type="submit" disabled={saving} style={styles.saveButton}>
+            <button type="submit" disabled={saving || !hasSubscription} style={styles.saveButton}>
               {saving ? 'Salvando...' : idSelecionado ? 'Atualizar' : 'Criar monitor'}
             </button>
 
@@ -970,5 +1000,44 @@ const styles = {
     fontSize: '13px',
     fontWeight: '500' as const,
     cursor: 'pointer',
+  },
+  subscriptionWarning: {
+    backgroundColor: '#fef3c7',
+    borderLeft: '4px solid #f59e0b',
+    padding: '20px',
+    marginBottom: '24px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    flexWrap: 'wrap' as const,
+  },
+  warningIcon: {
+    fontSize: '32px',
+  },
+  warningContent: {
+    flex: '1',
+    minWidth: '250px',
+  },
+  warningText: {
+    margin: '8px 0 0 0',
+    fontSize: '14px',
+    color: '#92400e',
+  },
+  upgradeButton: {
+    backgroundColor: '#f59e0b',
+    color: 'white',
+    padding: '12px 24px',
+    borderRadius: '6px',
+    textDecoration: 'none',
+    fontSize: '14px',
+    fontWeight: '600' as const,
+    whiteSpace: 'nowrap' as const,
+    display: 'inline-block',
+  },
+  fieldset: {
+    border: 'none',
+    padding: 0,
+    margin: 0,
   },
 };
