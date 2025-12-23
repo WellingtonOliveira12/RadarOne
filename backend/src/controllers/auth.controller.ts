@@ -285,15 +285,28 @@ export class AuthController {
         where: { email: email.toLowerCase().trim() }
       });
 
-      // SEMPRE retornar 200 para não revelar se o email existe ou não (segurança)
-      // Mensagem genérica independente de o usuário existir
+      // Comportamento condicional baseado em ENV (DEV vs PROD)
+      // Em DEV: revelar se email não existe (útil para UX/testes)
+      // Em PROD: sempre retornar mensagem genérica (segurança contra enumeração)
+      const revealEmailNotFound = process.env.REVEAL_EMAIL_NOT_FOUND === 'true';
       const genericMessage = 'Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.';
 
-      // Se o usuário não existir, retorna sucesso mas não envia email
+      // Se o usuário não existir
       if (!user) {
         console.log(`[AUTH] Tentativa de reset para email não cadastrado: ${sanitizeEmail(email)}`);
-        res.json({ message: genericMessage });
-        return;
+
+        if (revealEmailNotFound) {
+          // DEV: retornar erro específico
+          res.status(404).json({
+            error: 'E-mail não cadastrado',
+            errorCode: 'EMAIL_NOT_FOUND'
+          });
+          return;
+        } else {
+          // PROD: retornar mensagem genérica (não revelar se existe)
+          res.json({ message: genericMessage });
+          return;
+        }
       }
 
       // Verificar se usuário está bloqueado

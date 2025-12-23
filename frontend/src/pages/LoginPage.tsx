@@ -15,24 +15,22 @@ import {
   AlertIcon,
   AlertDescription,
 } from '@chakra-ui/react';
-import { login } from '../services/auth';
-import { saveToken } from '../services/tokenStorage';
+import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../lib/toast';
 import { trackLogin } from '../lib/analytics';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { login: loginAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [userName, setUserName] = useState('');
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setUserName('');
 
     // Validações básicas
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -51,16 +49,12 @@ export function LoginPage() {
     }
 
     try {
-      const data = await login(email, password);
-      saveToken(data.token);
-      setUserName(data.user.name);
-      showSuccess(`Bem-vindo, ${data.user.name}!`);
+      await loginAuth(email, password);
+      showSuccess('Login realizado com sucesso!');
       trackLogin('email');
 
-      // Redirecionar para dashboard após login bem-sucedido
-      setTimeout(() => {
-        navigate('/monitors');
-      }, 1000);
+      // Redirecionar imediatamente (não usar setTimeout)
+      navigate('/monitors', { replace: true });
     } catch (err: any) {
       const errorMessage = err.message || 'Erro ao fazer login';
       setError(errorMessage);
@@ -145,13 +139,6 @@ export function LoginPage() {
             </Text>
           </VStack>
         </Box>
-
-        {userName && (
-          <Alert status="success" borderRadius="md">
-            <AlertIcon />
-            <AlertDescription>Logado como: {userName}</AlertDescription>
-          </Alert>
-        )}
 
         {error && (
           <Alert status="error" borderRadius="md">

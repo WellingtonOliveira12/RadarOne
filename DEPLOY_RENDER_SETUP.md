@@ -215,8 +215,8 @@ import cron from 'node-cron';
 #### Environment Variables
 
 ```bash
-# Backend API
-VITE_API_URL=https://radarone-backend.onrender.com
+# Backend API (SEM /api no final - os endpoints já incluem /api)
+VITE_API_BASE_URL=https://radarone.onrender.com
 
 # Analytics (opcional)
 VITE_ANALYTICS_ID=G-XXXXXXXXXX
@@ -225,6 +225,8 @@ VITE_ANALYTICS_ID=G-XXXXXXXXXX
 VITE_SENTRY_DSN=https://xxxxx@sentry.io/xxxxx
 VITE_APP_VERSION=1.0.0
 ```
+
+**⚠️ IMPORTANTE:** A variável `VITE_API_BASE_URL` deve conter **apenas** a URL base do backend, **sem** o prefixo `/api`. Os endpoints no código já incluem `/api` (ex: `/api/auth/login`), então a URL final será `https://radarone.onrender.com/api/auth/login`.
 
 #### Custom Domain (opcional)
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
+import { AppLayout } from '../components/AppLayout';
 
 /**
  * Dashboard - Página principal após login
@@ -27,7 +29,7 @@ interface UserStats {
 }
 
 export const DashboardPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [stats, setStats] = useState<UserStats>({ monitorsCount: 0, sitesCount: 0 });
@@ -40,21 +42,9 @@ export const DashboardPage: React.FC = () => {
 
   const loadDashboardData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      // Usar client API que lida com token automaticamente
+      const subData = await api.get('/api/subscriptions/my');
 
-      // Carregar subscription
-      const subResponse = await fetch(`${API_URL}/api/subscriptions/my`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!subResponse.ok) {
-        throw new Error('Erro ao carregar assinatura');
-      }
-
-      const subData = await subResponse.json();
       setSubscription({
         id: subData.subscription.id,
         status: subData.subscription.status,
@@ -70,7 +60,20 @@ export const DashboardPage: React.FC = () => {
         sitesCount: 0 // API não retorna sitesCount ainda
       });
     } catch (err: any) {
-      setError('Erro ao carregar dados');
+      // Diagnóstico melhorado em DEV
+      const isDev = import.meta.env.DEV;
+      if (isDev) {
+        console.error('Dashboard: Erro ao carregar dados', {
+          endpoint: '/api/subscriptions/my',
+          status: err.status,
+          errorCode: err.errorCode,
+          message: err.message,
+          data: err.data
+        });
+        setError(`Erro ao carregar dados (${err.status || 'Network'} - ${err.errorCode || 'UNKNOWN'}). Ver console.`);
+      } else {
+        setError('Erro ao carregar dados. Tente novamente mais tarde.');
+      }
     } finally {
       setLoading(false);
     }
@@ -117,9 +120,9 @@ export const DashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={styles.container}>
+      <AppLayout>
         <p>Carregando...</p>
-      </div>
+      </AppLayout>
     );
   }
 
@@ -127,27 +130,7 @@ export const DashboardPage: React.FC = () => {
   const showExpiryWarning = daysLeft <= 5 && daysLeft > 0;
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <h1 style={styles.logo}>RadarOne</h1>
-          <nav style={styles.nav}>
-            <Link to="/dashboard" style={styles.navLink}>
-              Dashboard
-            </Link>
-            <Link to="/monitors" style={styles.navLink}>
-              Monitores
-            </Link>
-            <button onClick={logout} style={styles.logoutButton}>
-              Sair
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div style={styles.content}>
+    <AppLayout>
         {/* Welcome Section */}
         <section style={styles.welcomeSection}>
           <h1 style={styles.welcomeTitle}>Olá, {user?.name || 'Usuário'}! 👋</h1>
@@ -156,7 +139,20 @@ export const DashboardPage: React.FC = () => {
           </p>
         </section>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <div style={styles.error}>
+            {error}
+            <button
+              onClick={() => {
+                setError('');
+                loadDashboardData();
+              }}
+              style={styles.retryButton}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         {/* Subscription Card */}
         {subscription && (
@@ -271,61 +267,11 @@ export const DashboardPage: React.FC = () => {
               </Link>
             </div>
           )}
-      </div>
-    </div>
+    </AppLayout>
   );
 };
 
 const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '16px 0',
-  },
-  headerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    margin: 0,
-  },
-  nav: {
-    display: 'flex',
-    gap: '16px',
-    alignItems: 'center',
-  },
-  navLink: {
-    color: '#4b5563',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '500',
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    border: 'none',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-  },
-  content: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
   welcomeSection: {
     marginBottom: '32px',
   },
@@ -345,6 +291,21 @@ const styles = {
     padding: '16px',
     borderRadius: '8px',
     marginBottom: '24px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  retryButton: {
+    backgroundColor: '#991b1b',
+    color: 'white',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
   },
   subscriptionCard: {
     backgroundColor: 'white',
@@ -409,8 +370,8 @@ const styles = {
   },
   limitsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '20px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
+    gap: 'clamp(16px, 3vw, 20px)',
   },
   limitCard: {
     textAlign: 'center' as const,
@@ -440,8 +401,8 @@ const styles = {
   },
   actionsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '24px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))',
+    gap: 'clamp(16px, 4vw, 24px)',
     marginBottom: '32px',
   },
   actionCard: {

@@ -202,6 +202,49 @@ export function trackSelectPlan(planName: string, price: number): void {
 }
 
 /**
+ * Rastreia quando trial expira e usuário é bloqueado
+ */
+export function trackTrialExpired(params?: {
+  planName?: string;
+  daysExpired?: number;
+  endpoint?: string;
+  source?: 'api' | 'manual';
+}): void {
+  trackEvent('trial_expired', {
+    plan_name: params?.planName,
+    days_expired: params?.daysExpired,
+    endpoint: params?.endpoint,
+    source: params?.source || 'api',
+  });
+}
+
+/**
+ * Rastreia quando usuário é redirecionado para /plans por trial expirado
+ */
+export function trackRedirectToPlans(reason: string): void {
+  trackEvent('redirect_to_plans', {
+    reason,
+  });
+}
+
+/**
+ * Rastreia quando banner de trial expirando é mostrado
+ */
+export function trackTrialExpiringBannerShown(daysRemaining: number, planName?: string): void {
+  trackEvent('trial_expiring_banner_shown', {
+    days_remaining: daysRemaining,
+    plan_name: planName,
+  });
+}
+
+/**
+ * Rastreia quando toast de trial expirado é mostrado
+ */
+export function trackTrialExpiredToastShown(): void {
+  trackEvent('trial_expired_toast_shown');
+}
+
+/**
  * Verifica se analytics está habilitado
  */
 export function isAnalyticsEnabled(): boolean {

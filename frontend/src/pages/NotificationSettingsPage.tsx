@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
+import { AppLayout } from '../components/AppLayout';
 
 /**
  * Configurações de Notificações
@@ -17,7 +19,7 @@ interface NotificationSettings {
 }
 
 export const NotificationSettingsPage: React.FC = () => {
-  const { logout } = useAuth();
+  useAuth(); // Required for protected route
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,19 +38,8 @@ export const NotificationSettingsPage: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_URL}/api/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar configurações');
-      }
-
-      const data = await response.json();
+      // Usar client API que lida com token automaticamente
+      const data = await api.get('/api/me');
       const telegramAccount = data.user.telegramAccounts?.[0];
 
       const loadedSettings: NotificationSettings = {
@@ -65,7 +56,20 @@ export const NotificationSettingsPage: React.FC = () => {
         telegramUsername: loadedSettings.telegramUsername || '',
       });
     } catch (err: any) {
-      setError('Erro ao carregar configurações');
+      // Diagnóstico melhorado em DEV
+      const isDev = import.meta.env.DEV;
+      if (isDev) {
+        console.error('NotificationSettings: Erro ao carregar configurações', {
+          endpoint: '/api/me',
+          status: err.status,
+          errorCode: err.errorCode,
+          message: err.message,
+          data: err.data
+        });
+        setError(`Erro ao carregar configurações (${err.status || 'Network'} - ${err.errorCode || 'UNKNOWN'}). Ver console.`);
+      } else {
+        setError('Erro ao carregar configurações. Tente novamente mais tarde.');
+      }
     } finally {
       setLoading(false);
     }
@@ -77,8 +81,6 @@ export const NotificationSettingsPage: React.FC = () => {
     setSuccess('');
 
     try {
-      const token = localStorage.getItem('token');
-
       // Por enquanto, apenas salvar se tiver telegram username
       // A vinculação real do chatId acontece quando o usuário conecta no bot
       const updateData: any = {};
@@ -88,25 +90,24 @@ export const NotificationSettingsPage: React.FC = () => {
         // updateData.telegramChatId = '...';
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_URL}/api/me/notifications`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(updateData)
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao salvar');
-      }
+      // Usar client API que lida com token automaticamente
+      await api.post('/api/me/notifications', updateData);
 
       setSuccess('Configurações salvas com sucesso!');
       setEditing(false);
       loadSettings();
     } catch (err: any) {
+      // Diagnóstico melhorado em DEV
+      const isDev = import.meta.env.DEV;
+      if (isDev) {
+        console.error('NotificationSettings: Erro ao salvar', {
+          endpoint: '/api/me/notifications',
+          status: err.status,
+          errorCode: err.errorCode,
+          message: err.message,
+          data: err.data
+        });
+      }
       setError(err.message || 'Erro ao salvar configurações');
     } finally {
       setSaving(false);
@@ -115,34 +116,14 @@ export const NotificationSettingsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={styles.container}>
+      <AppLayout>
         <p>Carregando...</p>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <h1 style={styles.logo}>RadarOne</h1>
-          <nav style={styles.nav}>
-            <Link to="/dashboard" style={styles.navLink}>
-              Dashboard
-            </Link>
-            <Link to="/monitors" style={styles.navLink}>
-              Monitores
-            </Link>
-            <button onClick={logout} style={styles.logoutButton}>
-              Sair
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Content */}
-      <div style={styles.content}>
+    <AppLayout>
         <div style={styles.breadcrumb}>
           <Link to="/dashboard" style={styles.breadcrumbLink}>
             Dashboard
@@ -156,7 +137,20 @@ export const NotificationSettingsPage: React.FC = () => {
           Escolha como você quer receber os alertas de novos anúncios
         </p>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <div style={styles.error}>
+            {error}
+            <button
+              onClick={() => {
+                setError('');
+                loadSettings();
+              }}
+              style={styles.retryButton}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
         {success && <div style={styles.success}>{success}</div>}
 
         {settings && (
@@ -294,61 +288,11 @@ export const NotificationSettingsPage: React.FC = () => {
             )}
           </div>
         )}
-      </div>
-    </div>
+    </AppLayout>
   );
 };
 
 const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '16px 0',
-  },
-  headerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    margin: 0,
-  },
-  nav: {
-    display: 'flex',
-    gap: '16px',
-    alignItems: 'center',
-  },
-  navLink: {
-    color: '#4b5563',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '500',
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    border: 'none',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-  },
-  content: {
-    maxWidth: '800px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
   breadcrumb: {
     marginBottom: '24px',
     fontSize: '14px',
@@ -381,6 +325,21 @@ const styles = {
     padding: '12px 16px',
     borderRadius: '8px',
     marginBottom: '16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  retryButton: {
+    backgroundColor: '#991b1b',
+    color: 'white',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
   },
   success: {
     backgroundColor: '#d1fae5',

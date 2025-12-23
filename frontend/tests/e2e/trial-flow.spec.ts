@@ -10,6 +10,14 @@ import { login, clearStorage, TEST_USER } from './helpers';
 
 test.describe('Trial Flow E2E', () => {
   test.beforeEach(async ({ page }) => {
+    // Forçar variante A para testes determinísticos (A/B testing)
+    // addInitScript roda ANTES de qualquer script da página em CADA navegação
+    await page.addInitScript(() => {
+      sessionStorage.setItem('ab_test_trialExpiredToast', 'A');
+      sessionStorage.setItem('ab_test_trialExpiredBanner', 'A');
+      sessionStorage.setItem('ab_test_trialExpiringBanner', 'A');
+    });
+
     await clearStorage(page);
   });
 

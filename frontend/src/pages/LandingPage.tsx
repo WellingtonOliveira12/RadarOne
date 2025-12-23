@@ -135,6 +135,7 @@ const styles = {
   container: {
     minHeight: '100vh',
     backgroundColor: '#f9fafb',
+    width: '100%',
   },
   header: {
     backgroundColor: 'white',
@@ -144,10 +145,12 @@ const styles = {
   headerContent: {
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '0 20px',
+    padding: '0 clamp(16px, 4vw, 20px)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap' as const,
+    gap: '12px',
   },
   logo: {
     fontSize: '24px',
@@ -157,8 +160,9 @@ const styles = {
   },
   nav: {
     display: 'flex',
-    gap: '16px',
+    gap: 'clamp(8px, 2vw, 16px)',
     alignItems: 'center',
+    flexWrap: 'wrap' as const,
   },
   navLink: {
     color: '#4b5563',
@@ -178,18 +182,20 @@ const styles = {
   hero: {
     maxWidth: '800px',
     margin: '0 auto',
-    padding: '80px 20px',
+    padding: 'clamp(40px, 10vw, 80px) clamp(16px, 4vw, 20px)',
     textAlign: 'center' as const,
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   heroTitle: {
-    fontSize: '48px',
+    fontSize: 'clamp(28px, 6vw, 48px)', // Responsivo: 28px (mobile) até 48px (desktop)
     fontWeight: 'bold',
     color: '#1f2937',
     marginBottom: '16px',
     lineHeight: '1.2',
   },
   heroSubtitle: {
-    fontSize: '20px',
+    fontSize: 'clamp(16px, 3.5vw, 20px)', // Responsivo: 16px (mobile) até 20px (desktop)
     color: '#6b7280',
     marginBottom: '32px',
     lineHeight: '1.6',
@@ -224,10 +230,12 @@ const styles = {
   features: {
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '60px 20px',
+    padding: 'clamp(40px, 8vw, 60px) clamp(16px, 4vw, 20px)',
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   sectionTitle: {
-    fontSize: '36px',
+    fontSize: 'clamp(24px, 5vw, 36px)', // Responsivo: 24px (mobile) até 36px (desktop)
     fontWeight: 'bold',
     color: '#1f2937',
     textAlign: 'center' as const,
@@ -263,7 +271,9 @@ const styles = {
   benefits: {
     maxWidth: '800px',
     margin: '0 auto',
-    padding: '60px 20px',
+    padding: 'clamp(40px, 8vw, 60px) clamp(16px, 4vw, 20px)',
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   benefitsList: {
     display: 'flex',
@@ -282,19 +292,23 @@ const styles = {
   },
   cta: {
     backgroundColor: '#3b82f6',
-    padding: '80px 20px',
+    padding: 'clamp(50px, 10vw, 80px) clamp(16px, 4vw, 20px)',
     textAlign: 'center' as const,
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   ctaTitle: {
-    fontSize: '36px',
+    fontSize: 'clamp(24px, 5vw, 36px)', // Responsivo
     fontWeight: 'bold',
     color: 'white',
     marginBottom: '16px',
   },
   ctaSubtitle: {
-    fontSize: '18px',
+    fontSize: 'clamp(16px, 3vw, 18px)',
     color: 'rgba(255,255,255,0.9)',
     marginBottom: '32px',
+    maxWidth: '600px',
+    margin: '0 auto 32px auto',
   },
   ctaButton: {
     backgroundColor: 'white',
