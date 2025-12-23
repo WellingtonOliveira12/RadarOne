@@ -128,12 +128,11 @@ export async function startTrialForUser(
   console.log('[BILLING] Trial iniciado:', userId, plan.name);
 
   // Enviar e-mail de trial iniciado (não bloqueia se falhar)
-  if (subscription.user) {
+  if (subscription.user && subscription.trialEndsAt) {
     sendTrialStartedEmail(
       subscription.user.email,
-      subscription.user.name,
       plan.name,
-      plan.trialDays
+      subscription.trialEndsAt
     ).catch((err) => {
       console.error('[BILLING] Erro ao enviar e-mail de trial iniciado:', err);
     });

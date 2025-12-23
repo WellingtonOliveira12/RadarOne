@@ -14,14 +14,13 @@ export class SubscriptionController {
   static async getMySubscription(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.userId;
-      const logger = req.logger || console;
 
       if (!userId) {
         res.status(401).json({ error: 'Não autenticado' });
         return;
       }
 
-      logger.info({ userId }, '[getMySubscription] Buscando subscription do usuário');
+      console.log('[getMySubscription] Buscando subscription do usuário', { userId });
 
       // Buscar subscription ativa ou trial
       let subscription = await prisma.subscription.findFirst({
@@ -54,7 +53,7 @@ export class SubscriptionController {
 
       // Se não houver subscription ativa/trial, verificar se há alguma expirada
       if (!subscription) {
-        logger.info({ userId }, '[getMySubscription] Nenhuma subscription ACTIVE/TRIAL encontrada, buscando qualquer subscription');
+        console.log('[getMySubscription] Nenhuma subscription ACTIVE/TRIAL encontrada, buscando qualquer subscription', { userId });
 
         subscription = await prisma.subscription.findFirst({
           where: { userId },
@@ -82,21 +81,62 @@ export class SubscriptionController {
         });
       }
 
-      // Se realmente não houver subscription, retornar objeto vazio
+      // Se realmente não houver subscription, verificar trial baseado em user.createdAt
       if (!subscription) {
-        logger.warn({ userId }, '[getMySubscription] Usuário sem subscription');
+        console.warn('[getMySubscription] Usuário sem subscription, verificando trial de 7 dias', { userId });
+
+        // Buscar user.createdAt
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { createdAt: true }
+        });
+
+        if (!user) {
+          res.status(404).json({ error: 'Usuário não encontrado' });
+          return;
+        }
+
+        // Calcular se está dentro do trial de 7 dias
+        const now = new Date();
+        const trialEndDate = new Date(user.createdAt);
+        trialEndDate.setDate(trialEndDate.getDate() + 7);
+
+        const diffTime = trialEndDate.getTime() - now.getTime();
+        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const isExpired = daysRemaining <= 0;
+
+        // Buscar plano Free (deve ser o padrão para trial)
+        const freePlan = await prisma.plan.findFirst({
+          where: { slug: 'free' }
+        });
+
+        if (!freePlan) {
+          console.error('[getMySubscription] Plano Free não encontrado no banco');
+          res.status(500).json({ error: 'Plano Free não configurado' });
+          return;
+        }
 
         res.status(200).json({
-          subscription: null,
+          subscription: {
+            id: 'trial-implicit',
+            status: isExpired ? 'EXPIRED' : 'TRIAL',
+            startDate: user.createdAt,
+            validUntil: trialEndDate,
+            trialEndsAt: trialEndDate,
+            isLifetime: false,
+            isTrial: !isExpired,
+            createdAt: user.createdAt,
+            plan: freePlan
+          },
           usage: {
             monitorsCreated: 0,
-            monitorsLimit: 0,
-            canCreateMore: false
+            monitorsLimit: freePlan.maxMonitors,
+            canCreateMore: !isExpired && 0 < freePlan.maxMonitors
           },
           timeRemaining: {
-            daysRemaining: 0,
-            expiresAt: null,
-            isExpired: true
+            daysRemaining: Math.max(0, daysRemaining),
+            expiresAt: trialEndDate,
+            isExpired
           }
         });
         return;
@@ -106,7 +146,7 @@ export class SubscriptionController {
       const now = new Date();
       if (subscription.status === 'TRIAL' && subscription.trialEndsAt) {
         if (subscription.trialEndsAt < now) {
-          logger.info({ subscriptionId: subscription.id }, '[getMySubscription] Trial expirado, atualizando status para EXPIRED');
+          console.log('[getMySubscription] Trial expirado, atualizando status para EXPIRED', { subscriptionId: subscription.id });
 
           subscription = await prisma.subscription.update({
             where: { id: subscription.id },

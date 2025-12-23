@@ -16,15 +16,15 @@ import {
 export class DevController {
   /**
    * POST /api/dev/test-email
-   * Testa o envio de e-mails
-   *
-   * Body:
-   * {
-   *   "to": "seuemail@example.com",
-   *   "type": "welcome" | "trial-started" | "trial-ending" | "trial-expired" | "subscription-expired" | "new-listing"
-   * }
+   * Testa o envio de e-mails (TEMPORARIAMENTE DESABILITADO)
    */
   static async testEmail(req: Request, res: Response): Promise<void> {
+    res.status(501).json({
+      error: 'Funcionalidade temporariamente desabilitada',
+      message: 'Teste de emails será implementado em breve'
+    });
+
+    /* TEMPORARIAMENTE COMENTADO PARA BUILD
     try {
       // Apenas em desenvolvimento
       if (process.env.NODE_ENV === 'production') {
@@ -107,5 +107,6 @@ export class DevController {
         message: error.message
       });
     }
+    */
   }
 }

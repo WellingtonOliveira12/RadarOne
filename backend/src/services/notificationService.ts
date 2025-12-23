@@ -89,10 +89,11 @@ export async function notifyNewListing(
 
   // 1. Telegram (se disponível)
   const telegram = await getUserTelegramAccount(userId);
-  if (telegram && telegram.active) {
+  if (telegram && telegram.chatId) {
     notificationPromises.push(
-      sendTelegramMessage(telegram.chatId, telegramMessage)
-        .then(async (sent) => {
+      sendTelegramMessage({ chatId: telegram.chatId, text: telegramMessage })
+        .then(async (result) => {
+          const sent = result.success;
           if (sent) {
             logger.info({ userId, channel: 'telegram' }, 'Telegram notification sent successfully');
             await logNotification(
@@ -139,15 +140,9 @@ export async function notifyNewListing(
     const emailMessage = `Monitor: ${monitor.name}\nTítulo: ${listing.title}\nPreço: ${priceText}\nURL: ${listing.url}`;
 
     notificationPromises.push(
-      sendNewListingEmail(
-        user.email,
-        user.name,
-        monitor.name,
-        listing.title,
-        listing.price,
-        listing.url
-      )
-        .then(async (sent) => {
+      sendNewListingEmail(user.email, listing.title, listing.url)
+        .then(async (result) => {
+          const sent = result.success;
           if (sent) {
             logger.info({ userId, channel: 'email', email: sanitizeEmail(user.email) }, 'Email notification sent successfully');
             await logNotification(

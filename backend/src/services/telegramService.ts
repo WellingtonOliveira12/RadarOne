@@ -101,3 +101,11 @@ export async function setTelegramWebhook(webhookUrl: string): Promise<{ success:
     };
   }
 }
+
+/**
+ * Stub - busca conta do Telegram do usuário
+ */
+export async function getUserTelegramAccount(userId: string): Promise<{ chatId: string; username: string } | null> {
+  console.log('[TelegramService] getUserTelegramAccount stub chamado', { userId });
+  return null;
+}

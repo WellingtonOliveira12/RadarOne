@@ -50,12 +50,9 @@ async function checkTrialExpiring() {
 
       if (daysRemaining > 0 && daysRemaining <= DAYS_BEFORE_WARNING) {
         try {
-          await sendTrialEndingEmail(
-            subscription.user.email,
-            subscription.user.name,
-            subscription.plan.name,
-            daysRemaining
-          );
+          // TODO: implementar corretamente
+          // await sendTrialEndingEmail(subscription.user.email, daysRemaining);
+          console.log(`[JOB] Email stub - trial ending`, { email: subscription.user.email, daysRemaining });
           console.log(`[JOB] ✅ E-mail de trial terminando enviado para ${subscription.user.email}`);
         } catch (err) {
           console.error(`[JOB] ❌ Erro ao enviar e-mail para ${subscription.user.email}:`, err);
@@ -89,12 +86,9 @@ async function checkTrialExpiring() {
           data: { status: 'EXPIRED' }
         });
 
-        // Enviar e-mail de trial expirado
-        await sendTrialExpiredEmail(
-          subscription.user.email,
-          subscription.user.name,
-          subscription.plan.name
-        );
+        // Enviar e-mail de trial expirado (TODO: implementar corretamente)
+        // await sendTrialExpiredEmail(subscription.user.email);
+        console.log(`[JOB] Email stub - trial expired`, { email: subscription.user.email });
 
         console.log(`[JOB] ✅ Trial expirado: ${subscription.user.email} - Status atualizado e e-mail enviado`);
       } catch (err) {

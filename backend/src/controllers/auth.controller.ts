@@ -335,7 +335,7 @@ export class AuthController {
 
       // Enviar email com link de reset (não bloqueia a resposta se falhar)
       const emailService = await import('../services/emailService');
-      emailService.sendPasswordResetEmail(user.email, user.name, resetToken).catch((err) => {
+      emailService.sendPasswordResetEmail(user.email, resetToken).catch((err) => {
         console.error('[AUTH] Erro ao enviar e-mail de reset de senha:', err);
       });
 
@@ -428,7 +428,7 @@ export class AuthController {
 
       // Enviar email de confirmação (não bloqueia a resposta se falhar)
       const emailService = await import('../services/emailService');
-      emailService.sendPasswordChangedEmail(user.email, user.name).catch((err) => {
+      emailService.sendPasswordChangedEmail(user.email).catch((err) => {
         console.error('[AUTH] Erro ao enviar e-mail de confirmação de senha alterada:', err);
       });
 

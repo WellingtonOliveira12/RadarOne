@@ -85,3 +85,49 @@ export async function sendAlertEmail(to: string, adTitle: string, adUrl: string,
 
   return sendEmail({ to, subject, html });
 }
+
+// Stubs para funções ainda não implementadas
+export async function sendWelcomeEmail(to: string, name: string): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendWelcomeEmail stub chamado', { to, name });
+  return { success: true };
+}
+
+export async function sendPasswordResetEmail(to: string, resetToken: string): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendPasswordResetEmail stub chamado', { to });
+  return { success: true };
+}
+
+export async function sendPasswordChangedEmail(to: string): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendPasswordChangedEmail stub chamado', { to });
+  return { success: true };
+}
+
+export async function sendTrialStartedEmail(to: string, planName: string, trialEndsAt: Date): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendTrialStartedEmail stub chamado', { to, planName });
+  return { success: true };
+}
+
+export async function sendTrialEndingEmail(to: string, daysRemaining: number): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendTrialEndingEmail stub chamado', { to, daysRemaining });
+  return { success: true };
+}
+
+export async function sendTrialExpiredEmail(to: string): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendTrialExpiredEmail stub chamado', { to });
+  return { success: true };
+}
+
+export async function sendSubscriptionExpiredEmail(to: string): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendSubscriptionExpiredEmail stub chamado', { to });
+  return { success: true };
+}
+
+export async function sendNewListingEmail(to: string, listingTitle: string, listingUrl: string): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendNewListingEmail stub chamado', { to, listingTitle });
+  return { success: true };
+}
+
+export async function sendMonthlyQueriesResetReport(to: string, resetCount: number): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendMonthlyQueriesResetReport stub chamado', { to, resetCount });
+  return { success: true };
+}

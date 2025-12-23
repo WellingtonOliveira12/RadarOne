@@ -55,10 +55,8 @@ async function resetMonthlyQueries() {
 
     // Enviar e-mail de relatório para o admin
     try {
-      await sendMonthlyQueriesResetReport({
-        totalUpdated: result.count,
-        runAt: now
-      });
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@radarone.com';
+      await sendMonthlyQueriesResetReport(adminEmail, result.count);
       console.log('[RESET_QUERIES_JOB] 📧 E-mail de relatório enviado com sucesso');
     } catch (emailError: any) {
       console.error('[RESET_QUERIES_JOB] ⚠️  Falha ao enviar e-mail de relatório:', emailError.message);

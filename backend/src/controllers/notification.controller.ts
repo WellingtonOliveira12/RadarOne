@@ -12,14 +12,13 @@ export class NotificationController {
   static async getSettings(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.userId;
-      const logger = req.logger || console;
 
       if (!userId) {
         res.status(401).json({ error: 'Não autenticado' });
         return;
       }
 
-      logger.info({ userId }, '[NotificationController.getSettings] Buscando configurações');
+      console.log('[NotificationController.getSettings] Buscando configurações', { userId });
 
       // Buscar ou criar configurações
       let settings = await prisma.notificationSettings.findUnique({
@@ -28,7 +27,7 @@ export class NotificationController {
 
       // Se não existir, criar com padrões
       if (!settings) {
-        logger.info({ userId }, '[NotificationController.getSettings] Criando configurações padrão');
+        console.log('[NotificationController.getSettings] Criando configurações padrão', { userId });
 
         settings = await prisma.notificationSettings.create({
           data: {
@@ -49,8 +48,7 @@ export class NotificationController {
         updatedAt: settings.updatedAt
       });
     } catch (error: any) {
-      const logger = req.logger || console;
-      logger.error({ err: error }, '[NotificationController.getSettings] Erro ao buscar configurações');
+      console.error('[NotificationController.getSettings] Erro ao buscar configurações', { error });
       res.status(500).json({
         error: 'Erro ao buscar configurações de notificação',
         message: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -65,7 +63,6 @@ export class NotificationController {
   static async updateSettings(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.userId;
-      const logger = req.logger || console;
       const { telegramUsername } = req.body;
 
       if (!userId) {
@@ -73,7 +70,7 @@ export class NotificationController {
         return;
       }
 
-      logger.info({ userId, telegramUsername }, '[NotificationController.updateSettings] Atualizando configurações');
+      console.log('[NotificationController.updateSettings] Atualizando configurações', { userId, telegramUsername });
 
       // Validar e normalizar telegram username
       let normalizedUsername: string | null = null;
@@ -97,7 +94,7 @@ export class NotificationController {
         }
 
         telegramEnabled = true;
-        logger.info({ normalizedUsername }, '[NotificationController.updateSettings] Telegram username validado');
+        console.log('[NotificationController.updateSettings] Telegram username validado', { normalizedUsername });
       }
 
       // Buscar configurações existentes
@@ -112,7 +109,9 @@ export class NotificationController {
           data: {
             emailEnabled: true, // Email sempre true
             telegramEnabled,
-            telegramUsername: normalizedUsername
+            telegramUsername: normalizedUsername,
+            // Se telegram desabilitado, limpar chatId também
+            telegramChatId: telegramEnabled ? settings.telegramChatId : null
           }
         });
       } else {
@@ -122,12 +121,13 @@ export class NotificationController {
             userId,
             emailEnabled: true,
             telegramEnabled,
-            telegramUsername: normalizedUsername
+            telegramUsername: normalizedUsername,
+            telegramChatId: null
           }
         });
       }
 
-      logger.info({ userId, telegramEnabled }, '[NotificationController.updateSettings] Configurações atualizadas');
+      console.log('[NotificationController.updateSettings] Configurações atualizadas', { userId, telegramEnabled });
 
       res.json({
         message: 'Configurações atualizadas com sucesso',
@@ -138,8 +138,7 @@ export class NotificationController {
         updatedAt: settings.updatedAt
       });
     } catch (error: any) {
-      const logger = req.logger || console;
-      logger.error({ err: error }, '[NotificationController.updateSettings] Erro ao atualizar configurações');
+      console.error('[NotificationController.updateSettings] Erro ao atualizar configurações', { error });
       res.status(500).json({
         error: 'Erro ao atualizar configurações de notificação',
         message: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -154,7 +153,6 @@ export class NotificationController {
   static async testEmail(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.userId;
-      const logger = req.logger || console;
       const { to } = req.body;
 
       if (!userId) {
@@ -174,7 +172,7 @@ export class NotificationController {
         return;
       }
 
-      logger.info({ to }, '[NotificationController.testEmail] Enviando email de teste');
+      console.log('[NotificationController.testEmail] Enviando email de teste', { to });
 
       // TODO: Implementar envio real via Resend quando estiver configurado
       // Por ora, apenas simular
@@ -187,8 +185,7 @@ export class NotificationController {
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
-      const logger = req.logger || console;
-      logger.error({ err: error }, '[NotificationController.testEmail] Erro ao enviar email de teste');
+      console.error('[NotificationController.testEmail] Erro ao enviar email de teste', { error });
       res.status(500).json({
         error: 'Erro ao enviar email de teste',
         message: process.env.NODE_ENV === 'development' ? error.message : undefined
