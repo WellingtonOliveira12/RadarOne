@@ -25,7 +25,7 @@ export const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ childr
 
       try {
         const token = localStorage.getItem('token');
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
         // Tenta acessar endpoint admin para verificar role
         const response = await fetch(`${API_URL}/api/admin/stats`, {

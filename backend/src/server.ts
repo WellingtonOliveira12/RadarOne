@@ -61,9 +61,29 @@ app.set('trust proxy', 1);
 // MIDDLEWARES
 // ============================================
 
+// CORS: aceitar múltiplas origens (produção + desenvolvimento)
+const allowedOrigins = [
+  'https://radarone-frontend.onrender.com',  // Frontend público (Render)
+  'http://localhost:5173',                   // Dev (Vite)
+  'http://localhost:3000',                   // Dev (caso use outra porta)
+  'http://localhost',                        // Dev (Docker)
+  process.env.FRONTEND_URL,                  // Custom domain (se configurado)
+].filter(Boolean); // Remove undefined/null
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true
+  origin: (origin, callback) => {
+    // Permitir requests sem origem (ex: Postman, curl, server-side)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: Origem ${origin} não permitida`));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());
