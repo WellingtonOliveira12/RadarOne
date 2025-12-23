@@ -94,6 +94,10 @@ export const api = {
     apiRequest<T>(path, { method: 'GET', token }),
   post: <T = any>(path: string, body?: any, token?: string | null) =>
     apiRequest<T>(path, { method: 'POST', body, token }),
+  put: <T = any>(path: string, body?: any, token?: string | null) =>
+    apiRequest<T>(path, { method: 'PUT', body, token }),
+  delete: <T = any>(path: string, token?: string | null) =>
+    apiRequest<T>(path, { method: 'DELETE', token }),
 };
 
 export { BASE_URL };
