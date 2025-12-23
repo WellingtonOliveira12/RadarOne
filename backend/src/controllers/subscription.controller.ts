@@ -14,14 +14,17 @@ export class SubscriptionController {
   static async getMySubscription(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.userId;
+      const logger = req.logger || console;
 
       if (!userId) {
         res.status(401).json({ error: 'Não autenticado' });
         return;
       }
 
-      // Buscar subscription ativa
-      const subscription = await prisma.subscription.findFirst({
+      logger.info({ userId }, '[getMySubscription] Buscando subscription do usuário');
+
+      // Buscar subscription ativa ou trial
+      let subscription = await prisma.subscription.findFirst({
         where: {
           userId,
           status: { in: ['ACTIVE', 'TRIAL'] }
@@ -49,13 +52,88 @@ export class SubscriptionController {
         }
       });
 
+      // Se não houver subscription ativa/trial, verificar se há alguma expirada
       if (!subscription) {
-        res.status(404).json({ error: 'Nenhuma assinatura ativa encontrada' });
+        logger.info({ userId }, '[getMySubscription] Nenhuma subscription ACTIVE/TRIAL encontrada, buscando qualquer subscription');
+
+        subscription = await prisma.subscription.findFirst({
+          where: { userId },
+          include: {
+            plan: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                priceCents: true,
+                billingPeriod: true,
+                maxMonitors: true,
+                maxSites: true,
+                maxAlertsPerDay: true,
+                checkInterval: true,
+                isRecommended: true,
+                isLifetime: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
+      }
+
+      // Se realmente não houver subscription, retornar objeto vazio
+      if (!subscription) {
+        logger.warn({ userId }, '[getMySubscription] Usuário sem subscription');
+
+        res.status(200).json({
+          subscription: null,
+          usage: {
+            monitorsCreated: 0,
+            monitorsLimit: 0,
+            canCreateMore: false
+          },
+          timeRemaining: {
+            daysRemaining: 0,
+            expiresAt: null,
+            isExpired: true
+          }
+        });
         return;
       }
 
-      // Calcular dias restantes
+      // Verificar se trial expirou e atualizar status
       const now = new Date();
+      if (subscription.status === 'TRIAL' && subscription.trialEndsAt) {
+        if (subscription.trialEndsAt < now) {
+          logger.info({ subscriptionId: subscription.id }, '[getMySubscription] Trial expirado, atualizando status para EXPIRED');
+
+          subscription = await prisma.subscription.update({
+            where: { id: subscription.id },
+            data: { status: 'EXPIRED' },
+            include: {
+              plan: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  description: true,
+                  priceCents: true,
+                  billingPeriod: true,
+                  maxMonitors: true,
+                  maxSites: true,
+                  maxAlertsPerDay: true,
+                  checkInterval: true,
+                  isRecommended: true,
+                  isLifetime: true
+                }
+              }
+            }
+          });
+        }
+      }
+
+      // Calcular dias restantes (now já foi declarado acima)
       let daysRemaining = 0;
       let expiresAt: Date | null = null;
 

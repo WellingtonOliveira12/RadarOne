@@ -1,43 +1,103 @@
-import { prisma } from '../server';
+import axios from 'axios';
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
-export async function linkTelegramAccount(userId: string, chatId: string, username?: string) {
-  return await prisma.telegramAccount.upsert({
-    where: { chatId },
-    update: { userId, username, active: true },
-    create: { userId, chatId, username, active: true }
-  });
+export interface SendTelegramMessageOptions {
+  chatId: string;
+  text: string;
+  parseMode?: 'HTML' | 'Markdown';
+  disableWebPagePreview?: boolean;
 }
 
-export async function getUserTelegramAccount(userId: string) {
-  return await prisma.telegramAccount.findFirst({
-    where: { userId, active: true }
-  });
-}
+/**
+ * Envia mensagem via Telegram Bot
+ */
+export async function sendTelegramMessage(options: SendTelegramMessageOptions): Promise<{ success: boolean; messageId?: number; error?: string }> {
+  const { chatId, text, parseMode = 'HTML', disableWebPagePreview = false } = options;
 
-export async function sendTelegramMessage(chatId: string, text: string): Promise<boolean> {
-  if (!BOT_TOKEN) {
-    console.warn('[TELEGRAM] BOT_TOKEN não configurado');
-    return false;
+  if (!TELEGRAM_BOT_TOKEN) {
+    console.warn('[TelegramService] TELEGRAM_BOT_TOKEN não configurado. Mensagem não enviada.');
+    return {
+      success: false,
+      error: 'TELEGRAM_BOT_TOKEN não configurado'
+    };
   }
 
-  const url = 'https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage';
-
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: 'HTML'
-      })
+    const response = await axios.post(`${TELEGRAM_API_BASE}/sendMessage`, {
+      chat_id: chatId,
+      text,
+      parse_mode: parseMode,
+      disable_web_page_preview: disableWebPagePreview
     });
 
-    return response.ok;
-  } catch (error) {
-    console.error('[TELEGRAM] Erro ao enviar mensagem:', error);
-    return false;
+    console.log('[TelegramService] Mensagem enviada com sucesso', { chatId, messageId: response.data.result.message_id });
+
+    return {
+      success: true,
+      messageId: response.data.result.message_id
+    };
+  } catch (error: any) {
+    console.error('[TelegramService] Erro ao enviar mensagem', { chatId, error: error.message });
+
+    return {
+      success: false,
+      error: error.response?.data?.description || error.message
+    };
+  }
+}
+
+/**
+ * Envia alerta sobre novo anúncio via Telegram
+ */
+export async function sendAlertTelegram(chatId: string, adTitle: string, adUrl: string, monitorName: string): Promise<{ success: boolean; error?: string }> {
+  const text = `
+🚨 <b>Novo anúncio detectado!</b>
+
+Monitor: <i>${monitorName}</i>
+
+<b>${adTitle}</b>
+
+<a href="${adUrl}">Ver anúncio</a>
+  `.trim();
+
+  return sendTelegramMessage({
+    chatId,
+    text,
+    parseMode: 'HTML',
+    disableWebPagePreview: false
+  });
+}
+
+/**
+ * Configura webhook do Telegram
+ */
+export async function setTelegramWebhook(webhookUrl: string): Promise<{ success: boolean; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return {
+      success: false,
+      error: 'TELEGRAM_BOT_TOKEN não configurado'
+    };
+  }
+
+  try {
+    const response = await axios.post(`${TELEGRAM_API_BASE}/setWebhook`, {
+      url: webhookUrl
+    });
+
+    console.log('[TelegramService] Webhook configurado', { webhookUrl, result: response.data });
+
+    return {
+      success: response.data.ok,
+      error: response.data.description
+    };
+  } catch (error: any) {
+    console.error('[TelegramService] Erro ao configurar webhook', { webhookUrl, error: error.message });
+
+    return {
+      success: false,
+      error: error.response?.data?.description || error.message
+    };
   }
 }

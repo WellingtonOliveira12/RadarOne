@@ -139,7 +139,7 @@ app.use('/api/admin', authenticateToken, adminRoutes); // Protegida (auth + admi
 app.use('/api/dev', devRoutes); // Rotas de desenvolvimento (apenas em dev)
 app.use('/api/webhooks', webhookRoutes); // Webhooks (SEM autenticação JWT - usa HMAC)
 app.use('/api/coupons', couponRoutes); // Cupons (validate público, apply protegido)
-app.use('/api/notifications', notificationRoutes); // Histórico de notificações (protegido)
+app.use('/api/notifications', authenticateToken, notificationRoutes); // Configurações de notificações (protegido)
 
 // Rota de teste
 app.get('/api/test', (req: Request, res: Response) => {
