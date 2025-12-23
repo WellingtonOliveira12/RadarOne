@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
+import { getToken } from '../services/tokenStorage';
 
 /**
  * AdminJobsPage - Dashboard de monitoramento de execuções de jobs
@@ -55,7 +56,7 @@ export const AdminJobsPage: React.FC = () => {
   const loadJobs = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
 
       const queryParams = new URLSearchParams({
         page: pagination.page.toString(),

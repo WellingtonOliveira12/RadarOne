@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getToken } from '../services/tokenStorage';
 
 /**
  * Componente para proteger rotas que requerem role ADMIN
@@ -24,7 +25,7 @@ export const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ childr
       }
 
       try {
-        const token = localStorage.getItem('token');
+        const token = getToken();
         const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
         // Tenta acessar endpoint admin para verificar role

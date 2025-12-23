@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
+import { getToken } from '../services/tokenStorage';
 
 /**
  * Gerenciamento de Assinatura
@@ -43,7 +44,7 @@ export const SubscriptionSettingsPage: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
       // Carregar subscription atual
@@ -82,7 +83,7 @@ export const SubscriptionSettingsPage: React.FC = () => {
     // Em desenvolvimento: apenas chamar backend para trocar plano
     // Em produção futura: redirecionar para URL de checkout externa
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
       const response = await fetch(`${API_URL}/api/subscriptions/change-plan`, {
         method: 'POST',

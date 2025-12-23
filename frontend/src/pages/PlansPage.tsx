@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { trackViewPlans, trackSelectPlan, trackTrialExpiredToastShown } from '../lib/analytics';
 import { showInfo } from '../lib/toast';
 import { getABMessage, trackABVariantShown } from '../lib/abtest';
+import { getToken } from '../services/tokenStorage';
 
 /**
  * Página de Planos - Mostra os 5 planos comerciais
@@ -99,7 +100,7 @@ export const PlansPage: React.FC = () => {
 
     // Se está logado E não tem checkoutUrl, iniciar trial interno
     try {
-      const token = localStorage.getItem('radarone_token');
+      const token = getToken();
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
       const response = await fetch(`${API_URL}/api/subscriptions/start-trial`, {
         method: 'POST',
