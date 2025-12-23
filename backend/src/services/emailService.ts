@@ -1,8 +1,11 @@
 import { Resend } from 'resend';
+import { renderTestEmailTemplate, renderNewAdEmailTemplate } from '../templates/email/baseTemplate';
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
+
+const EMAIL_FROM = process.env.EMAIL_FROM || 'contato@radarone.com.br';
 
 export interface SendEmailOptions {
   to: string;
@@ -16,14 +19,14 @@ export interface SendEmailOptions {
  */
 export async function sendEmail(options: SendEmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const { to, subject, html, from } = options;
-  const fromEmail = from || process.env.EMAIL_FROM || 'noreply@radarone.com';
+  const fromEmail = from || EMAIL_FROM;
 
-  // Se não houver API key configurada, apenas simular
+  // Se não houver API key configurada, retornar erro amigável
   if (!resend) {
     console.warn('[EmailService] RESEND_API_KEY não configurado. Email não enviado.');
     return {
       success: false,
-      error: 'RESEND_API_KEY não configurado'
+      error: 'Serviço de e-mail não configurado. Configure RESEND_API_KEY nas variáveis de ambiente.'
     };
   }
 
@@ -48,6 +51,17 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
       success: false,
       error: error.message
     };
+  }
+}
+
+/**
+ * Envia email de notificação genérico
+ */
+export async function sendNotificationEmail(to: string, subject: string, html: string): Promise<void> {
+  const result = await sendEmail({ to, subject, html });
+
+  if (!result.success) {
+    throw new Error(result.error || 'Erro ao enviar email');
   }
 }
 
@@ -86,10 +100,19 @@ export async function sendAlertEmail(to: string, adTitle: string, adUrl: string,
   return sendEmail({ to, subject, html });
 }
 
-// Stubs para funções ainda não implementadas
+/**
+ * Envia email de boas-vindas
+ */
 export async function sendWelcomeEmail(to: string, name: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendWelcomeEmail stub chamado', { to, name });
-  return { success: true };
+  console.log('[EmailService] Enviando email de boas-vindas', { to, name });
+
+  const html = renderTestEmailTemplate(name);
+
+  return sendEmail({
+    to,
+    subject: 'Bem-vindo ao RadarOne!',
+    html
+  });
 }
 
 export async function sendPasswordResetEmail(to: string, resetToken: string): Promise<{ success: boolean; error?: string }> {
@@ -123,8 +146,20 @@ export async function sendSubscriptionExpiredEmail(to: string): Promise<{ succes
 }
 
 export async function sendNewListingEmail(to: string, listingTitle: string, listingUrl: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendNewListingEmail stub chamado', { to, listingTitle });
-  return { success: true };
+  console.log('[EmailService] Enviando email de novo anúncio', { to, listingTitle });
+
+  const html = renderNewAdEmailTemplate({
+    userName: 'Usuário',
+    monitorName: 'Monitor',
+    adTitle: listingTitle,
+    adUrl: listingUrl
+  });
+
+  return sendEmail({
+    to,
+    subject: `🚨 Novo anúncio: ${listingTitle}`,
+    html
+  });
 }
 
 export async function sendMonthlyQueriesResetReport(to: string, resetCount: number): Promise<{ success: boolean; error?: string }> {

@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../server';
+import { generateLinkCode, sendTelegramMessage } from '../services/telegramService';
+import { sendWelcomeEmail } from '../services/emailService';
 
 /**
  * Controller de Configurações de Notificações
@@ -147,47 +149,137 @@ export class NotificationController {
   }
 
   /**
-   * Endpoint de teste para enviar email (apenas dev/admin)
+   * Endpoint de teste para enviar email
    * POST /api/notifications/test-email
    */
   static async testEmail(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.userId;
-      const { to } = req.body;
 
       if (!userId) {
         res.status(401).json({ error: 'Não autenticado' });
         return;
       }
 
-      // Apenas em desenvolvimento ou para admin
       const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (process.env.NODE_ENV !== 'development' && user?.role !== 'ADMIN') {
-        res.status(403).json({ error: 'Acesso negado' });
+
+      if (!user) {
+        res.status(404).json({ error: 'Usuário não encontrado' });
         return;
       }
 
-      if (!to || typeof to !== 'string') {
-        res.status(400).json({ error: 'Campo "to" é obrigatório' });
-        return;
+      console.log('[NotificationController.testEmail] Enviando email de teste', { to: user.email });
+
+      // Enviar email de teste real
+      const result = await sendWelcomeEmail(user.email, user.name);
+
+      if (result.success) {
+        res.json({
+          message: 'Email de teste enviado com sucesso!',
+          to: user.email,
+          service: 'Resend'
+        });
+      } else {
+        res.status(500).json({
+          error: 'Erro ao enviar email de teste',
+          message: result.error
+        });
       }
-
-      console.log('[NotificationController.testEmail] Enviando email de teste', { to });
-
-      // TODO: Implementar envio real via Resend quando estiver configurado
-      // Por ora, apenas simular
-      const emailService = process.env.RESEND_API_KEY ? 'Resend' : 'Simulado';
-
-      res.json({
-        message: 'Email de teste enviado (simulado)',
-        service: emailService,
-        to,
-        timestamp: new Date().toISOString()
-      });
     } catch (error: any) {
       console.error('[NotificationController.testEmail] Erro ao enviar email de teste', { error });
       res.status(500).json({
         error: 'Erro ao enviar email de teste',
+        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Gera código de vínculo para Telegram
+   * POST /api/notifications/telegram/link-code
+   */
+  static async generateTelegramLinkCode(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      console.log('[NotificationController.generateTelegramLinkCode] Gerando código', { userId });
+
+      const { code, expiresAt } = await generateLinkCode(userId);
+
+      const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'RadarOneBot';
+
+      res.json({
+        code,
+        expiresAt,
+        botUsername: `@${botUsername}`,
+        instructions: [
+          `1. Abra o Telegram e procure por @${botUsername}`,
+          `2. Envie a mensagem: ${code}`,
+          `3. Aguarde a confirmação`,
+          `4. Pronto! Você receberá notificações aqui`
+        ]
+      });
+    } catch (error: any) {
+      console.error('[NotificationController.generateTelegramLinkCode] Erro', { error });
+      res.status(500).json({
+        error: 'Erro ao gerar código de vínculo',
+        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Testa envio de mensagem Telegram
+   * POST /api/notifications/test-telegram
+   */
+  static async testTelegram(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const settings = await prisma.notificationSettings.findUnique({
+        where: { userId }
+      });
+
+      if (!settings || !settings.telegramChatId) {
+        res.status(400).json({
+          error: 'Telegram não vinculado',
+          message: 'Você precisa vincular sua conta do Telegram primeiro. Use o endpoint /telegram/link-code para gerar um código.'
+        });
+        return;
+      }
+
+      console.log('[NotificationController.testTelegram] Enviando mensagem de teste', { userId });
+
+      const result = await sendTelegramMessage({
+        chatId: settings.telegramChatId,
+        text: '🎉 Teste de notificação!\n\nSua conta do Telegram está vinculada corretamente ao RadarOne.'
+      });
+
+      if (result.success) {
+        res.json({
+          message: 'Mensagem de teste enviada com sucesso',
+          messageId: result.messageId
+        });
+      } else {
+        res.status(500).json({
+          error: 'Erro ao enviar mensagem de teste',
+          message: result.error
+        });
+      }
+    } catch (error: any) {
+      console.error('[NotificationController.testTelegram] Erro', { error });
+      res.status(500).json({
+        error: 'Erro ao testar Telegram',
         message: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

@@ -31,6 +31,7 @@ import webhookRoutes from './routes/webhook.routes';
 import adminRoutes from './routes/admin.routes';
 import couponRoutes from './routes/coupon.routes';
 import notificationRoutes from './routes/notification.routes';
+import telegramRoutes from './routes/telegram.routes';
 
 // Importa middleware de autenticação
 import { authenticateToken } from './middlewares/auth.middleware';
@@ -64,10 +65,12 @@ app.set('trust proxy', 1);
 // CORS: aceitar múltiplas origens (produção + desenvolvimento)
 const allowedOrigins = [
   'https://radarone-frontend.onrender.com',  // Frontend público (Render)
+  'https://radarone.com.br',                 // Domínio custom principal
+  'https://www.radarone.com.br',             // Domínio custom com www
   'http://localhost:5173',                   // Dev (Vite)
   'http://localhost:3000',                   // Dev (caso use outra porta)
   'http://localhost',                        // Dev (Docker)
-  process.env.FRONTEND_URL,                  // Custom domain (se configurado)
+  process.env.FRONTEND_URL,                  // Custom domain adicional (se configurado)
 ].filter(Boolean); // Remove undefined/null
 
 app.use(cors({
@@ -138,6 +141,7 @@ app.use('/api/me', authenticateToken, userRoutes); // Protegida
 app.use('/api/admin', authenticateToken, adminRoutes); // Protegida (auth + admin)
 app.use('/api/dev', devRoutes); // Rotas de desenvolvimento (apenas em dev)
 app.use('/api/webhooks', webhookRoutes); // Webhooks (SEM autenticação JWT - usa HMAC)
+app.use('/api/telegram', telegramRoutes); // Telegram webhook (SEM JWT - usa secret)
 app.use('/api/coupons', couponRoutes); // Cupons (validate público, apply protegido)
 app.use('/api/notifications', authenticateToken, notificationRoutes); // Configurações de notificações (protegido)
 

@@ -16,6 +16,13 @@ interface NotificationSettings {
   updatedAt: string;
 }
 
+interface LinkCodeData {
+  code: string;
+  expiresAt: string;
+  botUsername: string;
+  instructions: string[];
+}
+
 export const NotificationSettingsPage: React.FC = () => {
   const { user } = useAuth();
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
@@ -25,6 +32,10 @@ export const NotificationSettingsPage: React.FC = () => {
   const [success, setSuccess] = useState('');
 
   const [telegramUsername, setTelegramUsername] = useState('');
+  const [showLinkCodeModal, setShowLinkCodeModal] = useState(false);
+  const [linkCodeData, setLinkCodeData] = useState<LinkCodeData | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [testingTelegram, setTestingTelegram] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -76,6 +87,43 @@ export const NotificationSettingsPage: React.FC = () => {
       setError(err.message || 'Erro ao salvar configurações');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGenerateLinkCode = async () => {
+    setGeneratingCode(true);
+    setError('');
+
+    try {
+      const data = await api.post('/api/notifications/telegram/link-code', {});
+      setLinkCodeData(data);
+      setShowLinkCodeModal(true);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao gerar código de vínculo');
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
+
+  const handleTestTelegram = async () => {
+    setTestingTelegram(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.post('/api/notifications/test-telegram', {});
+      setSuccess('Mensagem de teste enviada para o Telegram!');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao enviar mensagem de teste');
+    } finally {
+      setTestingTelegram(false);
+    }
+  };
+
+  const copyCode = () => {
+    if (linkCodeData) {
+      navigator.clipboard.writeText(linkCodeData.code);
+      setSuccess('Código copiado!');
     }
   };
 
@@ -194,6 +242,65 @@ export const NotificationSettingsPage: React.FC = () => {
                 {saving ? 'Salvando...' : 'Salvar configurações'}
               </button>
             </div>
+
+            {/* Botão de vincular Telegram */}
+            {settings.telegramEnabled && !settings.telegramChatId && (
+              <div style={{ marginTop: '16px' }}>
+                <button
+                  onClick={handleGenerateLinkCode}
+                  disabled={generatingCode}
+                  style={styles.linkButton}
+                >
+                  {generatingCode ? 'Gerando código...' : 'Vincular Telegram'}
+                </button>
+              </div>
+            )}
+
+            {/* Botão de testar Telegram */}
+            {settings.telegramEnabled && settings.telegramChatId && (
+              <div style={{ marginTop: '16px' }}>
+                <button
+                  onClick={handleTestTelegram}
+                  disabled={testingTelegram}
+                  style={styles.testButton}
+                >
+                  {testingTelegram ? 'Enviando...' : 'Testar Telegram'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal do Link Code */}
+      {showLinkCodeModal && linkCodeData && (
+        <div style={styles.modalOverlay} onClick={() => setShowLinkCodeModal(false)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.modalTitle}>Vincular Telegram</h2>
+
+            <div style={styles.codeBox}>
+              <div style={styles.codeLabel}>Seu código:</div>
+              <div style={styles.codeValue}>{linkCodeData.code}</div>
+              <button onClick={copyCode} style={styles.copyButton}>
+                Copiar código
+              </button>
+            </div>
+
+            <div style={styles.instructionsBox}>
+              <p style={styles.instructionsTitle}>Como vincular:</p>
+              <ol style={styles.instructionsList}>
+                {linkCodeData.instructions.map((instruction, index) => (
+                  <li key={index}>{instruction}</li>
+                ))}
+              </ol>
+            </div>
+
+            <button
+              onClick={() => setShowLinkCodeModal(false)}
+              style={styles.closeButton}
+            >
+              Fechar
+            </button>
           </div>
         </div>
       )}
@@ -368,5 +475,109 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
+  },
+  linkButton: {
+    backgroundColor: '#10b981',
+    color: 'white',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  testButton: {
+    backgroundColor: '#8b5cf6',
+    color: 'white',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  modalOverlay: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: '32px',
+    borderRadius: '12px',
+    maxWidth: '500px',
+    width: '90%',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+  },
+  modalTitle: {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginTop: 0,
+    marginBottom: '24px',
+  },
+  codeBox: {
+    backgroundColor: '#f3f4f6',
+    padding: '20px',
+    borderRadius: '8px',
+    textAlign: 'center' as const,
+    marginBottom: '24px',
+  },
+  codeLabel: {
+    fontSize: '14px',
+    color: '#6b7280',
+    marginBottom: '8px',
+  },
+  codeValue: {
+    fontSize: '32px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+    letterSpacing: '2px',
+    marginBottom: '16px',
+    fontFamily: 'monospace',
+  },
+  copyButton: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  instructionsBox: {
+    marginBottom: '24px',
+  },
+  instructionsTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: '12px',
+  },
+  instructionsList: {
+    fontSize: '14px',
+    color: '#4b5563',
+    lineHeight: '1.6',
+    paddingLeft: '20px',
+    margin: 0,
+  },
+  closeButton: {
+    backgroundColor: '#f3f4f6',
+    color: '#1f2937',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    width: '100%',
   },
 };

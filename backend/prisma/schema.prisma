@@ -82,6 +82,10 @@ model NotificationSettings {
   telegramUsername String? @map("telegram_username") // @username normalizado
   telegramChatId   String? @map("telegram_chat_id") // chatId numérico (quando vincular)
 
+  // Link Code para vincular bot Telegram (temporário, expira em 30min)
+  telegramLinkCode      String?   @map("telegram_link_code")
+  telegramLinkExpiresAt DateTime? @map("telegram_link_expires_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
