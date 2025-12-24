@@ -11,13 +11,23 @@ export class TelegramController {
    */
   static async handleWebhook(req: Request, res: Response): Promise<void> {
     try {
-      // Validar segredo (via query ?secret=... ou header)
+      // Validar segredo (suporta múltiplas fontes)
+      // 1. Query string: ?secret=... (atual configuração no Telegram)
+      // 2. Header customizado: x-telegram-secret
+      // 3. Header oficial Telegram: x-telegram-bot-api-secret-token (para futuro)
       const secretFromQuery = req.query.secret as string | undefined;
       const secretFromHeader = req.get('x-telegram-secret');
-      const secret = secretFromQuery || secretFromHeader;
+      const secretFromTelegramHeader = req.get('x-telegram-bot-api-secret-token');
+      const secret = secretFromQuery || secretFromHeader || secretFromTelegramHeader;
 
       if (!validateWebhookSecret(secret)) {
-        console.warn('[TelegramWebhook] Tentativa de acesso não autorizado');
+        console.warn('[TelegramWebhook] Tentativa de acesso não autorizado', {
+          ip: req.ip,
+          hasQuery: !!secretFromQuery,
+          hasCustomHeader: !!secretFromHeader,
+          hasTelegramHeader: !!secretFromTelegramHeader,
+          userAgent: req.get('user-agent')
+        });
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }

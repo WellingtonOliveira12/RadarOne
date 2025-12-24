@@ -33,6 +33,9 @@ import couponRoutes from './routes/coupon.routes';
 import notificationRoutes from './routes/notification.routes';
 import telegramRoutes from './routes/telegram.routes';
 
+// Importa controller do Telegram (para handler de debug explícito)
+import { TelegramController } from './controllers/telegram.controller';
+
 // Importa middleware de autenticação
 import { authenticateToken } from './middlewares/auth.middleware';
 
@@ -131,6 +134,75 @@ app.get('/healthz', (req: Request, res: Response) => {
 });
 
 // ============================================
+// ENDPOINTS DE DIAGNÓSTICO
+// ============================================
+
+// Endpoint de meta informações (público) - mostra versão e commit rodando
+app.get('/api/_meta', (req: Request, res: Response) => {
+  res.json({
+    service: 'RadarOne API',
+    version: '1.0.1', // Incrementado para provar rebuild
+    timestamp: new Date().toISOString(),
+    gitSha: process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'unknown',
+    nodeEnv: process.env.NODE_ENV || 'development',
+    nodeVersion: process.version,
+    platform: process.platform
+  });
+});
+
+// Endpoint para listar rotas registradas (apenas em desenvolvimento ou com token)
+app.get('/api/_routes', (req: Request, res: Response) => {
+  // Proteção: apenas em desenvolvimento OU com header de admin
+  const isDev = process.env.NODE_ENV !== 'production';
+  const adminToken = req.get('x-admin-token');
+  const validAdminToken = process.env.ADMIN_DEBUG_TOKEN || 'debug-token-change-me';
+
+  if (!isDev && adminToken !== validAdminToken) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+
+  // Listar todas as rotas registradas no Express
+  const routes: any[] = [];
+
+  app._router.stack.forEach((middleware: any) => {
+    if (middleware.route) {
+      // Rotas diretas
+      const methods = Object.keys(middleware.route.methods).map(m => m.toUpperCase());
+      routes.push({
+        methods,
+        path: middleware.route.path
+      });
+    } else if (middleware.name === 'router') {
+      // Sub-routers
+      middleware.handle.stack.forEach((handler: any) => {
+        if (handler.route) {
+          const methods = Object.keys(handler.route.methods).map(m => m.toUpperCase());
+          const basePath = middleware.regexp.source
+            .replace('\\/?', '')
+            .replace('(?=\\/|$)', '')
+            .replace(/\\\//g, '/')
+            .replace(/\^/g, '')
+            .replace(/\$/g, '')
+            .replace(/\?\(\?=/g, '');
+
+          routes.push({
+            methods,
+            path: basePath + handler.route.path
+          });
+        }
+      });
+    }
+  });
+
+  res.json({
+    totalRoutes: routes.length,
+    routes: routes.sort((a, b) => a.path.localeCompare(b.path)),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ============================================
 // ROTAS PRINCIPAIS
 // ============================================
 app.use('/api/auth', authRoutes);
@@ -142,6 +214,30 @@ app.use('/api/admin', authenticateToken, adminRoutes); // Protegida (auth + admi
 app.use('/api/dev', devRoutes); // Rotas de desenvolvimento (apenas em dev)
 app.use('/api/webhooks', webhookRoutes); // Webhooks (SEM autenticação JWT - usa HMAC)
 app.use('/api/telegram', telegramRoutes); // Telegram webhook (SEM JWT - usa secret)
+
+// ============================================
+// DEBUG: Handler explícito temporário para webhook do Telegram
+// Este handler garante que /api/telegram/webhook sempre responda
+// Se este handler funcionar mas o router não, significa que telegramRoutes não está sendo carregado
+// REMOVER após confirmar que router está funcionando
+// ============================================
+app.post('/api/telegram/webhook', (req: Request, res: Response, next: NextFunction) => {
+  // Log para confirmar que o handler explícito foi chamado
+  logger.info({
+    method: req.method,
+    path: req.path,
+    query: req.query,
+    headers: {
+      'content-type': req.get('content-type'),
+      'user-agent': req.get('user-agent')
+    }
+  }, 'DEBUG: Hit explicit /api/telegram/webhook handler (BYPASS)');
+
+  // Se chegou aqui, significa que o problema foi o router não estar montado
+  // Chama o controller diretamente
+  TelegramController.handleWebhook(req, res).catch(next);
+});
+
 app.use('/api/coupons', couponRoutes); // Cupons (validate público, apply protegido)
 app.use('/api/notifications', authenticateToken, notificationRoutes); // Configurações de notificações (protegido)
 
