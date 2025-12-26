@@ -57,6 +57,8 @@ jobs:
 
       - name: Generate Prisma Client
         working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test
         run: npm run prisma:generate
 
       - name: Run database migrations
@@ -144,6 +146,7 @@ jobs:
           name: backend-logs-${{ matrix.browser }}
           path: backend/backend.log
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload test results
         if: always()
@@ -152,14 +155,16 @@ jobs:
           name: playwright-report-${{ matrix.browser }}
           path: frontend/playwright-report/
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload test screenshots
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-screenshots-${{ matrix.browser }}
           path: frontend/test-results/
           retention-days: 7
+          if-no-files-found: ignore
 
   # Job para rodar testes mobile
   test-e2e-mobile:
@@ -210,6 +215,8 @@ jobs:
 
       - name: Generate Prisma Client
         working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test
         run: npm run prisma:generate
 
       - name: Run database migrations
@@ -297,6 +304,7 @@ jobs:
           name: backend-logs-${{ matrix.device }}
           path: backend/backend.log
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload test results
         if: always()
@@ -305,6 +313,7 @@ jobs:
           name: playwright-report-${{ matrix.device }}
           path: frontend/playwright-report/
           retention-days: 7
+          if-no-files-found: ignore
 
   # Job de resumo
   test-summary:
