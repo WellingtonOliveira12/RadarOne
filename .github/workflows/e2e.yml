@@ -100,20 +100,36 @@ jobs:
 
       - name: Build frontend
         working-directory: ./frontend
+        env:
+          VITE_API_BASE_URL: http://localhost:3000
         run: npm run build
+
+      - name: Start frontend server (preview)
+        working-directory: ./frontend
+        run: |
+          nohup npm run preview -- --port 5173 --strictPort > frontend.log 2>&1 &
+          echo $! > frontend.pid
+          # Aguardar frontend iniciar
+          sleep 3
+          curl --retry 5 --retry-delay 2 --retry-connrefused http://localhost:5173 || (cat frontend.log && exit 1)
 
       # ============================================
       # RUN TESTS
       # ============================================
       - name: Run E2E tests (${{ matrix.browser }})
         working-directory: ./frontend
-        env:
-          VITE_API_BASE_URL: http://localhost:3000
         run: npm run test:e2e -- --project=${{ matrix.browser }}
 
       # ============================================
       # CLEANUP & ARTIFACTS
       # ============================================
+      - name: Stop frontend server
+        if: always()
+        run: |
+          if [ -f frontend/frontend.pid ]; then
+            kill $(cat frontend/frontend.pid) || true
+          fi
+
       - name: Stop backend server
         if: always()
         run: |
@@ -237,20 +253,36 @@ jobs:
 
       - name: Build frontend
         working-directory: ./frontend
+        env:
+          VITE_API_BASE_URL: http://localhost:3000
         run: npm run build
+
+      - name: Start frontend server (preview)
+        working-directory: ./frontend
+        run: |
+          nohup npm run preview -- --port 5173 --strictPort > frontend.log 2>&1 &
+          echo $! > frontend.pid
+          # Aguardar frontend iniciar
+          sleep 3
+          curl --retry 5 --retry-delay 2 --retry-connrefused http://localhost:5173 || (cat frontend.log && exit 1)
 
       # ============================================
       # RUN TESTS
       # ============================================
       - name: Run E2E tests (${{ matrix.device }})
         working-directory: ./frontend
-        env:
-          VITE_API_BASE_URL: http://localhost:3000
         run: npm run test:e2e -- --project="${{ matrix.device }}"
 
       # ============================================
       # CLEANUP & ARTIFACTS
       # ============================================
+      - name: Stop frontend server
+        if: always()
+        run: |
+          if [ -f frontend/frontend.pid ]; then
+            kill $(cat frontend/frontend.pid) || true
+          fi
+
       - name: Stop backend server
         if: always()
         run: |

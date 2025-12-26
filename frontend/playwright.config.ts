@@ -75,12 +75,14 @@ export default defineConfig({
     },
   ],
 
-  /* Rodar servidor de dev antes dos testes */
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    stdout: 'ignore',
-    stderr: 'pipe',
-  },
+  /* Rodar servidor de dev antes dos testes (apenas em local, não em CI) */
+  webServer: process.env.CI
+    ? undefined
+    : {
+        command: 'npm run dev',
+        url: 'http://localhost:5173',
+        reuseExistingServer: true,
+        stdout: 'ignore',
+        stderr: 'pipe',
+      },
 });
