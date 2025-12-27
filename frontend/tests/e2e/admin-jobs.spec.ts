@@ -45,34 +45,41 @@ test.describe('Admin Jobs Dashboard Flow', () => {
       await route.fulfill({
         status: 200,
         body: JSON.stringify({
-          success: true,
-          jobs: [
+          data: [
             {
               id: '1',
-              jobName: 'checkTrialExpiring',
+              event: 'checkTrialExpiring',
               status: 'SUCCESS',
+              createdAt: new Date().toISOString(),
               executedAt: new Date().toISOString(),
-              duration: 1234,
-              result: { processed: 5, sent: 3 },
+              updatedCount: 5,
+              processed: true,
             },
             {
               id: '2',
-              jobName: 'resetMonthlyQueries',
+              event: 'resetMonthlyQueries',
               status: 'SUCCESS',
+              createdAt: new Date(Date.now() - 86400000).toISOString(),
               executedAt: new Date(Date.now() - 86400000).toISOString(),
-              duration: 567,
-              result: { reset: 10 },
+              updatedCount: 10,
+              processed: true,
             },
             {
               id: '3',
-              jobName: 'checkSubscriptionExpired',
+              event: 'checkSubscriptionExpired',
               status: 'FAILURE',
+              createdAt: new Date(Date.now() - 3600000).toISOString(),
               executedAt: new Date(Date.now() - 3600000).toISOString(),
-              duration: 890,
               error: 'Database connection timeout',
+              processed: false,
             },
           ],
-          total: 3,
+          pagination: {
+            page: 1,
+            pageSize: 20,
+            total: 3,
+            totalPages: 1,
+          },
         }),
       });
     });
