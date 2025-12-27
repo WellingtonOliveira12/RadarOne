@@ -40,8 +40,20 @@ test.describe('Admin Jobs Dashboard Flow', () => {
       });
     });
 
+    // Mock da API de monitores (chamada quando redireciona para /monitors após login)
+    await page.route('**/api/monitors*', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          body: JSON.stringify({ success: true, data: [], count: 0 }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
     // Mock da API de jobs do admin
-    await page.route('**/api/admin/jobs**', async (route) => {
+    await page.route('**/api/admin/jobs*', async (route) => {
       await route.fulfill({
         status: 200,
         body: JSON.stringify({
