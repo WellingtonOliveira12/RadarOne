@@ -7,6 +7,17 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
 
+  /* Padrão de arquivos de teste - APENAS arquivos .spec.ts no diretório E2E */
+  testMatch: '**/*.spec.ts',
+
+  /* Ignorar completamente qualquer arquivo .test.ts (Vitest) */
+  testIgnore: [
+    '**/*.test.ts',
+    '**/node_modules/**',
+    '**/backend/**',
+    '../../backend/**',
+  ],
+
   /* Configurações globais */
   timeout: 30 * 1000, // 30 segundos por teste
   expect: {
