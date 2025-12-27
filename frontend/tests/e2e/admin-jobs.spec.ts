@@ -113,6 +113,9 @@ test.describe('Admin Jobs Dashboard Flow', () => {
     await page.fill('input[type="password"]', ADMIN_USER.password);
     await page.click('button[type="submit"]');
 
+    // Aguardar redirecionamento pós-login
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
+
     // Navegar para admin/jobs
     await page.goto('/admin/jobs');
 
@@ -125,6 +128,7 @@ test.describe('Admin Jobs Dashboard Flow', () => {
     await page.fill('input[type="password"]', ADMIN_USER.password);
     await page.click('button[type="submit"]');
 
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
     await page.goto('/admin/jobs');
 
     // Aguarda a lista de jobs aparecer
@@ -142,6 +146,7 @@ test.describe('Admin Jobs Dashboard Flow', () => {
     await page.fill('input[type="password"]', ADMIN_USER.password);
     await page.click('button[type="submit"]');
 
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
     await page.goto('/admin/jobs');
 
     // Aguarda jobs carregarem
@@ -157,6 +162,7 @@ test.describe('Admin Jobs Dashboard Flow', () => {
     await page.fill('input[type="password"]', ADMIN_USER.password);
     await page.click('button[type="submit"]');
 
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
     await page.goto('/admin/jobs');
 
     // Aguarda jobs carregarem
@@ -173,6 +179,7 @@ test.describe('Admin Jobs Dashboard Flow', () => {
     await page.fill('input[type="password"]', ADMIN_USER.password);
     await page.click('button[type="submit"]');
 
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
     await page.goto('/admin/jobs');
 
     // Aguarda jobs carregarem
@@ -189,6 +196,7 @@ test.describe('Admin Jobs Dashboard Flow', () => {
     await page.fill('input[type="password"]', ADMIN_USER.password);
     await page.click('button[type="submit"]');
 
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
     await page.goto('/admin/jobs');
 
     // Verifica se há input de busca ou filtro
@@ -229,6 +237,7 @@ test.describe('Admin Jobs Dashboard Flow', () => {
     await page.fill('input[type="password"]', 'User123!');
     await page.click('button[type="submit"]');
 
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
     await page.goto('/admin/jobs');
 
     // Deve mostrar erro 403 ou redirecionar
