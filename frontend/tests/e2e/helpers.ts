@@ -48,9 +48,14 @@ export async function waitForToast(page: Page, message?: string) {
 }
 
 /**
- * Limpa localStorage
+ * Limpa localStorage e sessionStorage
+ * IMPORTANTE: Navega para baseURL primeiro para estabelecer origin
  */
 export async function clearStorage(page: Page) {
+  // Navegar para baseURL para estabelecer context de origin
+  // Isso previne SecurityError ao acessar localStorage
+  await page.goto('/');
+
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
