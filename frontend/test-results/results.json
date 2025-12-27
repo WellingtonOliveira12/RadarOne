@@ -1,0 +1,4476 @@
+{
+  "config": {
+    "configFile": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/playwright.config.ts",
+    "rootDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        null
+      ],
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/tests/e2e",
+        "testIgnore": [
+          "**/*.test.ts",
+          "**/node_modules/**",
+          "**/backend/**",
+          "../../backend/**"
+        ],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/tests/e2e",
+        "testIgnore": [
+          "**/*.test.ts",
+          "**/node_modules/**",
+          "**/backend/**",
+          "../../backend/**"
+        ],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/tests/e2e",
+        "testIgnore": [
+          "**/*.test.ts",
+          "**/node_modules/**",
+          "**/backend/**",
+          "../../backend/**"
+        ],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "Mobile Chrome",
+        "name": "Mobile Chrome",
+        "testDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/tests/e2e",
+        "testIgnore": [
+          "**/*.test.ts",
+          "**/node_modules/**",
+          "**/backend/**",
+          "../../backend/**"
+        ],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "Mobile Safari",
+        "name": "Mobile Safari",
+        "testDir": "/Users/wellingtonbarrosdeoliveira/RadarOne/frontend/tests/e2e",
+        "testIgnore": [
+          "**/*.test.ts",
+          "**/node_modules/**",
+          "**/backend/**",
+          "../../backend/**"
+        ],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 4,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:5173",
+      "reuseExistingServer": true,
+      "stdout": "ignore",
+      "stderr": "pipe"
+    }
+  },
+  "suites": [
+    {
+      "title": "admin-jobs.spec.ts",
+      "file": "admin-jobs.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Admin Jobs Dashboard Flow",
+          "file": "admin-jobs.spec.ts",
+          "line": 13,
+          "column": 6,
+          "specs": [
+            {
+              "title": "deve exigir autenticação para acessar página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-95538d71d4b43258f5e2",
+              "file": "admin-jobs.spec.ts",
+              "line": 18,
+              "column": 3
+            },
+            {
+              "title": "deve exibir página de jobs do admin após login como admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-ae4badb14333039200ad",
+              "file": "admin-jobs.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve listar jobs executados (dados reais ou vazio)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-dd301f231ad8f921d6f8",
+              "file": "admin-jobs.spec.ts",
+              "line": 43,
+              "column": 3
+            },
+            {
+              "title": "usuário comum não deve acessar admin jobs",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-34697c0abd2ad6cba789",
+              "file": "admin-jobs.spec.ts",
+              "line": 60,
+              "column": 3
+            },
+            {
+              "title": "deve ter título e header corretos na página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-49ceede19f0403c949a7",
+              "file": "admin-jobs.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve ter funcionalidade de navegação (se houver)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-09515901377e5343a60a",
+              "file": "admin-jobs.spec.ts",
+              "line": 88,
+              "column": 3
+            },
+            {
+              "title": "deve exigir autenticação para acessar página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-f55fa90cceccf142a43c",
+              "file": "admin-jobs.spec.ts",
+              "line": 18,
+              "column": 3
+            },
+            {
+              "title": "deve exibir página de jobs do admin após login como admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-810259db26186e5f27f7",
+              "file": "admin-jobs.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve listar jobs executados (dados reais ou vazio)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-e8db2f8ac05fd0fe2c50",
+              "file": "admin-jobs.spec.ts",
+              "line": 43,
+              "column": 3
+            },
+            {
+              "title": "usuário comum não deve acessar admin jobs",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-b76fbf3820f110a1e3ab",
+              "file": "admin-jobs.spec.ts",
+              "line": 60,
+              "column": 3
+            },
+            {
+              "title": "deve ter título e header corretos na página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-36f780f7d184c5ffdd92",
+              "file": "admin-jobs.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve ter funcionalidade de navegação (se houver)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-f9cfdb41b68f95015b62",
+              "file": "admin-jobs.spec.ts",
+              "line": 88,
+              "column": 3
+            },
+            {
+              "title": "deve exigir autenticação para acessar página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-989840ba73a1005d5bb4",
+              "file": "admin-jobs.spec.ts",
+              "line": 18,
+              "column": 3
+            },
+            {
+              "title": "deve exibir página de jobs do admin após login como admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-350e1a00a6d9d1f50446",
+              "file": "admin-jobs.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve listar jobs executados (dados reais ou vazio)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-a432c1563a9a4596f3b9",
+              "file": "admin-jobs.spec.ts",
+              "line": 43,
+              "column": 3
+            },
+            {
+              "title": "usuário comum não deve acessar admin jobs",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-76c20055805a5dfb6d91",
+              "file": "admin-jobs.spec.ts",
+              "line": 60,
+              "column": 3
+            },
+            {
+              "title": "deve ter título e header corretos na página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-67ea9bf9bafe4c1e32a5",
+              "file": "admin-jobs.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve ter funcionalidade de navegação (se houver)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-01f7c8795242a887209b",
+              "file": "admin-jobs.spec.ts",
+              "line": 88,
+              "column": 3
+            },
+            {
+              "title": "deve exigir autenticação para acessar página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-83ea2859b0220f7c9e79",
+              "file": "admin-jobs.spec.ts",
+              "line": 18,
+              "column": 3
+            },
+            {
+              "title": "deve exibir página de jobs do admin após login como admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-e575ab7f4d1f5ca7ba51",
+              "file": "admin-jobs.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve listar jobs executados (dados reais ou vazio)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-5d576b8ca557adec2379",
+              "file": "admin-jobs.spec.ts",
+              "line": 43,
+              "column": 3
+            },
+            {
+              "title": "usuário comum não deve acessar admin jobs",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-bd89ccddeb6ee5e6a4b3",
+              "file": "admin-jobs.spec.ts",
+              "line": 60,
+              "column": 3
+            },
+            {
+              "title": "deve ter título e header corretos na página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-123888dd71dac834af98",
+              "file": "admin-jobs.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve ter funcionalidade de navegação (se houver)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-aa18554af91206a9eb53",
+              "file": "admin-jobs.spec.ts",
+              "line": 88,
+              "column": 3
+            },
+            {
+              "title": "deve exigir autenticação para acessar página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-ac8d566bafd9e96639b7",
+              "file": "admin-jobs.spec.ts",
+              "line": 18,
+              "column": 3
+            },
+            {
+              "title": "deve exibir página de jobs do admin após login como admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-68adcc982c4bcac4d04d",
+              "file": "admin-jobs.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve listar jobs executados (dados reais ou vazio)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-5e76afa2c3ac6e63ee6f",
+              "file": "admin-jobs.spec.ts",
+              "line": 43,
+              "column": 3
+            },
+            {
+              "title": "usuário comum não deve acessar admin jobs",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-3b2f8fcc09bcc60e9c7b",
+              "file": "admin-jobs.spec.ts",
+              "line": 60,
+              "column": 3
+            },
+            {
+              "title": "deve ter título e header corretos na página admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-bc1e1534f0a755c3015f",
+              "file": "admin-jobs.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve ter funcionalidade de navegação (se houver)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "236c087278a32cfed582-2d53e4aba3752058f939",
+              "file": "admin-jobs.spec.ts",
+              "line": 88,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "create-monitor.spec.ts",
+      "file": "create-monitor.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Create Monitor Flow",
+          "file": "create-monitor.spec.ts",
+          "line": 13,
+          "column": 6,
+          "specs": [
+            {
+              "title": "deve exibir a página de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-00260f6b3a33739ee146",
+              "file": "create-monitor.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve listar monitores existentes do seed",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-c96919666b5b4934f11a",
+              "file": "create-monitor.spec.ts",
+              "line": 26,
+              "column": 3
+            },
+            {
+              "title": "deve ter formulário de criação de monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-85dc42f49d6369218d25",
+              "file": "create-monitor.spec.ts",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios ao criar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-e97c06f8d48959c80410",
+              "file": "create-monitor.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve criar um monitor com sucesso (integração real)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-18ffdb6b00188ef67d0e",
+              "file": "create-monitor.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao exceder limite de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-9f910e6d7d13fc08e043",
+              "file": "create-monitor.spec.ts",
+              "line": 114,
+              "column": 3
+            },
+            {
+              "title": "deve permitir editar monitor existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-71bcc568428da2d8cd21",
+              "file": "create-monitor.spec.ts",
+              "line": 142,
+              "column": 3
+            },
+            {
+              "title": "deve permitir ativar/desativar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-caa73a8c008b73fa9d70",
+              "file": "create-monitor.spec.ts",
+              "line": 161,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-095f388cae8a40cabc21",
+              "file": "create-monitor.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve listar monitores existentes do seed",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-f55b6d0cebe6dbcc7697",
+              "file": "create-monitor.spec.ts",
+              "line": 26,
+              "column": 3
+            },
+            {
+              "title": "deve ter formulário de criação de monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-bfe35151df61900ee451",
+              "file": "create-monitor.spec.ts",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios ao criar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-54e97e909a204baea12c",
+              "file": "create-monitor.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve criar um monitor com sucesso (integração real)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-3060922b9d6fe3e03428",
+              "file": "create-monitor.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao exceder limite de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-896a3a788542dac7d3de",
+              "file": "create-monitor.spec.ts",
+              "line": 114,
+              "column": 3
+            },
+            {
+              "title": "deve permitir editar monitor existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-b93e8118d2b972d87172",
+              "file": "create-monitor.spec.ts",
+              "line": 142,
+              "column": 3
+            },
+            {
+              "title": "deve permitir ativar/desativar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-de309f1d23e81ffb629b",
+              "file": "create-monitor.spec.ts",
+              "line": 161,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-3c4b44abd38e59a8bf56",
+              "file": "create-monitor.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve listar monitores existentes do seed",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-63ebfa8f39d23b6fd291",
+              "file": "create-monitor.spec.ts",
+              "line": 26,
+              "column": 3
+            },
+            {
+              "title": "deve ter formulário de criação de monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-abeb1b0c0bc228e361ee",
+              "file": "create-monitor.spec.ts",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios ao criar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-43639ce423e29e134afe",
+              "file": "create-monitor.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve criar um monitor com sucesso (integração real)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-b9ec60ceb7b4602b594b",
+              "file": "create-monitor.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao exceder limite de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-2d229bc43ba82b4ff697",
+              "file": "create-monitor.spec.ts",
+              "line": 114,
+              "column": 3
+            },
+            {
+              "title": "deve permitir editar monitor existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-faaa1b43f67f1e7fc0d4",
+              "file": "create-monitor.spec.ts",
+              "line": 142,
+              "column": 3
+            },
+            {
+              "title": "deve permitir ativar/desativar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-f706f79d4594583edb23",
+              "file": "create-monitor.spec.ts",
+              "line": 161,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-2f88b4143c3cffbf1742",
+              "file": "create-monitor.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve listar monitores existentes do seed",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-e981fb381f39124a1cdd",
+              "file": "create-monitor.spec.ts",
+              "line": 26,
+              "column": 3
+            },
+            {
+              "title": "deve ter formulário de criação de monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-5a06a7a055c4bb584816",
+              "file": "create-monitor.spec.ts",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios ao criar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-b5070ec92daae496c569",
+              "file": "create-monitor.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve criar um monitor com sucesso (integração real)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-73665ef6d1281d1e89f5",
+              "file": "create-monitor.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao exceder limite de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-b8f3e6e9edf72140db87",
+              "file": "create-monitor.spec.ts",
+              "line": 114,
+              "column": 3
+            },
+            {
+              "title": "deve permitir editar monitor existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-8644e85dff46aa2bf396",
+              "file": "create-monitor.spec.ts",
+              "line": 142,
+              "column": 3
+            },
+            {
+              "title": "deve permitir ativar/desativar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-7bd0a1c06bcbe473a834",
+              "file": "create-monitor.spec.ts",
+              "line": 161,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-ec999044280b7bc92ec6",
+              "file": "create-monitor.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve listar monitores existentes do seed",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-e2e1c306cd31758d1e24",
+              "file": "create-monitor.spec.ts",
+              "line": 26,
+              "column": 3
+            },
+            {
+              "title": "deve ter formulário de criação de monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-aaf26aad41d74c0ad312",
+              "file": "create-monitor.spec.ts",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios ao criar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-d3c121f962b9b51b80c4",
+              "file": "create-monitor.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve criar um monitor com sucesso (integração real)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-1ea1741aee571acec4bb",
+              "file": "create-monitor.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao exceder limite de monitores",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-05c466dcd8c0ee112108",
+              "file": "create-monitor.spec.ts",
+              "line": 114,
+              "column": 3
+            },
+            {
+              "title": "deve permitir editar monitor existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-51eff55b01d8621b526d",
+              "file": "create-monitor.spec.ts",
+              "line": 142,
+              "column": 3
+            },
+            {
+              "title": "deve permitir ativar/desativar monitor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e78c72ba4aa906c05a5-651ccdaa1812dedfb395",
+              "file": "create-monitor.spec.ts",
+              "line": 161,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "forgot-password.spec.ts",
+      "file": "forgot-password.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Forgot Password Flow",
+          "file": "forgot-password.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "deve exibir a página de recuperação de senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-6dc103b57d1a0b5b7935",
+              "file": "forgot-password.spec.ts",
+              "line": 9,
+              "column": 3
+            },
+            {
+              "title": "deve validar email obrigatório",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-e87c1079dec4b5086227",
+              "file": "forgot-password.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve validar formato de email",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-f5c91de42108c8caafc9",
+              "file": "forgot-password.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve enviar solicitação de reset com email válido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-49b3e29676a833f2b570",
+              "file": "forgot-password.spec.ts",
+              "line": 39,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-e3bdca0e12fb275e92d4",
+              "file": "forgot-password.spec.ts",
+              "line": 53,
+              "column": 3
+            },
+            {
+              "title": "deve enviar request ao backend real",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-b6e5029fd02e7ceb6bcc",
+              "file": "forgot-password.spec.ts",
+              "line": 63,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de recuperação de senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-185425d1a14f97efa6ec",
+              "file": "forgot-password.spec.ts",
+              "line": 9,
+              "column": 3
+            },
+            {
+              "title": "deve validar email obrigatório",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-651c35e38537e58dc486",
+              "file": "forgot-password.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve validar formato de email",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-d558204432dd9b94e82d",
+              "file": "forgot-password.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve enviar solicitação de reset com email válido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-a663c1ed9c2fea1651b1",
+              "file": "forgot-password.spec.ts",
+              "line": 39,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-7e853c45732dfb58499f",
+              "file": "forgot-password.spec.ts",
+              "line": 53,
+              "column": 3
+            },
+            {
+              "title": "deve enviar request ao backend real",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-366eaecc18d032e779f8",
+              "file": "forgot-password.spec.ts",
+              "line": 63,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de recuperação de senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-5d8de041ddf6b2c156ea",
+              "file": "forgot-password.spec.ts",
+              "line": 9,
+              "column": 3
+            },
+            {
+              "title": "deve validar email obrigatório",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-36f165e0841367b59a3d",
+              "file": "forgot-password.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve validar formato de email",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-a5f6fa726afc79a5fd30",
+              "file": "forgot-password.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve enviar solicitação de reset com email válido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-d478c3ac764ed783819a",
+              "file": "forgot-password.spec.ts",
+              "line": 39,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-6062d1c76c60795863d9",
+              "file": "forgot-password.spec.ts",
+              "line": 53,
+              "column": 3
+            },
+            {
+              "title": "deve enviar request ao backend real",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-4d39419f698499312fba",
+              "file": "forgot-password.spec.ts",
+              "line": 63,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de recuperação de senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-7ac28290ca2922a82e84",
+              "file": "forgot-password.spec.ts",
+              "line": 9,
+              "column": 3
+            },
+            {
+              "title": "deve validar email obrigatório",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-7dba30dc7f6099226c04",
+              "file": "forgot-password.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve validar formato de email",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-140ad0e8ae57ad197aea",
+              "file": "forgot-password.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve enviar solicitação de reset com email válido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-2d5b2141dd37497d30e0",
+              "file": "forgot-password.spec.ts",
+              "line": 39,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-69c0d4656ac441b0458b",
+              "file": "forgot-password.spec.ts",
+              "line": 53,
+              "column": 3
+            },
+            {
+              "title": "deve enviar request ao backend real",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-fdf4f4c5a227be974a7f",
+              "file": "forgot-password.spec.ts",
+              "line": 63,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de recuperação de senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-dcd5438fd81d4b955609",
+              "file": "forgot-password.spec.ts",
+              "line": 9,
+              "column": 3
+            },
+            {
+              "title": "deve validar email obrigatório",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-ea453d03cf4a6bc5b04d",
+              "file": "forgot-password.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve validar formato de email",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-7c67461c9318cb8194d4",
+              "file": "forgot-password.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve enviar solicitação de reset com email válido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-f517280e98448e2eeaf8",
+              "file": "forgot-password.spec.ts",
+              "line": 39,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-f4f4ee88de95c1a790d1",
+              "file": "forgot-password.spec.ts",
+              "line": 53,
+              "column": 3
+            },
+            {
+              "title": "deve enviar request ao backend real",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "852acb1e2419f9f859ad-b3b0656b6c24c093b9e1",
+              "file": "forgot-password.spec.ts",
+              "line": 63,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "login.spec.ts",
+      "file": "login.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Login Flow",
+          "file": "login.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "deve exibir a página de login corretamente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-2bd073917df4e47c4d51",
+              "file": "login.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com campos vazios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-d266e4cb8cb2f099935a",
+              "file": "login.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com credenciais inválidas",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-bcfdcce3c82a4b310edc",
+              "file": "login.spec.ts",
+              "line": 37,
+              "column": 3
+            },
+            {
+              "title": "deve fazer login com sucesso e redirecionar para dashboard/monitors",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-72ce4fdfae0c953808ea",
+              "file": "login.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Esqueci minha senha\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-eba51608dc8d66c6539c",
+              "file": "login.spec.ts",
+              "line": 68,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Criar conta\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-2839c2611a7ad61f2ae4",
+              "file": "login.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "admin deve conseguir fazer login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-49742adbd4afb6d2c646",
+              "file": "login.spec.ts",
+              "line": 85,
+              "column": 3
+            },
+            {
+              "title": "deve persistir sessão após refresh",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-015abee01582c52ec5e9",
+              "file": "login.spec.ts",
+              "line": 102,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de login corretamente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-5d78609ae3671eba64b5",
+              "file": "login.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com campos vazios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-aa3f1edc91a935959e7b",
+              "file": "login.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com credenciais inválidas",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-2b74bca28ca546ca0022",
+              "file": "login.spec.ts",
+              "line": 37,
+              "column": 3
+            },
+            {
+              "title": "deve fazer login com sucesso e redirecionar para dashboard/monitors",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-a619d1baf97af7c2797c",
+              "file": "login.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Esqueci minha senha\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-4aeff20df9d047fc1a78",
+              "file": "login.spec.ts",
+              "line": 68,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Criar conta\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-2051eb16294fdf14b300",
+              "file": "login.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "admin deve conseguir fazer login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-bf489315c7cf1b559829",
+              "file": "login.spec.ts",
+              "line": 85,
+              "column": 3
+            },
+            {
+              "title": "deve persistir sessão após refresh",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-908a2b55dd959a21b2f1",
+              "file": "login.spec.ts",
+              "line": 102,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de login corretamente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-75b08945f9c019fcc020",
+              "file": "login.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com campos vazios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-d422e4e68d5fce3529f1",
+              "file": "login.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com credenciais inválidas",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-de10a6bfc60f20fe065e",
+              "file": "login.spec.ts",
+              "line": 37,
+              "column": 3
+            },
+            {
+              "title": "deve fazer login com sucesso e redirecionar para dashboard/monitors",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-a84cd9189cef89b63121",
+              "file": "login.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Esqueci minha senha\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-98959ab68433c6b99736",
+              "file": "login.spec.ts",
+              "line": 68,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Criar conta\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-62467c1d7a537994ebdc",
+              "file": "login.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "admin deve conseguir fazer login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-c28876428e9d0052e86b",
+              "file": "login.spec.ts",
+              "line": 85,
+              "column": 3
+            },
+            {
+              "title": "deve persistir sessão após refresh",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-8666128cad3867a96e3d",
+              "file": "login.spec.ts",
+              "line": 102,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de login corretamente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-520682bae27dcbe1e060",
+              "file": "login.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com campos vazios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-03c07147c58c1bfe42fa",
+              "file": "login.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com credenciais inválidas",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-719b52621fb8bf4f51a5",
+              "file": "login.spec.ts",
+              "line": 37,
+              "column": 3
+            },
+            {
+              "title": "deve fazer login com sucesso e redirecionar para dashboard/monitors",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-56e2a16061211382e6bc",
+              "file": "login.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Esqueci minha senha\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-97e0a4063471d0dc4787",
+              "file": "login.spec.ts",
+              "line": 68,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Criar conta\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-bf87a0f658d888e60da6",
+              "file": "login.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "admin deve conseguir fazer login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-99c7ebd0c35066f85657",
+              "file": "login.spec.ts",
+              "line": 85,
+              "column": 3
+            },
+            {
+              "title": "deve persistir sessão após refresh",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-d7412e836e38ab7fede3",
+              "file": "login.spec.ts",
+              "line": 102,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de login corretamente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-7675b5ab01fe31a7df4f",
+              "file": "login.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com campos vazios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-89a4ba6458a88082dafc",
+              "file": "login.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar erro ao tentar login com credenciais inválidas",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-87651fafc98893a717b7",
+              "file": "login.spec.ts",
+              "line": 37,
+              "column": 3
+            },
+            {
+              "title": "deve fazer login com sucesso e redirecionar para dashboard/monitors",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-1a243af628905aca7c15",
+              "file": "login.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Esqueci minha senha\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-c6e52f9c272ce7683e6c",
+              "file": "login.spec.ts",
+              "line": 68,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para \"Criar conta\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-c2274757d99973ab5441",
+              "file": "login.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "admin deve conseguir fazer login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-876c2be256112174e7a6",
+              "file": "login.spec.ts",
+              "line": 85,
+              "column": 3
+            },
+            {
+              "title": "deve persistir sessão após refresh",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "41d3fd2474a19feb00a1-0ace43367af2d42dd1db",
+              "file": "login.spec.ts",
+              "line": 102,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "reset-password.spec.ts",
+      "file": "reset-password.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Reset Password Flow",
+          "file": "reset-password.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "deve exibir a página de redefinição de senha com token",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-e6a32338daaf0b9c99ec",
+              "file": "reset-password.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve exibir erro quando token não é fornecido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-716fd5bb0dc41b760819",
+              "file": "reset-password.spec.ts",
+              "line": 33,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos de senha obrigatórios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-98d08276b7b31264d91d",
+              "file": "reset-password.spec.ts",
+              "line": 45,
+              "column": 3
+            },
+            {
+              "title": "deve validar que as senhas coincidem",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-07c1437f6a849e1718bd",
+              "file": "reset-password.spec.ts",
+              "line": 61,
+              "column": 3
+            },
+            {
+              "title": "deve validar tamanho mínimo da senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-6ffcf3c5b36011b3b88b",
+              "file": "reset-password.spec.ts",
+              "line": 79,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-2ce961392c29ba16b7ea",
+              "file": "reset-password.spec.ts",
+              "line": 97,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de redefinição de senha com token",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-0e133ffebc5fef143144",
+              "file": "reset-password.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve exibir erro quando token não é fornecido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-c17b978b4f5e74fb32ab",
+              "file": "reset-password.spec.ts",
+              "line": 33,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos de senha obrigatórios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-168ec338e5cf52639793",
+              "file": "reset-password.spec.ts",
+              "line": 45,
+              "column": 3
+            },
+            {
+              "title": "deve validar que as senhas coincidem",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-d82593058dc4af244ebc",
+              "file": "reset-password.spec.ts",
+              "line": 61,
+              "column": 3
+            },
+            {
+              "title": "deve validar tamanho mínimo da senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-a07d7a3fa74ad8878402",
+              "file": "reset-password.spec.ts",
+              "line": 79,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-2527fe0545eef8a88385",
+              "file": "reset-password.spec.ts",
+              "line": 97,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de redefinição de senha com token",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-27da4d41435322b8a60a",
+              "file": "reset-password.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve exibir erro quando token não é fornecido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-eb677b9649ed5a000cd7",
+              "file": "reset-password.spec.ts",
+              "line": 33,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos de senha obrigatórios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-809456793fc977dcdff1",
+              "file": "reset-password.spec.ts",
+              "line": 45,
+              "column": 3
+            },
+            {
+              "title": "deve validar que as senhas coincidem",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-e8703e69a305e69c7083",
+              "file": "reset-password.spec.ts",
+              "line": 61,
+              "column": 3
+            },
+            {
+              "title": "deve validar tamanho mínimo da senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-ba4fc6ea66fbdf72468d",
+              "file": "reset-password.spec.ts",
+              "line": 79,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-c633c0ba7eed861ae6d5",
+              "file": "reset-password.spec.ts",
+              "line": 97,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de redefinição de senha com token",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-915d4a675cce61c4f341",
+              "file": "reset-password.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve exibir erro quando token não é fornecido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-5e6eb5b9d5ce708006bb",
+              "file": "reset-password.spec.ts",
+              "line": 33,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos de senha obrigatórios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-ee614a08c689fd5799eb",
+              "file": "reset-password.spec.ts",
+              "line": 45,
+              "column": 3
+            },
+            {
+              "title": "deve validar que as senhas coincidem",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-83f7ad085214b987cb4a",
+              "file": "reset-password.spec.ts",
+              "line": 61,
+              "column": 3
+            },
+            {
+              "title": "deve validar tamanho mínimo da senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-a65ae1503c1c4c6b7676",
+              "file": "reset-password.spec.ts",
+              "line": 79,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-2c51a3773623c07bb014",
+              "file": "reset-password.spec.ts",
+              "line": 97,
+              "column": 3
+            },
+            {
+              "title": "deve exibir a página de redefinição de senha com token",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-d22e52cd841188875d5a",
+              "file": "reset-password.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "deve exibir erro quando token não é fornecido",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-eafc245bff924f59609a",
+              "file": "reset-password.spec.ts",
+              "line": 33,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos de senha obrigatórios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-a8a1c49ab51f7195941a",
+              "file": "reset-password.spec.ts",
+              "line": 45,
+              "column": 3
+            },
+            {
+              "title": "deve validar que as senhas coincidem",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-86cd7abe36a68549e399",
+              "file": "reset-password.spec.ts",
+              "line": 61,
+              "column": 3
+            },
+            {
+              "title": "deve validar tamanho mínimo da senha",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-cb9f5ff198bcb996a289",
+              "file": "reset-password.spec.ts",
+              "line": 79,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para voltar ao login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "193bb8f07ddb614d27ad-4f5fd42da4ed0fd7fa84",
+              "file": "reset-password.spec.ts",
+              "line": 97,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "trial-flow.spec.ts",
+      "file": "trial-flow.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Trial Flow E2E",
+          "file": "trial-flow.spec.ts",
+          "line": 13,
+          "column": 6,
+          "specs": [
+            {
+              "title": "deve mostrar banner de trial expirando quando faltam poucos dias",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-839334d4d3878753415b",
+              "file": "trial-flow.spec.ts",
+              "line": 25,
+              "column": 3
+            },
+            {
+              "title": "não deve mostrar banner se o usuário não está em trial",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-899d0411448c6680e23b",
+              "file": "trial-flow.spec.ts",
+              "line": 46,
+              "column": 3
+            },
+            {
+              "title": "usuário em trial deve ter acesso normal às funcionalidades",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-2630b9eb35572e646fad",
+              "file": "trial-flow.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para /plans na página",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-4a1bd7cad7a50b7bd76d",
+              "file": "trial-flow.spec.ts",
+              "line": 69,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar banner de trial expirando quando faltam poucos dias",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-aa5ad1a903e027e2307c",
+              "file": "trial-flow.spec.ts",
+              "line": 25,
+              "column": 3
+            },
+            {
+              "title": "não deve mostrar banner se o usuário não está em trial",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-7f90ce70e7d955f8f065",
+              "file": "trial-flow.spec.ts",
+              "line": 46,
+              "column": 3
+            },
+            {
+              "title": "usuário em trial deve ter acesso normal às funcionalidades",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-f423f738aa35efbe621e",
+              "file": "trial-flow.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para /plans na página",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-5af812d534cc3c8e2689",
+              "file": "trial-flow.spec.ts",
+              "line": 69,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar banner de trial expirando quando faltam poucos dias",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-06311edfcab220f28a57",
+              "file": "trial-flow.spec.ts",
+              "line": 25,
+              "column": 3
+            },
+            {
+              "title": "não deve mostrar banner se o usuário não está em trial",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-73ee506f9fc0889ff79c",
+              "file": "trial-flow.spec.ts",
+              "line": 46,
+              "column": 3
+            },
+            {
+              "title": "usuário em trial deve ter acesso normal às funcionalidades",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-596f3762ac71c110b166",
+              "file": "trial-flow.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para /plans na página",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-a51b85ec139d64bd48f4",
+              "file": "trial-flow.spec.ts",
+              "line": 69,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar banner de trial expirando quando faltam poucos dias",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-2f50b342f8bdc96b8066",
+              "file": "trial-flow.spec.ts",
+              "line": 25,
+              "column": 3
+            },
+            {
+              "title": "não deve mostrar banner se o usuário não está em trial",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-52ea9f3acbeb82d84920",
+              "file": "trial-flow.spec.ts",
+              "line": 46,
+              "column": 3
+            },
+            {
+              "title": "usuário em trial deve ter acesso normal às funcionalidades",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-33d59d6036745de863f7",
+              "file": "trial-flow.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para /plans na página",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-b89b8b81ef5723c1b768",
+              "file": "trial-flow.spec.ts",
+              "line": 69,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar banner de trial expirando quando faltam poucos dias",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-4b553bdb47c3561edca3",
+              "file": "trial-flow.spec.ts",
+              "line": 25,
+              "column": 3
+            },
+            {
+              "title": "não deve mostrar banner se o usuário não está em trial",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-e55448a953a35b72dc41",
+              "file": "trial-flow.spec.ts",
+              "line": 46,
+              "column": 3
+            },
+            {
+              "title": "usuário em trial deve ter acesso normal às funcionalidades",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-53ede898f4663e099b27",
+              "file": "trial-flow.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "deve ter link para /plans na página",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-1f330e1b94cc89a958a0",
+              "file": "trial-flow.spec.ts",
+              "line": 69,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Register Flow - Duplicate User",
+          "file": "trial-flow.spec.ts",
+          "line": 88,
+          "column": 6,
+          "specs": [
+            {
+              "title": "deve mostrar página de registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-81022a7e4fedf738e4d9",
+              "file": "trial-flow.spec.ts",
+              "line": 89,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios no registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-b0bef07bfe39dde5a4ed",
+              "file": "trial-flow.spec.ts",
+              "line": 103,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar mensagem ao cadastrar com email existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-2cdf4b6473badb4507ed",
+              "file": "trial-flow.spec.ts",
+              "line": 117,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar página de registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-204645baef145e672a90",
+              "file": "trial-flow.spec.ts",
+              "line": 89,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios no registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-5a5b8bec372810b15a90",
+              "file": "trial-flow.spec.ts",
+              "line": 103,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar mensagem ao cadastrar com email existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-7d3941fe2a60824f06ae",
+              "file": "trial-flow.spec.ts",
+              "line": 117,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar página de registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-ce4e71a9b5947cc09e12",
+              "file": "trial-flow.spec.ts",
+              "line": 89,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios no registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-9c2589019fc931ad345f",
+              "file": "trial-flow.spec.ts",
+              "line": 103,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar mensagem ao cadastrar com email existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-4409644a54bcdd2e8d74",
+              "file": "trial-flow.spec.ts",
+              "line": 117,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar página de registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-c8a6fdc6978c7758c086",
+              "file": "trial-flow.spec.ts",
+              "line": 89,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios no registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-7743cbc65240b94a95e0",
+              "file": "trial-flow.spec.ts",
+              "line": 103,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar mensagem ao cadastrar com email existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-14b9058a5f28e55bbb9e",
+              "file": "trial-flow.spec.ts",
+              "line": 117,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar página de registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-4ea81ee4713f58c1caca",
+              "file": "trial-flow.spec.ts",
+              "line": 89,
+              "column": 3
+            },
+            {
+              "title": "deve validar campos obrigatórios no registro",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-de2310bcba0e970de1a4",
+              "file": "trial-flow.spec.ts",
+              "line": 103,
+              "column": 3
+            },
+            {
+              "title": "deve mostrar mensagem ao cadastrar com email existente",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-08e97ee54ee053706fa6",
+              "file": "trial-flow.spec.ts",
+              "line": 117,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Login Flow - Redirecionamento",
+          "file": "trial-flow.spec.ts",
+          "line": 163,
+          "column": 6,
+          "specs": [
+            {
+              "title": "deve redirecionar automaticamente para /monitors após login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-66e3347ed634b3753182",
+              "file": "trial-flow.spec.ts",
+              "line": 164,
+              "column": 3
+            },
+            {
+              "title": "deve redirecionar automaticamente para /monitors após login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-3d713c0c0e794fc10291",
+              "file": "trial-flow.spec.ts",
+              "line": 164,
+              "column": 3
+            },
+            {
+              "title": "deve redirecionar automaticamente para /monitors após login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-4c9e9b9f00c49eecdbdd",
+              "file": "trial-flow.spec.ts",
+              "line": 164,
+              "column": 3
+            },
+            {
+              "title": "deve redirecionar automaticamente para /monitors após login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Chrome",
+                  "projectName": "Mobile Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-3e5e12714fca7992f68c",
+              "file": "trial-flow.spec.ts",
+              "line": 164,
+              "column": 3
+            },
+            {
+              "title": "deve redirecionar automaticamente para /monitors após login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Mobile Safari",
+                  "projectName": "Mobile Safari",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "6bd2dd123c894f894863-4a73a35468f85632d8e7",
+              "file": "trial-flow.spec.ts",
+              "line": 164,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-12-27T23:11:42.350Z",
+    "duration": 85.15000000000009,
+    "expected": 0,
+    "skipped": 210,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
