@@ -35,6 +35,9 @@ jobs:
         # Rodar em múltiplos navegadores
         browser: [chromium, firefox, webkit]
 
+    env:
+      DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test?schema=public
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -57,14 +60,10 @@ jobs:
 
       - name: Generate Prisma Client
         working-directory: ./backend
-        env:
-          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test
         run: npm run prisma:generate
 
       - name: Run database migrations
         working-directory: ./backend
-        env:
-          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test
         run: npm run prisma:migrate:deploy
 
       - name: Start backend server
@@ -72,7 +71,6 @@ jobs:
         env:
           NODE_ENV: test
           PORT: 3000
-          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test
           JWT_SECRET: test-jwt-secret-for-ci-only-not-production
           JWT_EXPIRES_IN: 7d
           FRONTEND_URL: http://localhost:5173
@@ -193,6 +191,9 @@ jobs:
       matrix:
         device: ['Mobile Chrome', 'Mobile Safari']
 
+    env:
+      DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test?schema=public
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -215,14 +216,10 @@ jobs:
 
       - name: Generate Prisma Client
         working-directory: ./backend
-        env:
-          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test
         run: npm run prisma:generate
 
       - name: Run database migrations
         working-directory: ./backend
-        env:
-          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test
         run: npm run prisma:migrate:deploy
 
       - name: Start backend server
@@ -230,7 +227,6 @@ jobs:
         env:
           NODE_ENV: test
           PORT: 3000
-          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/radarone_test
           JWT_SECRET: test-jwt-secret-for-ci-only-not-production
           JWT_EXPIRES_IN: 7d
           FRONTEND_URL: http://localhost:5173
