@@ -1,9 +1,41 @@
 import { test, expect } from '@playwright/test';
-import { TEST_USER, clearStorage } from './helpers';
+import { TEST_USER, clearStorage, setupCommonMocks } from './helpers';
 
 test.describe('Login Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearStorage(page);
+
+    // Setup common mocks para testes que fazem login
+    await setupCommonMocks(page, 'USER');
+
+    // Mock da API de login
+    await page.route('**/api/auth/login', async (route) => {
+      const request = route.request();
+      const postData = request.postDataJSON();
+
+      if (postData.email === TEST_USER.email && postData.password === TEST_USER.password) {
+        await route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            token: 'mock-jwt-token',
+            user: { id: '1', name: TEST_USER.name, email: TEST_USER.email, role: 'USER' },
+          }),
+        });
+      } else {
+        await route.fulfill({
+          status: 401,
+          body: JSON.stringify({ error: 'Credenciais inválidas' }),
+        });
+      }
+    });
+
+    // Mock da API de monitores
+    await page.route('**/api/monitors', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({ success: true, data: [], count: 0 }),
+      });
+    });
   });
 
   test('deve exibir a página de login corretamente', async ({ page }) => {

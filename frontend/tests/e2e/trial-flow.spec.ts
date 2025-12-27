@@ -1,17 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { login, clearStorage, TEST_USER } from './helpers';
+import { clearStorage, TEST_USER } from './helpers';
 
 /**
  * Testes E2E para fluxo de Trial
- *
- * IMPORTANTE: Alguns testes requerem manipulação manual do banco de dados.
- * Veja instruções em backend/tests/helpers/trial-helpers.sql
+ * Agora usando mocks para simular diferentes estados de trial
  */
 
 test.describe('Trial Flow E2E', () => {
   test.beforeEach(async ({ page }) => {
     // Forçar variante A para testes determinísticos (A/B testing)
-    // addInitScript roda ANTES de qualquer script da página em CADA navegação
     await page.addInitScript(() => {
       sessionStorage.setItem('ab_test_trialExpiredToast', 'A');
       sessionStorage.setItem('ab_test_trialExpiredBanner', 'A');
@@ -19,28 +16,66 @@ test.describe('Trial Flow E2E', () => {
     });
 
     await clearStorage(page);
+
+    // Mock comum de login
+    await page.route('**/api/auth/login', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          token: 'mock-jwt-token',
+          user: { id: '1', name: TEST_USER.name, email: TEST_USER.email, role: 'USER' },
+        }),
+      });
+    });
+
+    // Mock comum de monitores
+    await page.route('**/api/monitors', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({ success: true, data: [], count: 0 }),
+      });
+    });
   });
 
   test('deve mostrar banner de trial expirando quando faltam poucos dias', async ({ page }) => {
-    /**
-     * PRÉ-REQUISITO: Usuário de teste com trial expirando em 2-3 dias
-     *
-     * Para configurar manualmente:
-     * UPDATE subscriptions
-     * SET trial_ends_at = NOW() + INTERVAL '2 days'
-     * WHERE user_id = (SELECT id FROM users WHERE email = 'e2e-test@radarone.com')
-     *   AND status = 'TRIAL';
-     */
+    // Mock de /api/auth/me com trial expirando em 2 dias
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 2);
+
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          user: {
+            id: '1',
+            email: TEST_USER.email,
+            name: TEST_USER.name,
+            role: 'USER',
+            subscriptions: [
+              {
+                status: 'TRIAL',
+                trialEndsAt: trialEndsAt.toISOString(),
+                plan: { name: 'Free' },
+              },
+            ],
+          },
+        }),
+      });
+    });
 
     // Login
-    await login(page);
+    await page.goto('/login');
+    await page.fill('input[type="email"]', TEST_USER.email);
+    await page.fill('input[type="password"]', TEST_USER.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
 
     // Navegar para monitors
     await page.goto('/monitors');
 
     // Verificar se banner de trial aparece
     await expect(page.locator('text=/Seu trial expira em \\d+ dias?/i')).toBeVisible({
-      timeout: 5000
+      timeout: 5000,
     });
 
     // Verificar botão "Ver planos"
@@ -53,17 +88,48 @@ test.describe('Trial Flow E2E', () => {
   });
 
   test('deve redirecionar para /plans quando trial expirar (403 TRIAL_EXPIRED)', async ({ page }) => {
-    /**
-     * PRÉ-REQUISITO: Usuário de teste com trial EXPIRADO
-     *
-     * Para configurar manualmente:
-     * UPDATE subscriptions
-     * SET trial_ends_at = NOW() - INTERVAL '1 day', status = 'TRIAL'
-     * WHERE user_id = (SELECT id FROM users WHERE email = 'e2e-test@radarone.com');
-     */
+    // Mock de /api/auth/me com trial expirado
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() - 1);
+
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          user: {
+            id: '1',
+            email: TEST_USER.email,
+            name: TEST_USER.name,
+            role: 'USER',
+            subscriptions: [
+              {
+                status: 'TRIAL',
+                trialEndsAt: trialEndsAt.toISOString(),
+                plan: { name: 'Free' },
+              },
+            ],
+          },
+        }),
+      });
+    });
+
+    // Mock de /api/monitors retornando 403 TRIAL_EXPIRED
+    await page.route('**/api/monitors', async (route) => {
+      await route.fulfill({
+        status: 403,
+        body: JSON.stringify({
+          error: 'Seu período de teste gratuito expirou. Assine um plano para continuar.',
+          errorCode: 'TRIAL_EXPIRED',
+        }),
+      });
+    });
 
     // Login
-    await login(page);
+    await page.goto('/login');
+    await page.fill('input[type="email"]', TEST_USER.email);
+    await page.fill('input[type="password"]', TEST_USER.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
 
     // Tentar acessar /monitors (deve redirecionar para /plans por causa do interceptor)
     await page.goto('/monitors');
@@ -85,17 +151,33 @@ test.describe('Trial Flow E2E', () => {
   });
 
   test('não deve mostrar banner de trial se o usuário não está em trial', async ({ page }) => {
-    /**
-     * PRÉ-REQUISITO: Usuário de teste com assinatura ACTIVE (paga)
-     *
-     * Para configurar manualmente:
-     * UPDATE subscriptions
-     * SET status = 'ACTIVE', is_trial = false
-     * WHERE user_id = (SELECT id FROM users WHERE email = 'e2e-test@radarone.com');
-     */
+    // Mock de /api/auth/me com assinatura ACTIVE
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          user: {
+            id: '1',
+            email: TEST_USER.email,
+            name: TEST_USER.name,
+            role: 'USER',
+            subscriptions: [
+              {
+                status: 'ACTIVE',
+                plan: { name: 'Pro' },
+              },
+            ],
+          },
+        }),
+      });
+    });
 
     // Login
-    await login(page);
+    await page.goto('/login');
+    await page.fill('input[type="email"]', TEST_USER.email);
+    await page.fill('input[type="password"]', TEST_USER.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
 
     // Navegar para monitors
     await page.goto('/monitors');
@@ -108,18 +190,37 @@ test.describe('Trial Flow E2E', () => {
   });
 
   test('não deve mostrar banner se trial ainda tem mais de 7 dias', async ({ page }) => {
-    /**
-     * PRÉ-REQUISITO: Usuário de teste com trial de 10+ dias
-     *
-     * Para configurar manualmente:
-     * UPDATE subscriptions
-     * SET trial_ends_at = NOW() + INTERVAL '10 days'
-     * WHERE user_id = (SELECT id FROM users WHERE email = 'e2e-test@radarone.com')
-     *   AND status = 'TRIAL';
-     */
+    // Mock de /api/auth/me com trial de 10 dias
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 10);
+
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          user: {
+            id: '1',
+            email: TEST_USER.email,
+            name: TEST_USER.name,
+            role: 'USER',
+            subscriptions: [
+              {
+                status: 'TRIAL',
+                trialEndsAt: trialEndsAt.toISOString(),
+                plan: { name: 'Free' },
+              },
+            ],
+          },
+        }),
+      });
+    });
 
     // Login
-    await login(page);
+    await page.goto('/login');
+    await page.fill('input[type="email"]', TEST_USER.email);
+    await page.fill('input[type="password"]', TEST_USER.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
 
     // Navegar para monitors
     await page.goto('/monitors');
@@ -134,12 +235,22 @@ test.describe('Trial Flow E2E', () => {
 
 test.describe('Register Flow - Duplicate User', () => {
   test('deve mostrar mensagem clara ao cadastrar com email existente', async ({ page }) => {
+    // Mock de registro retornando erro de duplicata
+    await page.route('**/api/auth/register', async (route) => {
+      await route.fulfill({
+        status: 400,
+        body: JSON.stringify({
+          error: 'Você já tem cadastro com este email',
+        }),
+      });
+    });
+
     // Ir para página de registro
     await page.goto('/register');
 
     // Preencher com email já existente
     await page.fill('input[name="name"]', 'Teste Duplicado');
-    await page.fill('input[name="email"]', TEST_USER.email); // Email que já existe
+    await page.fill('input[name="email"]', TEST_USER.email);
     await page.fill('input[name="cpf"]', '123.456.789-00');
     await page.fill('input[name="phone"]', '(11) 98765-4321');
     await page.fill('input[name="password"]', 'Senha123!');
@@ -163,19 +274,55 @@ test.describe('Register Flow - Duplicate User', () => {
 
 test.describe('Login Flow', () => {
   test('deve redirecionar automaticamente para /monitors após login', async ({ page }) => {
+    // Mock de /api/auth/me
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          user: {
+            id: '1',
+            email: TEST_USER.email,
+            name: TEST_USER.name,
+            role: 'USER',
+            subscriptions: [
+              {
+                status: 'ACTIVE',
+                plan: { name: 'Free' },
+              },
+            ],
+          },
+        }),
+      });
+    });
+
+    // Mock de /api/auth/login
+    await page.route('**/api/auth/login', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          token: 'mock-jwt-token',
+          user: { id: '1', name: TEST_USER.name, email: TEST_USER.email, role: 'USER' },
+        }),
+      });
+    });
+
+    // Mock de /api/monitors
+    await page.route('**/api/monitors', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({ success: true, data: [], count: 0 }),
+      });
+    });
+
+    // Ir para página de login
     await page.goto('/login');
 
-    // Preencher formulário
+    // Fazer login
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
-
-    // Submit
     await page.click('button[type="submit"]');
 
-    // Deve redirecionar automaticamente (não ficar na tela de login)
-    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 5000 });
-
-    // Verificar que não está mais em /login
-    expect(page.url()).not.toContain('/login');
+    // Deve redirecionar para /monitors
+    await page.waitForURL(/\/monitors/, { timeout: 10000 });
   });
 });

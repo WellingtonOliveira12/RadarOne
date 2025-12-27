@@ -1,9 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { login, clearStorage, TEST_USER } from './helpers';
+import { login, clearStorage, setupCommonMocks, TEST_USER } from './helpers';
 
 test.describe('Create Monitor Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearStorage(page);
+
+    // Setup common mocks (incluindo /api/auth/me)
+    await setupCommonMocks(page, 'USER');
 
     // Mock da API de login
     await page.route('**/api/auth/login', async (route) => {

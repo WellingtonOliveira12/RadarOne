@@ -11,6 +11,32 @@ export const TEST_USER = {
 };
 
 /**
+ * Configura mocks comuns necessários para testes autenticados
+ */
+export async function setupCommonMocks(page: Page, userRole: 'USER' | 'ADMIN' = 'USER') {
+  // Mock do endpoint /api/auth/me usado pelo TrialBanner e outros componentes
+  await page.route('**/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      body: JSON.stringify({
+        user: {
+          id: '1',
+          email: TEST_USER.email,
+          name: TEST_USER.name,
+          role: userRole,
+          subscriptions: [
+            {
+              status: 'ACTIVE',
+              plan: { name: 'Free' },
+            },
+          ],
+        },
+      }),
+    });
+  });
+}
+
+/**
  * Realiza login no sistema
  */
 export async function login(page: Page, email = TEST_USER.email, password = TEST_USER.password) {

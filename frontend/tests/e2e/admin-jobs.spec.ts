@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearStorage } from './helpers';
+import { clearStorage, setupCommonMocks } from './helpers';
 
 test.describe('Admin Jobs Dashboard Flow', () => {
   const ADMIN_USER = {
@@ -9,6 +9,9 @@ test.describe('Admin Jobs Dashboard Flow', () => {
 
   test.beforeEach(async ({ page }) => {
     await clearStorage(page);
+
+    // Setup common mocks (incluindo /api/auth/me)
+    await setupCommonMocks(page, 'ADMIN');
 
     // Mock da API de login como admin
     await page.route('**/api/auth/login', async (route) => {
