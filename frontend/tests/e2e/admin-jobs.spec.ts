@@ -26,6 +26,17 @@ test.describe('Admin Jobs Dashboard Flow', () => {
       });
     });
 
+    // Mock da API de stats do admin (usado pelo AdminProtectedRoute para verificar role)
+    await page.route('**/api/admin/stats', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          success: true,
+          stats: {},
+        }),
+      });
+    });
+
     // Mock da API de jobs do admin
     await page.route('**/api/admin/jobs**', async (route) => {
       await route.fulfill({
