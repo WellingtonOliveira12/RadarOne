@@ -1,68 +1,111 @@
 import { Page } from '@playwright/test';
 
 /**
- * Helpers compartilhados para testes E2E
+ * Helpers para testes E2E REAIS (sem mocks)
+ *
+ * Estratégia: Backend REAL + Seed E2E + Login REAL + Token JWT válido
+ *
+ * IMPORTANTE:
+ * - Não use mocks de API (page.route)
+ * - Todos os requests vão para o backend real
+ * - Usuários e dados são criados pelo seed E2E (backend/prisma/seed-e2e.ts)
  */
-
-export const TEST_USER = {
-  email: 'e2e-test@radarone.com',
-  password: 'Test123456!',
-  name: 'E2E Test User',
-};
 
 /**
- * Configura mocks comuns necessários para testes autenticados
+ * Credenciais dos usuários E2E (criados pelo seed)
  */
-export async function setupCommonMocks(page: Page, userRole: 'USER' | 'ADMIN' = 'USER') {
-  // Mock do endpoint /api/auth/me usado pelo TrialBanner e outros componentes
-  await page.route('**/api/auth/me', async (route) => {
-    await route.fulfill({
-      status: 200,
-      body: JSON.stringify({
-        user: {
-          id: '1',
-          email: TEST_USER.email,
-          name: TEST_USER.name,
-          role: userRole,
-          subscriptions: [
-            {
-              status: 'ACTIVE',
-              plan: { name: 'Free' },
-            },
-          ],
-        },
-      }),
-    });
+export const E2E_USERS = {
+  USER: {
+    email: 'e2e-test@radarone.com',
+    password: 'Test123456!',
+    name: 'E2E Test User',
+    role: 'USER',
+  },
+  ADMIN: {
+    email: 'e2e-admin@radarone.com',
+    password: 'Admin123456!',
+    name: 'E2E Admin User',
+    role: 'ADMIN',
+  },
+  TRIAL: {
+    email: 'e2e-trial@radarone.com',
+    password: 'Trial123456!',
+    name: 'E2E Trial User',
+    role: 'USER',
+  },
+} as const;
+
+/**
+ * Limpa localStorage e sessionStorage
+ * IMPORTANTE: Navega para baseURL primeiro para estabelecer origin
+ */
+export async function clearStorage(page: Page) {
+  await page.goto('/');
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
   });
 }
 
 /**
- * Realiza login no sistema
+ * Faz login REAL no sistema via UI
+ *
+ * Fluxo:
+ * 1. Navega para /login
+ * 2. Preenche credenciais REAIS
+ * 3. Submete formulário
+ * 4. Backend valida e retorna JWT REAL
+ * 5. Frontend salva token no localStorage
+ * 6. Aguarda redirecionamento para /monitors ou /dashboard
+ *
+ * @param page - Página do Playwright
+ * @param userType - Tipo de usuário (USER, ADMIN, TRIAL)
  */
-export async function login(page: Page, email = TEST_USER.email, password = TEST_USER.password) {
+export async function loginReal(
+  page: Page,
+  userType: keyof typeof E2E_USERS = 'USER'
+): Promise<void> {
+  const user = E2E_USERS[userType];
+
+  console.log(`[E2E] Fazendo login real como: ${user.email}`);
+
   await page.goto('/login');
 
-  // Aguardar página carregar completamente (AuthProvider montar)
+  // Aguardar página carregar completamente
   await page.waitForLoadState('networkidle');
 
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', password);
+  // Preencher formulário
+  await page.fill('input[type="email"]', user.email);
+  await page.fill('input[type="password"]', user.password);
+
+  // Submit
   await page.click('button[type="submit"]');
 
-  // Aguarda redirecionamento (agora funciona com useAuth)
+  // Aguardar redirecionamento (login real pode levar alguns ms)
   await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
+
+  console.log(`[E2E] Login real bem-sucedido: ${page.url()}`);
 }
 
 /**
- * Realiza logout
+ * Faz logout
  */
 export async function logout(page: Page) {
-  await page.click('text=Sair');
-  await page.waitForURL('/login', { timeout: 5000 });
+  // Procurar botão/link de logout (pode variar entre "Sair", "Logout", etc.)
+  const logoutButton = page.locator('text=Sair, text=Logout, button:has-text("Sair")').first();
+
+  if (await logoutButton.isVisible({ timeout: 2000 })) {
+    await logoutButton.click();
+    await page.waitForURL('/login', { timeout: 5000 });
+  } else {
+    // Fallback: limpar storage manualmente
+    await clearStorage(page);
+    await page.goto('/login');
+  }
 }
 
 /**
- * Aguarda toast aparecer
+ * Aguarda toast aparecer (Chakra UI)
  */
 export async function waitForToast(page: Page, message?: string) {
   if (message) {
@@ -74,16 +117,79 @@ export async function waitForToast(page: Page, message?: string) {
 }
 
 /**
- * Limpa localStorage e sessionStorage
- * IMPORTANTE: Navega para baseURL primeiro para estabelecer origin
+ * Aguarda elemento aparecer com timeout customizado
  */
-export async function clearStorage(page: Page) {
-  // Navegar para baseURL para estabelecer context de origin
-  // Isso previne SecurityError ao acessar localStorage
-  await page.goto('/');
+export async function waitForElement(
+  page: Page,
+  selector: string,
+  timeout: number = 5000
+) {
+  await page.waitForSelector(selector, { timeout });
+}
 
-  await page.evaluate(() => {
-    localStorage.clear();
-    sessionStorage.clear();
+/**
+ * Aguarda elemento desaparecer
+ */
+export async function waitForElementToDisappear(
+  page: Page,
+  selector: string,
+  timeout: number = 5000
+) {
+  await page.waitForSelector(selector, { state: 'hidden', timeout });
+}
+
+/**
+ * Aguarda requests de API específicos terminarem
+ *
+ * Útil quando você sabe que uma página vai fazer requests e quer esperar
+ * todos terminarem antes de fazer assertions.
+ */
+export async function waitForAPIRequest(
+  page: Page,
+  urlPattern: string | RegExp,
+  timeout: number = 5000
+): Promise<void> {
+  await page.waitForResponse((response) => {
+    const url = response.url();
+    if (typeof urlPattern === 'string') {
+      return url.includes(urlPattern);
+    }
+    return urlPattern.test(url);
+  }, { timeout });
+}
+
+/**
+ * Helper para debug: imprime todos os requests /api/** feitos pela página
+ *
+ * Útil para diagnosticar se requests estão indo para o backend ou sendo bloqueados.
+ */
+export function debugAPIRequests(page: Page) {
+  page.on('request', (request) => {
+    const url = request.url();
+    if (url.includes('/api/')) {
+      console.log(`[E2E REQUEST] ${request.method()} ${url}`);
+    }
+  });
+
+  page.on('response', (response) => {
+    const url = response.url();
+    if (url.includes('/api/')) {
+      console.log(`[E2E RESPONSE] ${response.status()} ${url}`);
+    }
+  });
+}
+
+/**
+ * Helper para debug: imprime erros de console do browser
+ */
+export function debugConsoleErrors(page: Page) {
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      console.error(`[BROWSER CONSOLE ERROR] ${msg.text()}`);
+    }
+  });
+
+  page.on('pageerror', (error) => {
+    console.error(`[BROWSER PAGE ERROR] ${error.message}`);
   });
 }

@@ -1,41 +1,17 @@
 import { test, expect } from '@playwright/test';
-import { TEST_USER, clearStorage, setupCommonMocks } from './helpers';
+import { E2E_USERS, clearStorage, loginReal } from './helpers';
+
+/**
+ * Testes E2E do fluxo de Login
+ *
+ * Estratégia: Backend REAL + Seed E2E + Login REAL
+ * - Sem mocks de API
+ * - Credenciais reais criadas pelo seed (backend/prisma/seed-e2e.ts)
+ */
 
 test.describe('Login Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearStorage(page);
-
-    // Setup common mocks para testes que fazem login
-    await setupCommonMocks(page, 'USER');
-
-    // Mock da API de login
-    await page.route('**/api/auth/login', async (route) => {
-      const request = route.request();
-      const postData = request.postDataJSON();
-
-      if (postData.email === TEST_USER.email && postData.password === TEST_USER.password) {
-        await route.fulfill({
-          status: 200,
-          body: JSON.stringify({
-            token: 'mock-jwt-token',
-            user: { id: '1', name: TEST_USER.name, email: TEST_USER.email, role: 'USER' },
-          }),
-        });
-      } else {
-        await route.fulfill({
-          status: 401,
-          body: JSON.stringify({ error: 'Credenciais inválidas' }),
-        });
-      }
-    });
-
-    // Mock da API de monitores
-    await page.route('**/api/monitors', async (route) => {
-      await route.fulfill({
-        status: 200,
-        body: JSON.stringify({ success: true, data: [], count: 0 }),
-      });
-    });
   });
 
   test('deve exibir a página de login corretamente', async ({ page }) => {
@@ -66,20 +42,22 @@ test.describe('Login Flow', () => {
     await page.click('button[type="submit"]');
 
     // Aguarda mensagem de erro (toast ou alert)
+    // Backend real vai retornar 401 e frontend vai mostrar erro
     await page.waitForSelector('text=/erro|inválid|incorret/i', { timeout: 5000 });
   });
 
-  test('deve fazer login com sucesso e redirecionar para dashboard', async ({ page }) => {
+  test('deve fazer login com sucesso e redirecionar para dashboard/monitors', async ({ page }) => {
     await page.goto('/login');
 
     // Aguardar página carregar (AuthProvider montar)
     await page.waitForLoadState('networkidle');
 
-    await page.fill('input[type="email"]', TEST_USER.email);
-    await page.fill('input[type="password"]', TEST_USER.password);
+    // Preencher com credenciais REAIS do seed
+    await page.fill('input[type="email"]', E2E_USERS.USER.email);
+    await page.fill('input[type="password"]', E2E_USERS.USER.password);
     await page.click('button[type="submit"]');
 
-    // Aguarda redirecionamento (useAuth agora atualiza contexto corretamente)
+    // Aguarda redirecionamento (backend REAL vai validar e retornar JWT válido)
     await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
 
     // Verifica se está autenticado
@@ -102,5 +80,37 @@ test.describe('Login Flow', () => {
 
     const registerLink = page.locator('a', { hasText: /criar conta|cadastr|register/i });
     await expect(registerLink).toBeVisible();
+  });
+
+  test('admin deve conseguir fazer login', async ({ page }) => {
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+
+    // Login com credenciais de ADMIN do seed
+    await page.fill('input[type="email"]', E2E_USERS.ADMIN.email);
+    await page.fill('input[type="password"]', E2E_USERS.ADMIN.password);
+    await page.click('button[type="submit"]');
+
+    // Aguarda redirecionamento
+    await page.waitForURL(/\/(dashboard|monitors)/, { timeout: 10000 });
+
+    // Verifica se redirecionou
+    const url = page.url();
+    expect(url).toMatch(/\/(dashboard|monitors)/);
+  });
+
+  test('deve persistir sessão após refresh', async ({ page }) => {
+    // Fazer login
+    await loginReal(page, 'USER');
+
+    // Pegar URL atual
+    const currentURL = page.url();
+
+    // Refresh
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Deve continuar na mesma URL (não redirecionar para /login)
+    expect(page.url()).toBe(currentURL);
   });
 });

@@ -66,6 +66,10 @@ jobs:
         working-directory: ./backend
         run: npm run prisma:migrate:deploy
 
+      - name: Seed E2E data
+        working-directory: ./backend
+        run: npm run seed:e2e
+
       - name: Start backend server
         working-directory: ./backend
         env:
@@ -221,6 +225,10 @@ jobs:
       - name: Run database migrations
         working-directory: ./backend
         run: npm run prisma:migrate:deploy
+
+      - name: Seed E2E data
+        working-directory: ./backend
+        run: npm run seed:e2e
 
       - name: Start backend server
         working-directory: ./backend
