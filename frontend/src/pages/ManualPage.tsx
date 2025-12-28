@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
 import { TELEGRAM_BOT_USERNAME } from '../constants/app';
+import { trackHelpPageView } from '../lib/analytics';
 
 export const ManualPage: React.FC = () => {
+  useEffect(() => {
+    trackHelpPageView('manual');
+  }, []);
+
   return (
     <AppLayout>
       <div style={styles.container}>

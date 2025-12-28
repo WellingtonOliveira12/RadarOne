@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
 import { TELEGRAM_BOT_USERNAME } from '../constants/app';
+import { trackHelpPageView } from '../lib/analytics';
 
 interface FAQItem {
   question: string;
@@ -11,6 +12,10 @@ interface FAQItem {
 
 export const FAQPage: React.FC = () => {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    trackHelpPageView('faq');
+  }, []);
 
   const toggleFAQ = (index: number) => {
     setExpandedIndex(expandedIndex === index ? null : index);

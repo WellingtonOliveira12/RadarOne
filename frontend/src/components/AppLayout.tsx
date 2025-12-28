@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { APP_VERSION } from '../constants/app';
+import { trackHelpMenuClick } from '../lib/analytics';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -16,7 +17,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const toggleHelpMenu = () => setHelpMenuOpen(!helpMenuOpen);
+  const toggleHelpMenu = () => {
+    const newState = !helpMenuOpen;
+    setHelpMenuOpen(newState);
+    // Track quando abre o menu (não quando fecha)
+    if (newState) {
+      trackHelpMenuClick('open');
+    }
+  };
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
   return (
@@ -101,6 +109,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                     to="/manual"
                     style={styles.dropdownItem}
                     onClick={() => {
+                      trackHelpMenuClick('manual');
                       setHelpMenuOpen(false);
                       setMobileMenuOpen(false);
                     }}
@@ -111,6 +120,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                     to="/faq"
                     style={styles.dropdownItem}
                     onClick={() => {
+                      trackHelpMenuClick('faq');
                       setHelpMenuOpen(false);
                       setMobileMenuOpen(false);
                     }}
@@ -121,6 +131,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                     to="/contact"
                     style={styles.dropdownItem}
                     onClick={() => {
+                      trackHelpMenuClick('contact');
                       setHelpMenuOpen(false);
                       setMobileMenuOpen(false);
                     }}

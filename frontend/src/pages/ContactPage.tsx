@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
+import { trackHelpPageView } from '../lib/analytics';
 
 export const ContactPage: React.FC = () => {
   const { user } = useAuth();
   const [category, setCategory] = useState('Suporte');
+
+  useEffect(() => {
+    trackHelpPageView('contact');
+  }, []);
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState(user?.email || '');
