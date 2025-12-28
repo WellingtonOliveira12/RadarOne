@@ -24,47 +24,28 @@ const IS_DEV = import.meta.env.DEV;
 
 /**
  * Inicializa o Google Analytics
- * Deve ser chamado uma vez no início da aplicação
+ * NOTA: O script principal é carregado no main.tsx antes do React.
+ * Esta função serve apenas para verificação e debug.
  */
 export function initAnalytics(): void {
   if (!IS_ENABLED) {
     if (IS_DEV) {
-      console.log('[ANALYTICS] Desabilitado (VITE_ANALYTICS_ID não configurado)');
+      console.log('[GA4] ⚠️ Analytics desabilitado (VITE_ANALYTICS_ID não configurado)');
     }
     return;
   }
 
-  // Verifica se já foi inicializado
-  if (window.gtag) {
-    console.warn('[ANALYTICS] Já foi inicializado anteriormente');
-    return;
-  }
-
-  try {
-    // Cria o script do Google Analytics
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${ANALYTICS_ID}`;
-    document.head.appendChild(script);
-
-    // Inicializa o dataLayer
-    window.dataLayer = window.dataLayer || [];
-    window.gtag = function () {
-      // eslint-disable-next-line prefer-rest-params
-      window.dataLayer?.push(arguments);
-    };
-
-    window.gtag('js', new Date());
-    window.gtag('config', ANALYTICS_ID, {
-      send_page_view: false, // Vamos controlar manualmente
-      anonymize_ip: true, // LGPD compliance
-    });
-
+  // Verifica se foi carregado corretamente
+  if (window.gtag && window.dataLayer) {
     if (IS_DEV) {
-      console.log('[ANALYTICS] Inicializado com sucesso:', ANALYTICS_ID);
+      console.log('[GA4] ✅ Analytics verificado - funcionando corretamente');
+      console.log('[GA4] 📊 ID:', ANALYTICS_ID);
+      console.log('[GA4] 🔍 window.gtag:', typeof window.gtag === 'function' ? '✅' : '❌');
+      console.log('[GA4] 🔍 window.dataLayer:', Array.isArray(window.dataLayer) ? '✅' : '❌');
     }
-  } catch (error) {
-    console.error('[ANALYTICS] Erro ao inicializar:', error);
+  } else if (IS_DEV) {
+    console.warn('[GA4] ⚠️ Analytics não foi carregado corretamente');
+    console.warn('[GA4] Verifique se VITE_ANALYTICS_ID está configurado');
   }
 }
 
