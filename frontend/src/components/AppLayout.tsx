@@ -25,7 +25,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <header style={styles.header}>
         <div style={styles.headerContent}>
           <Link to="/dashboard" style={styles.logoLink}>
-            <h1 style={styles.logo}>RadarOne</h1>
+            <div style={styles.logoContainer}>
+              <img
+                src="/brand/radarone-logo.png"
+                alt="RadarOne Logo"
+                style={styles.logoImage}
+              />
+              <h1 style={styles.logo}>RadarOne</h1>
+            </div>
           </Link>
 
           {/* Mobile Menu Button */}
@@ -188,8 +195,18 @@ const styles = {
   logoLink: {
     textDecoration: 'none',
   },
+  logoContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'clamp(8px, 2vw, 12px)',
+  },
+  logoImage: {
+    height: 'clamp(32px, 5vw, 40px)',
+    width: 'auto',
+    objectFit: 'contain' as const,
+  },
   logo: {
-    fontSize: 'clamp(20px, 5vw, 24px)',
+    fontSize: 'clamp(18px, 4vw, 22px)',
     fontWeight: 'bold' as const,
     color: '#1f2937',
     margin: 0,

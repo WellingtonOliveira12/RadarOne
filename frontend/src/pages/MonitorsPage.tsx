@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { trackMonitorCreated } from '../lib/analytics';
 import { TrialBanner } from '../components/TrialBanner';
 import { AppLayout } from '../components/AppLayout';
+import * as responsive from '../styles/responsive';
 
 type MonitorSite =
   | 'MERCADO_LIVRE'
@@ -680,15 +681,13 @@ const styles = {
     color: '#6b7280',
   },
   title: {
-    fontSize: '32px',
-    fontWeight: 'bold' as const,
-    color: '#1f2937',
-    marginBottom: '8px',
+    ...responsive.typography.h1,
+    marginBottom: responsive.spacing.xs,
   },
   subtitle: {
-    fontSize: '16px',
+    ...responsive.typography.body,
     color: '#6b7280',
-    marginBottom: '32px',
+    marginBottom: responsive.spacing.lg,
   },
   error: {
     backgroundColor: '#fee2e2',
@@ -706,43 +705,26 @@ const styles = {
     fontWeight: '600' as const,
   },
   form: {
-    backgroundColor: 'white',
-    padding: '32px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    marginBottom: '32px',
+    ...responsive.card,
+    marginBottom: responsive.spacing.lg,
   },
   formTitle: {
-    fontSize: '20px',
-    fontWeight: '600' as const,
-    color: '#1f2937',
+    ...responsive.typography.h2,
     marginTop: 0,
-    marginBottom: '24px',
+    marginBottom: responsive.spacing.lg,
   },
   field: {
     marginBottom: '20px',
   },
   label: {
-    fontSize: '14px',
-    fontWeight: '500' as const,
-    color: '#374151',
-    display: 'block',
-    marginBottom: '6px',
+    ...responsive.label,
   },
   labelSmall: {
-    fontSize: '13px',
-    fontWeight: '500' as const,
-    color: '#374151',
-    display: 'block',
-    marginBottom: '6px',
+    ...responsive.label,
+    fontSize: responsive.typography.small.fontSize,
   },
   input: {
-    width: '100%',
-    padding: '10px 12px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    fontSize: '14px',
-    boxSizing: 'border-box' as const,
+    ...responsive.input,
   },
   helpText: {
     fontSize: '12px',
@@ -781,9 +763,8 @@ const styles = {
     marginBottom: '16px',
   },
   filtersGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '16px',
+    ...responsive.grid,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
   },
   checkboxLabel: {
     display: 'flex',
@@ -793,35 +774,18 @@ const styles = {
     cursor: 'pointer',
   },
   buttons: {
-    display: 'flex',
-    gap: '12px',
-    marginTop: '24px',
+    ...responsive.flexRow,
+    marginTop: responsive.spacing.lg,
   },
   saveButton: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    padding: '12px 24px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '600' as const,
-    cursor: 'pointer',
+    ...responsive.buttonPrimary,
   },
   cancelButton: {
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    border: 'none',
-    padding: '12px 24px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '600' as const,
-    cursor: 'pointer',
+    ...responsive.buttonSecondary,
   },
   sectionTitle: {
-    fontSize: '24px',
-    fontWeight: 'bold' as const,
-    color: '#1f2937',
-    marginBottom: '20px',
+    ...responsive.typography.h2,
+    marginBottom: responsive.spacing.md,
   },
   loading: {
     textAlign: 'center' as const,
@@ -838,10 +802,12 @@ const styles = {
     backgroundColor: 'white',
     borderRadius: '12px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    overflow: 'hidden',
+    overflow: 'auto',
+    maxWidth: '100%',
   },
   table: {
     width: '100%',
+    minWidth: '600px',
     borderCollapse: 'collapse' as const,
   },
   th: {
