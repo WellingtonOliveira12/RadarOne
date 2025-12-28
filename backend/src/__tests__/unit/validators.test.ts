@@ -97,7 +97,7 @@ describe('Validators', () => {
     });
 
     it('should reject too long password', () => {
-      const longPassword = 'a'.repeat(120) + '1234567';
+      const longPassword = 'a'.repeat(122) + '1234567'; // 129 caracteres total (> 128)
       const result = validatePassword(longPassword);
       expect(result.valid).toBe(false);
       expect(result.error).toContain('muito longa');
