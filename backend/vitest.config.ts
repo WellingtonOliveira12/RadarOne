@@ -7,12 +7,12 @@ export default defineConfig({
     environment: 'node',
 
     // Diretórios e padrões de arquivos de teste
-    include: ['tests/**/*.test.ts', 'tests/**/*.spec.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'src/**/__tests__/**/*.test.ts'],
     exclude: ['node_modules', 'dist', 'build'],
 
-    // Configurações de timeout
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    // Configurações de timeout (aumentado para testes de integração)
+    testTimeout: 30000,
+    hookTimeout: 30000,
 
     // Cobertura de código
     coverage: {
