@@ -90,6 +90,9 @@ export const requireAdmin = async (
  * 1. Usuário tem plano FREE (trial)
  * 2. Trial já expirou (trialEndsAt < now)
  *
+ * Usuários sem assinatura são permitidos (presumivelmente novos usuários
+ * que ainda não tiveram assinatura criada - o sistema deve criar automaticamente no registro)
+ *
  * Deve ser usado APÓS authenticateToken
  */
 export const checkTrialExpired = async (
@@ -117,12 +120,15 @@ export const checkTrialExpired = async (
       }
     });
 
-    // Se não tem assinatura, bloquear acesso
+    // Se não tem assinatura, permitir acesso
+    // (usuário novo, assinatura será criada no primeiro acesso ou já foi criada no registro)
+    // Isso evita 403 para usuários recém-criados
     if (!subscription) {
-      res.status(403).json({
-        error: 'Você precisa assinar um plano para acessar este recurso.',
-        errorCode: 'NO_SUBSCRIPTION'
+      logWithUser(req.userId, 'warn', 'Usuário sem assinatura - permitindo acesso', {
+        endpoint: `${req.method} ${req.path}`,
+        userAgent: req.headers['user-agent'],
       });
+      next();
       return;
     }
 
