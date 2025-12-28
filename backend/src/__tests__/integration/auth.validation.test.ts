@@ -10,7 +10,7 @@ describe('Auth Validation Integration Tests', () => {
   });
 
   describe('POST /api/auth/register', () => {
-    it('should reject invalid email format', async () => {
+    it('should reject invalid email format with standardized error', async () => {
       const response = await request(app)
         .post('/api/auth/register')
         .send({
@@ -20,7 +20,10 @@ describe('Auth Validation Integration Tests', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('email');
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code', 'INVALID_EMAIL');
+      expect(response.body.error).toHaveProperty('field', 'email');
+      expect(response.body.error).toHaveProperty('message');
     });
 
     it('should reject weak password (no numbers)', async () => {

@@ -4,6 +4,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { prisma } from '../server';
 import { validateCpf, encryptCpf } from '../utils/crypto';
 import { validateEmail, validatePassword } from '../utils/validators';
+import { sendError, sendValidationError, ErrorCodes } from '../utils/errorResponse';
 import { startTrialForUser } from '../services/billingService';
 import { sendWelcomeEmail } from '../services/emailService';
 import logger from '../logger';
@@ -32,14 +33,14 @@ export class AuthController {
 
       // Validações básicas
       if (!email || !password || !name) {
-        res.status(400).json({ error: 'Campos obrigatórios faltando (email, password, name)' });
+        sendError(res, 400, ErrorCodes.MISSING_REQUIRED_FIELDS, 'Campos obrigatórios faltando (email, password, name)');
         return;
       }
 
       // Validar formato de email
       const emailValidation = validateEmail(email);
       if (!emailValidation.valid) {
-        res.status(400).json({ error: emailValidation.error });
+        sendValidationError(res, emailValidation.error!, 'email');
         return;
       }
       const normalizedEmail = emailValidation.value!;
@@ -47,14 +48,14 @@ export class AuthController {
       // Validar força da senha
       const passwordValidation = validatePassword(password);
       if (!passwordValidation.valid) {
-        res.status(400).json({ error: passwordValidation.error });
+        sendValidationError(res, passwordValidation.error!, 'password');
         return;
       }
 
       // Validar CPF se fornecido
       if (cpf) {
         if (!validateCpf(cpf)) {
-          res.status(400).json({ error: 'CPF inválido' });
+          sendValidationError(res, 'CPF inválido', 'cpf');
           return;
         }
       }
@@ -65,10 +66,7 @@ export class AuthController {
       });
 
       if (existingUser) {
-        res.status(409).json({
-          error: 'Você já tem cadastro. Faça login para entrar.',
-          errorCode: 'USER_ALREADY_EXISTS'
-        });
+        sendError(res, 409, ErrorCodes.USER_ALREADY_EXISTS, 'Você já tem cadastro. Faça login para entrar.', 'email');
         return;
       }
 
@@ -80,10 +78,7 @@ export class AuthController {
         });
 
         if (existingCpf) {
-          res.status(409).json({
-            error: 'Você já tem cadastro. Faça login para entrar.',
-            errorCode: 'USER_ALREADY_EXISTS'
-          });
+          sendError(res, 409, ErrorCodes.USER_ALREADY_EXISTS, 'Você já tem cadastro. Faça login para entrar.', 'cpf');
           return;
         }
       }
@@ -155,7 +150,7 @@ export class AuthController {
       });
     } catch (error) {
       logger.error({ err: error, requestId: req.requestId }, 'Failed to register user');
-      res.status(500).json({ error: 'Erro ao criar usuário' });
+      sendError(res, 500, ErrorCodes.INTERNAL_SERVER_ERROR, 'Erro ao criar usuário');
     }
   }
 
@@ -167,14 +162,14 @@ export class AuthController {
       const { email, password } = req.body;
 
       if (!email || !password) {
-        res.status(400).json({ error: 'Email e senha são obrigatórios' });
+        sendError(res, 400, ErrorCodes.MISSING_REQUIRED_FIELDS, 'Email e senha são obrigatórios');
         return;
       }
 
       // Validar e normalizar email
       const emailValidation = validateEmail(email);
       if (!emailValidation.valid) {
-        res.status(400).json({ error: emailValidation.error });
+        sendValidationError(res, emailValidation.error!, 'email');
         return;
       }
       const normalizedEmail = emailValidation.value!;
@@ -195,20 +190,20 @@ export class AuthController {
       });
 
       if (!user) {
-        res.status(401).json({ error: 'Credenciais inválidas' });
+        sendError(res, 401, ErrorCodes.INVALID_CREDENTIALS, 'Credenciais inválidas');
         return;
       }
 
       // Verifica senha
       const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
       if (!isPasswordValid) {
-        res.status(401).json({ error: 'Credenciais inválidas' });
+        sendError(res, 401, ErrorCodes.INVALID_CREDENTIALS, 'Credenciais inválidas');
         return;
       }
 
       // Verifica se usuário está ativo e não bloqueado
       if (!user.isActive || user.blocked) {
-        res.status(403).json({ error: 'Usuário bloqueado. Entre em contato com o suporte' });
+        sendError(res, 403, ErrorCodes.USER_BLOCKED, 'Usuário bloqueado. Entre em contato com o suporte');
         return;
       }
 
@@ -241,7 +236,7 @@ export class AuthController {
       });
     } catch (error) {
       logger.error({ err: error, requestId: req.requestId }, 'Failed to login');
-      res.status(500).json({ error: 'Erro ao fazer login' });
+      sendError(res, 500, ErrorCodes.INTERNAL_SERVER_ERROR, 'Erro ao fazer login');
     }
   }
 
@@ -253,7 +248,7 @@ export class AuthController {
       const userId = req.userId;
 
       if (!userId) {
-        res.status(401).json({ error: 'Não autenticado' });
+        sendError(res, 401, ErrorCodes.UNAUTHORIZED, 'Não autenticado');
         return;
       }
 
@@ -280,14 +275,14 @@ export class AuthController {
       });
 
       if (!user) {
-        res.status(404).json({ error: 'Usuário não encontrado' });
+        sendError(res, 404, ErrorCodes.USER_NOT_FOUND, 'Usuário não encontrado');
         return;
       }
 
       res.json({ user });
     } catch (error) {
       console.error('Erro ao buscar dados do usuário:', error);
-      res.status(500).json({ error: 'Erro ao buscar dados' });
+      sendError(res, 500, ErrorCodes.INTERNAL_SERVER_ERROR, 'Erro ao buscar dados');
     }
   }
 
@@ -383,14 +378,14 @@ export class AuthController {
 
       // Validações básicas
       if (!token || !password) {
-        res.status(400).json({ error: 'Token e nova senha são obrigatórios' });
+        sendError(res, 400, ErrorCodes.MISSING_REQUIRED_FIELDS, 'Token e nova senha são obrigatórios');
         return;
       }
 
       // Validar força da senha
       const passwordValidation = validatePassword(password);
       if (!passwordValidation.valid) {
-        res.status(400).json({ error: passwordValidation.error });
+        sendValidationError(res, passwordValidation.error!, 'password');
         return;
       }
 

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as monitorService from '../services/monitorService';
 import { MonitorSite } from '@prisma/client';
 import { validateUrl } from '../utils/validators';
+import { sendError, sendValidationError, ErrorCodes } from '../utils/errorResponse';
 
 /**
  * Controller de Monitores - RadarOne
@@ -18,7 +19,7 @@ export async function getMonitors(req: Request, res: Response): Promise<void> {
     const userId = req.userId;
 
     if (!userId) {
-      res.status(401).json({ error: 'Não autorizado' });
+      sendError(res, 401, ErrorCodes.UNAUTHORIZED, 'Não autorizado');
       return;
     }
 
@@ -31,10 +32,7 @@ export async function getMonitors(req: Request, res: Response): Promise<void> {
     });
   } catch (error: any) {
     console.error('Error in getMonitors:', error);
-    res.status(500).json({
-      error: 'Falha ao buscar monitores',
-      message: error.message,
-    });
+    sendError(res, 500, ErrorCodes.INTERNAL_SERVER_ERROR, 'Falha ao buscar monitores');
   }
 }
 
@@ -105,30 +103,21 @@ export async function createMonitor(
 
     // Validação de campos obrigatórios
     if (!name || !site || !searchUrl) {
-      res.status(400).json({
-        error: 'Erro de validação',
-        message: 'Nome, site e URL de busca são obrigatórios',
-      });
+      sendError(res, 400, ErrorCodes.MISSING_REQUIRED_FIELDS, 'Nome, site e URL de busca são obrigatórios');
       return;
     }
 
     // Validação de URL
     const urlValidation = validateUrl(searchUrl);
     if (!urlValidation.valid) {
-      res.status(400).json({
-        error: 'Erro de validação',
-        message: urlValidation.error,
-      });
+      sendValidationError(res, urlValidation.error!, 'searchUrl');
       return;
     }
     const validatedUrl = urlValidation.value!;
 
     // Validação do enum site
     if (!Object.values(MonitorSite).includes(site)) {
-      res.status(400).json({
-        error: 'Erro de validação',
-        message: `Site inválido. Deve ser um dos seguintes: ${Object.values(MonitorSite).join(', ')}`,
-      });
+      sendError(res, 400, ErrorCodes.VALIDATION_ERROR, `Site inválido. Deve ser um dos seguintes: ${Object.values(MonitorSite).join(', ')}`, 'site');
       return;
     }
 

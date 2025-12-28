@@ -9,20 +9,25 @@ describe('Auth HTTP Status Codes', () => {
   });
 
   describe('Token Authentication - Status 401', () => {
-    it('should return 401 when token is not provided', async () => {
+    it('should return 401 with standardized error when token is not provided', async () => {
       const response = await request(app).get('/api/auth/me');
 
       expect(response.status).toBe(401);
-      expect(response.body.error).toContain('Token não fornecido');
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code', 'TOKEN_NOT_PROVIDED');
+      expect(response.body.error).toHaveProperty('message');
+      expect(response.body.error.message).toContain('Token não fornecido');
     });
 
-    it('should return 401 when token is invalid', async () => {
+    it('should return 401 with standardized error when token is invalid', async () => {
       const response = await request(app)
         .get('/api/auth/me')
         .set('Authorization', 'Bearer invalid-token');
 
       expect(response.status).toBe(401);
-      expect(response.body.error).toContain('inválido ou expirado');
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code', 'TOKEN_INVALID');
+      expect(response.body.error).toHaveProperty('message');
     });
 
     it('should return 401 when token is malformed', async () => {
@@ -31,6 +36,8 @@ describe('Auth HTTP Status Codes', () => {
         .set('Authorization', 'InvalidFormat');
 
       expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code');
     });
   });
 

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../server';
 import { logWithUser } from '../logger';
+import { sendError, ErrorCodes } from '../utils/errorResponse';
 
 // Estende o tipo Request para incluir userId
 declare global {
@@ -34,7 +35,7 @@ export const authenticateToken = (
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
     if (!token) {
-      res.status(401).json({ error: 'Token não fornecido' });
+      sendError(res, 401, ErrorCodes.TOKEN_NOT_PROVIDED, 'Token não fornecido');
       return;
     }
 
@@ -46,9 +47,13 @@ export const authenticateToken = (
     const decoded = jwt.verify(token, secret) as JwtPayload;
     req.userId = decoded.userId;
     next();
-  } catch (error) {
+  } catch (error: any) {
     // Token inválido ou expirado = 401 (não autenticado)
-    res.status(401).json({ error: 'Token inválido ou expirado' });
+    if (error.name === 'TokenExpiredError') {
+      sendError(res, 401, ErrorCodes.TOKEN_EXPIRED, 'Token expirado');
+    } else {
+      sendError(res, 401, ErrorCodes.TOKEN_INVALID, 'Token inválido');
+    }
   }
 };
 
@@ -102,7 +107,7 @@ export const checkTrialExpired = async (
 ): Promise<void> => {
   try {
     if (!req.userId) {
-      res.status(401).json({ error: 'Não autenticado' });
+      sendError(res, 401, ErrorCodes.UNAUTHORIZED, 'Não autenticado');
       return;
     }
 
@@ -150,10 +155,7 @@ export const checkTrialExpired = async (
           userAgent: req.headers['user-agent'],
         });
 
-        res.status(403).json({
-          error: 'Seu período de teste gratuito expirou. Assine um plano para continuar.',
-          errorCode: 'TRIAL_EXPIRED'
-        });
+        sendError(res, 403, ErrorCodes.TRIAL_EXPIRED, 'Seu período de teste gratuito expirou. Assine um plano para continuar.');
         return;
       }
     }
@@ -162,6 +164,6 @@ export const checkTrialExpired = async (
     next();
   } catch (error) {
     console.error('Erro ao verificar trial:', error);
-    res.status(500).json({ error: 'Erro ao verificar acesso' });
+    sendError(res, 500, ErrorCodes.INTERNAL_SERVER_ERROR, 'Erro ao verificar acesso');
   }
 };
