@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { trackSignUp } from '../lib/analytics';
+import { TELEGRAM_BOT_USERNAME, TELEGRAM_BOT_LINK } from '../constants/app';
 
 /**
  * Página de Cadastro com CPF e preferências de notificação
@@ -296,12 +297,12 @@ export const RegisterPage: React.FC = () => {
                   <li>
                     Fale com o{' '}
                     <a
-                      href="https://t.me/RadarOneBot"
+                      href={TELEGRAM_BOT_LINK}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={styles.link}
                     >
-                      @RadarOneBot
+                      @{TELEGRAM_BOT_USERNAME}
                     </a>{' '}
                     e clique em /start
                   </li>

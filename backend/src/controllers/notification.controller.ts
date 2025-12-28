@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../server';
 import { generateLinkCode, sendTelegramMessage } from '../services/telegramService';
 import { sendWelcomeEmail } from '../services/emailService';
+import { TELEGRAM_BOT_USERNAME } from '../constants/telegram';
 
 /**
  * Controller de Configurações de Notificações
@@ -211,7 +212,7 @@ export class NotificationController {
 
       const { code, expiresAt } = await generateLinkCode(userId);
 
-      const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'RadarOneBot';
+      const botUsername = TELEGRAM_BOT_USERNAME;
 
       res.json({
         code,

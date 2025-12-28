@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
+import { TELEGRAM_BOT_USERNAME, TELEGRAM_BOT_LINK } from '../constants/app';
 
 /**
  * Configurações de Notificações
@@ -208,12 +209,12 @@ export const NotificationSettingsPage: React.FC = () => {
                 <li>
                   Abra o Telegram e fale com{' '}
                   <a
-                    href="https://t.me/RadarOneBot"
+                    href={TELEGRAM_BOT_LINK}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={styles.link}
                   >
-                    @RadarOneBot
+                    @{TELEGRAM_BOT_USERNAME}
                   </a>
                 </li>
                 <li>Digite /start para vincular sua conta</li>
