@@ -1,0 +1,7 @@
+# Redirect www to apex domain
+# Google Analytics requires consistent domain for tracking
+https://www.radarone.com.br/* https://radarone.com.br/:splat 301!
+http://www.radarone.com.br/* https://radarone.com.br/:splat 301!
+
+# SPA fallback (must be last)
+/* /index.html 200
