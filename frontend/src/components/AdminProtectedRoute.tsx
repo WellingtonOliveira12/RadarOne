@@ -37,7 +37,7 @@ export const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ childr
 
         // Se retornar 200, é admin; se 403, não é admin
         setIsAdmin(response.ok);
-      } catch (error) {
+      } catch {
         setIsAdmin(false);
       } finally {
         setLoading(false);

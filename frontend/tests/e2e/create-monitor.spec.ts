@@ -241,9 +241,6 @@ test.describe('Create Monitor Flow', () => {
     await page.goto('/monitors');
     await page.waitForLoadState('networkidle');
 
-    // Contar monitores antes
-    const monitorsBefore = await page.locator('text=/Monitor.*E2E/i').count();
-
     // Criar novo monitor
     const monitorName = `Monitor Lista ${Date.now()}`;
     const nameInput = page.locator('input[name="name"], input[placeholder*="nome"]').first();

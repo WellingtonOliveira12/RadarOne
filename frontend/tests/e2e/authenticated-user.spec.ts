@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { E2E_USERS, clearStorage, loginReal } from './helpers';
+import { clearStorage, loginReal } from './helpers';
 
 /**
  * Testes E2E de Usuário Autenticado (Happy Path)

@@ -72,7 +72,8 @@ export const PlansPage: React.FC = () => {
       const data = await response.json();
       setPlans(data);
       trackViewPlans();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error('Erro ao carregar planos:', err);
       setError('Erro ao carregar planos');
     } finally {
       setLoading(false);
@@ -119,8 +120,9 @@ export const PlansPage: React.FC = () => {
 
       // Redirecionar para dashboard (usuário verá trial ativo lá)
       navigate('/dashboard');
-    } catch (err: any) {
-      setError('Erro ao iniciar trial: ' + err.message);
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError('Erro ao iniciar trial: ' + error.message);
     }
   };
 

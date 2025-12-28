@@ -47,8 +47,9 @@ export function HealthCheckPage() {
       const data = await api.get<HealthResponse>('/health');
       setHealthData(data);
       setBackendStatus('online');
-    } catch (err: any) {
-      setError(err.message || 'Erro ao conectar com o backend');
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'Erro ao conectar com o backend');
       setBackendStatus('offline');
       setHealthData(null);
     }

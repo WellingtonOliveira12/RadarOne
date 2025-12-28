@@ -112,23 +112,24 @@ export function MonitorsPage() {
       const data = await api.get<MonitorsResponse>('/api/monitors', token);
       setMonitors(data.data);
       setHasSubscription(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as { errorCode?: string; response?: { status?: number; data?: { errorCode?: string; error?: string } }; message?: string };
       // Tratar erro de sem assinatura
-      const errorCode = err.errorCode || err.response?.data?.errorCode;
-      if (errorCode === 'NO_SUBSCRIPTION' || err.message?.includes('precisa assinar')) {
+      const errorCode = error.errorCode || error.response?.data?.errorCode;
+      if (errorCode === 'NO_SUBSCRIPTION' || error.message?.includes('precisa assinar')) {
         setHasSubscription(false);
         setError('Você precisa assinar um plano para criar monitores.');
         return;
       }
 
       // Tratar erro de limite excedido
-      if (err.response?.status === 403 || err.message?.includes('limite')) {
+      if (error.response?.status === 403 || error.message?.includes('limite')) {
         setError(
-          err.response?.data?.error ||
+          error.response?.data?.error ||
             'Limite de monitores atingido. Faça upgrade do seu plano.'
         );
       } else {
-        setError(err.message || 'Erro ao buscar monitores');
+        setError(error.message || 'Erro ao buscar monitores');
       }
     } finally {
       setLoadingLista(false);
@@ -158,7 +159,14 @@ export function MonitorsPage() {
         }
       }
 
-      const body: any = {
+      const body: {
+        name: string;
+        site: MonitorSite;
+        mode: MonitorMode;
+        active: boolean;
+        searchUrl?: string;
+        filtersJson?: StructuredFilters;
+      } = {
         name,
         site,
         mode,
@@ -203,15 +211,16 @@ export function MonitorsPage() {
       });
 
       await fetchMonitors();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: { error?: string } }; message?: string };
       // Tratar erro de limite excedido
-      if (err.response?.status === 403 || err.message?.includes('limite')) {
+      if (error.response?.status === 403 || error.message?.includes('limite')) {
         setError(
-          err.response?.data?.error ||
+          error.response?.data?.error ||
             'Limite de monitores atingido. Faça upgrade do seu plano para adicionar mais.'
         );
       } else {
-        setError(err.message || 'Erro ao salvar monitor');
+        setError(error.message || 'Erro ao salvar monitor');
       }
     } finally {
       setSaving(false);
@@ -258,8 +267,9 @@ export function MonitorsPage() {
 
       await api.post(`/api/monitors/${id}`, {}, token);
       await fetchMonitors();
-    } catch (err: any) {
-      setError(err.message || 'Erro ao excluir monitor');
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'Erro ao excluir monitor');
     }
   }
 

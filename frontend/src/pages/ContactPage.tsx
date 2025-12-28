@@ -43,8 +43,9 @@ export const ContactPage: React.FC = () => {
       setSuccess(true);
       setSubject('');
       setMessage('');
-    } catch (err: any) {
-      setError(err.message || 'Erro ao enviar mensagem');
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'Erro ao enviar mensagem');
     } finally {
       setSubmitting(false);
     }
