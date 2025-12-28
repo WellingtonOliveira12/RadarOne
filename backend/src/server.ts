@@ -124,8 +124,11 @@ app.get('/', (req: Request, res: Response) => {
 app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
+    service: 'radarone-backend',
+    version: process.env.APP_VERSION || '1.0.0',
     timestamp: new Date().toISOString(),
-    service: 'RadarOne Backend'
+    uptime: Math.floor(process.uptime()),
+    env: process.env.NODE_ENV || 'development'
   });
 });
 
