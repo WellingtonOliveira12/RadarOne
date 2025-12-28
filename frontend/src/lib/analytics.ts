@@ -245,6 +245,25 @@ export function trackTrialExpiredToastShown(): void {
 }
 
 /**
+ * Rastreia clique no menu Ajuda
+ */
+export function trackHelpMenuClick(action: 'open' | 'manual' | 'faq' | 'contact'): void {
+  trackEvent('help_menu_interaction', {
+    action,
+    location: 'header',
+  });
+}
+
+/**
+ * Rastreia navegação para páginas de ajuda
+ */
+export function trackHelpPageView(page: 'manual' | 'faq' | 'contact'): void {
+  trackEvent('help_page_view', {
+    help_page: page,
+  });
+}
+
+/**
  * Verifica se analytics está habilitado
  */
 export function isAnalyticsEnabled(): boolean {
