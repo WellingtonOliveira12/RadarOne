@@ -142,10 +142,18 @@ export class AuthController {
         }
       }
 
+      // Gerar token JWT para auto-login após registro
+      const token = jwt.sign(
+        { userId: user.id },
+        process.env.JWT_SECRET!,
+        { expiresIn: '30d' }
+      );
+
       logger.info({ userId: user.id, email: sanitizeEmail(user.email) }, 'User registered successfully');
 
       res.status(201).json({
         message: 'Usuário criado com sucesso',
+        token,
         user
       });
     } catch (error) {
@@ -299,9 +307,16 @@ export class AuthController {
         return;
       }
 
+      // Validar formato do email
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.valid) {
+        res.status(400).json({ error: emailValidation.error });
+        return;
+      }
+
       // Buscar usuário pelo email (case-insensitive)
       const user = await prisma.user.findUnique({
-        where: { email: email.toLowerCase().trim() }
+        where: { email: emailValidation.value }
       });
 
       // Comportamento condicional baseado em ENV (DEV vs PROD)
