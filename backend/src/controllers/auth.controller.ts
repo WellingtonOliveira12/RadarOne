@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { prisma } from '../server';
 import { validateCpf, encryptCpf } from '../utils/crypto';
+import { validateEmail, validatePassword } from '../utils/validators';
 import { startTrialForUser } from '../services/billingService';
 import { sendWelcomeEmail } from '../services/emailService';
 import logger from '../logger';
@@ -35,6 +36,21 @@ export class AuthController {
         return;
       }
 
+      // Validar formato de email
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.valid) {
+        res.status(400).json({ error: emailValidation.error });
+        return;
+      }
+      const normalizedEmail = emailValidation.value!;
+
+      // Validar força da senha
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.valid) {
+        res.status(400).json({ error: passwordValidation.error });
+        return;
+      }
+
       // Validar CPF se fornecido
       if (cpf) {
         if (!validateCpf(cpf)) {
@@ -45,7 +61,7 @@ export class AuthController {
 
       // Verifica se usuário já existe (email ou CPF)
       const existingUser = await prisma.user.findUnique({
-        where: { email }
+        where: { email: normalizedEmail }
       });
 
       if (existingUser) {
@@ -88,7 +104,7 @@ export class AuthController {
       // Cria usuário
       const user = await prisma.user.create({
         data: {
-          email,
+          email: normalizedEmail,
           passwordHash: hashedPassword,
           name,
           phone,
@@ -155,9 +171,17 @@ export class AuthController {
         return;
       }
 
+      // Validar e normalizar email
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.valid) {
+        res.status(400).json({ error: emailValidation.error });
+        return;
+      }
+      const normalizedEmail = emailValidation.value!;
+
       // Busca usuário
       const user = await prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
         include: {
           subscriptions: {
             where: {
@@ -363,9 +387,10 @@ export class AuthController {
         return;
       }
 
-      // Validar senha (mínimo 8 caracteres)
-      if (password.length < 8) {
-        res.status(400).json({ error: 'A senha deve ter no mínimo 8 caracteres' });
+      // Validar força da senha
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.valid) {
+        res.status(400).json({ error: passwordValidation.error });
         return;
       }
 

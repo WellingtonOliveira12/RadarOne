@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as monitorService from '../services/monitorService';
 import { MonitorSite } from '@prisma/client';
+import { validateUrl } from '../utils/validators';
 
 /**
  * Controller de Monitores - RadarOne
@@ -111,6 +112,17 @@ export async function createMonitor(
       return;
     }
 
+    // Validação de URL
+    const urlValidation = validateUrl(searchUrl);
+    if (!urlValidation.valid) {
+      res.status(400).json({
+        error: 'Erro de validação',
+        message: urlValidation.error,
+      });
+      return;
+    }
+    const validatedUrl = urlValidation.value!;
+
     // Validação do enum site
     if (!Object.values(MonitorSite).includes(site)) {
       res.status(400).json({
@@ -141,7 +153,7 @@ export async function createMonitor(
     const monitor = await monitorService.createMonitor(userId, {
       name,
       site,
-      searchUrl,
+      searchUrl: validatedUrl,
       priceMin,
       priceMax,
     });
@@ -216,6 +228,20 @@ export async function updateMonitor(
       return;
     }
 
+    // Validação de URL se fornecida
+    let validatedUrl = searchUrl;
+    if (searchUrl) {
+      const urlValidation = validateUrl(searchUrl);
+      if (!urlValidation.valid) {
+        res.status(400).json({
+          error: 'Erro de validação',
+          message: urlValidation.error,
+        });
+        return;
+      }
+      validatedUrl = urlValidation.value!;
+    }
+
     // Validação de preços se fornecidos
     if (priceMin !== undefined && priceMin < 0) {
       res.status(400).json({
@@ -237,7 +263,7 @@ export async function updateMonitor(
     const monitor = await monitorService.updateMonitor(userId, id, {
       name,
       site,
-      searchUrl,
+      searchUrl: validatedUrl,
       priceMin,
       priceMax,
       active,
