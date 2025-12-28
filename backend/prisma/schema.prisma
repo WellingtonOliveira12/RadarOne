@@ -420,3 +420,58 @@ model NotificationLog {
   @@index([status])
   @@map("notification_logs")
 }
+
+// ============================================
+// TOKENS DE CONEXÃO TELEGRAM
+// ============================================
+
+model TelegramConnectToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique // Token único para deep link
+  status    TokenStatus @default(PENDING)
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([token])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("telegram_connect_tokens")
+}
+
+enum TokenStatus {
+  PENDING
+  USED
+  EXPIRED
+}
+
+// ============================================
+// SUPORTE / FALE CONOSCO
+// ============================================
+
+model SupportTicket {
+  id            String   @id @default(cuid())
+  userId        String?  @map("user_id") // Nullable para usuários não logados
+  email         String
+  category      String
+  subject       String
+  message       String   @db.Text
+  attachmentUrl String?  @map("attachment_url")
+  status        TicketStatus @default(OPEN)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("support_tickets")
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
