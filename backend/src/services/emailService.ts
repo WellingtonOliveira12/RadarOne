@@ -130,18 +130,18 @@ export async function sendTrialStartedEmail(to: string, planName: string, trialE
   return { success: true };
 }
 
-export async function sendTrialEndingEmail(to: string, daysRemaining: number): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendTrialEndingEmail stub chamado', { to, daysRemaining });
+export async function sendTrialEndingEmail(to: string, name: string, daysRemaining: number, planName: string): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendTrialEndingEmail stub chamado', { to, name, daysRemaining, planName });
   return { success: true };
 }
 
-export async function sendTrialExpiredEmail(to: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendTrialExpiredEmail stub chamado', { to });
+export async function sendTrialExpiredEmail(to: string, name: string, planName: string): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendTrialExpiredEmail stub chamado', { to, name, planName });
   return { success: true };
 }
 
-export async function sendSubscriptionExpiredEmail(to: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendSubscriptionExpiredEmail stub chamado', { to });
+export async function sendSubscriptionExpiredEmail(to: string, name: string, planName: string): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] sendSubscriptionExpiredEmail stub chamado', { to, name, planName });
   return { success: true };
 }
 

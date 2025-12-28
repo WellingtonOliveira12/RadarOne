@@ -316,7 +316,11 @@ export class WebhookController {
     });
 
     // 3. Enviar email de cancelamento
-    await sendSubscriptionExpiredEmail(subscription.user.email);
+    await sendSubscriptionExpiredEmail(
+      subscription.user.email,
+      subscription.user.name || 'Usuário',
+      subscription.plan.name
+    );
 
     console.log('[WEBHOOK] ✅ Subscription cancelada:', subscription.id);
   }
@@ -377,7 +381,11 @@ export class WebhookController {
     });
 
     // 3. Enviar email
-    await sendSubscriptionExpiredEmail(subscription.user.email);
+    await sendSubscriptionExpiredEmail(
+      subscription.user.email,
+      subscription.user.name || 'Usuário',
+      subscription.plan.name
+    );
 
     console.log('[WEBHOOK] ✅ Subscription cancelada por reembolso:', subscription.id);
   }
