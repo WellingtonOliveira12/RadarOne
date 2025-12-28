@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
 import { QRCodeSVG } from 'qrcode.react';
+import { TELEGRAM_BOT_USERNAME } from '../constants/app';
 
 interface TelegramStatus {
   connected: boolean;
@@ -172,7 +173,7 @@ export const TelegramConnectionPage: React.FC = () => {
                 <span style={styles.checkIcon}>✅</span>
                 <span>
                   Abra o bot oficial:{' '}
-                  <strong>@RadarOneAlertaBot</strong>
+                  <strong>@{TELEGRAM_BOT_USERNAME}</strong>
                 </span>
               </div>
               <div style={styles.checkItem}>
@@ -297,7 +298,7 @@ export const TelegramConnectionPage: React.FC = () => {
                   Clique em "Abrir bot oficial no Telegram" (não pesquise!)
                 </li>
                 <li>
-                  Confirme que o username é <strong>@RadarOneAlertaBot</strong>
+                  Confirme que o username é <strong>@{TELEGRAM_BOT_USERNAME}</strong>
                 </li>
                 <li>
                   Aguarde a mensagem "✅ Telegram conectado ao RadarOne"

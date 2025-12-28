@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
+import { TELEGRAM_BOT_USERNAME } from '../constants/app';
 
 export const ManualPage: React.FC = () => {
   return (
@@ -45,7 +46,7 @@ export const ManualPage: React.FC = () => {
             </li>
             <li>Clique em "Gerar link de conexão"</li>
             <li>Clique em "Abrir bot oficial no Telegram"</li>
-            <li>Confirme que o username é @RadarOneAlertaBot</li>
+            <li>Confirme que o username é @{TELEGRAM_BOT_USERNAME}</li>
             <li>
               Aguarde a mensagem "✅ Telegram conectado ao RadarOne com
               sucesso!"
@@ -54,7 +55,7 @@ export const ManualPage: React.FC = () => {
 
           <h3 style={styles.subsectionTitle}>Validação visual:</h3>
           <ul style={styles.list}>
-            <li>✅ Username correto: @RadarOneAlertaBot</li>
+            <li>✅ Username correto: @{TELEGRAM_BOT_USERNAME}</li>
             <li>✅ Mensagem de boas-vindas menciona RadarOne e monitores</li>
             <li>
               ❌ Se aparecer bot em outro idioma/nome estranho, é o bot errado
@@ -121,7 +122,7 @@ export const ManualPage: React.FC = () => {
 
           <h3 style={styles.subsectionTitle}>Bot errado / não recebe alertas:</h3>
           <ol style={styles.list}>
-            <li>Verifique se está em @RadarOneAlertaBot (username oficial)</li>
+            <li>Verifique se está em @{TELEGRAM_BOT_USERNAME} (username oficial)</li>
             <li>
               Se estiver em outro bot, volte ao painel e gere novo link
             </li>

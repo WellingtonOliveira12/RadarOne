@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
+import { TELEGRAM_BOT_USERNAME } from '../constants/app';
 
 interface FAQItem {
   question: string;
@@ -21,7 +22,7 @@ export const FAQPage: React.FC = () => {
       question: 'Qual é o bot oficial do Telegram?',
       answer: (
         <>
-          O bot oficial é <strong>@RadarOneAlertaBot</strong>.{' '}
+          O bot oficial é <strong>@{TELEGRAM_BOT_USERNAME}</strong>.{' '}
           <strong>Nunca pesquise "RadarOne" no Telegram!</strong> Use apenas o
           link gerado em{' '}
           <Link to="/telegram/connect" style={styles.link}>
@@ -41,7 +42,7 @@ export const FAQPage: React.FC = () => {
       category: 'Telegram',
       question: 'Como saber se conectei corretamente?',
       answer:
-        'Ao conectar, você deve receber uma mensagem "✅ Telegram conectado ao RadarOne com sucesso!" no chat. O username do bot deve ser @RadarOneAlertaBot. Verifique também em Configurações > Telegram se aparece "Telegram conectado".',
+        `Ao conectar, você deve receber uma mensagem "✅ Telegram conectado ao RadarOne com sucesso!" no chat. O username do bot deve ser @${TELEGRAM_BOT_USERNAME}. Verifique também em Configurações > Telegram se aparece "Telegram conectado".`,
     },
     {
       category: 'Telegram',
@@ -52,7 +53,7 @@ export const FAQPage: React.FC = () => {
           <ul>
             <li>
               Você está conectado no bot errado (verifique se é
-              @RadarOneAlertaBot)
+              @{TELEGRAM_BOT_USERNAME})
             </li>
             <li>Você não gerou monitores ou eles estão pausados</li>
             <li>Não há novos anúncios correspondentes aos seus critérios</li>

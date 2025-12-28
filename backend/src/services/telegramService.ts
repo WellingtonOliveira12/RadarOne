@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { prisma } from '../server';
+import { TELEGRAM_BOT_USERNAME, TELEGRAM_BOT_LINK } from '../constants/telegram';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -253,9 +254,6 @@ export async function getUserTelegramAccount(userId: string): Promise<{ chatId: 
 // NOVO SISTEMA DE TOKENS DE CONEXÃO
 // ============================================
 
-const BOT_USERNAME = 'RadarOneAlertaBot'; // Username oficial do bot
-const BOT_LINK = `https://t.me/${BOT_USERNAME}`;
-
 /**
  * Gera token seguro de conexão com deep link
  */
@@ -277,7 +275,7 @@ export async function generateConnectToken(userId: string): Promise<{ connectUrl
     }
   });
 
-  const connectUrl = `${BOT_LINK}?start=connect_${token}`;
+  const connectUrl = `${TELEGRAM_BOT_LINK}?start=connect_${token}`;
 
   console.log('[TelegramService] Token de conexão gerado', { userId, token: token.substring(0, 8) + '...', expiresAt });
 
