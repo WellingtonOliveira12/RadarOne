@@ -96,10 +96,8 @@ describe('resetMonthlyQueries Job', () => {
       data: { queriesUsed: 0 },
     });
     expect(mockSendMonthlyQueriesResetReport).toHaveBeenCalledWith(
-      expect.objectContaining({
-        totalUpdated: 10,
-        runAt: expect.any(Date),
-      })
+      'admin@radarone.com',
+      10
     );
     expect(mockPrismaWebhookLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -125,9 +123,8 @@ describe('resetMonthlyQueries Job', () => {
     // Assert
     expect(mockPrismaSubscription.updateMany).toHaveBeenCalled();
     expect(mockSendMonthlyQueriesResetReport).toHaveBeenCalledWith(
-      expect.objectContaining({
-        totalUpdated: 0,
-      })
+      'admin@radarone.com',
+      0
     );
     expect(mockPrismaWebhookLog.create).toHaveBeenCalled();
   });

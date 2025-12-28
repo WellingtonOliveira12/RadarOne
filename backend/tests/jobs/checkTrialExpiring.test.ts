@@ -113,8 +113,8 @@ describe('checkTrialExpiring Job', () => {
     expect(mockSendTrialEndingEmail).toHaveBeenCalledWith(
       'user1@test.com',
       'User 1',
-      'Starter',
-      expect.any(Number) // dias restantes
+      expect.any(Number), // dias restantes
+      'Starter'
     );
   });
 

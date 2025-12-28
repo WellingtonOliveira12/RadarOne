@@ -45,9 +45,12 @@ async function checkSubscriptionExpired() {
           data: { status: 'EXPIRED' }
         });
 
-        // Enviar e-mail de assinatura expirada (TODO: implementar corretamente)
-        // await sendSubscriptionExpiredEmail(subscription.user.email);
-        console.log('[checkSubscriptionExpired] Email stub - subscription expired', { email: subscription.user.email });
+        // Enviar e-mail de assinatura expirada
+        await sendSubscriptionExpiredEmail(
+          subscription.user.email,
+          subscription.user.name || 'Usuário',
+          subscription.plan.name
+        );
 
         console.log(`[JOB] ✅ Assinatura expirada: ${subscription.user.email} - Status atualizado e e-mail enviado`);
       } catch (err) {
