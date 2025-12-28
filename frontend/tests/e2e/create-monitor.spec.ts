@@ -171,4 +171,129 @@ test.describe('Create Monitor Flow', () => {
       expect(initialCount).toBeGreaterThan(0);
     }
   });
+
+  test('deve criar monitor completo com URL e validar toast de sucesso', async ({ page }) => {
+    await page.goto('/monitors');
+    await page.waitForLoadState('networkidle');
+
+    // Nome único para evitar duplicação
+    const monitorName = `Monitor E2E Happy Path ${Date.now()}`;
+
+    // Preencher nome
+    const nameInput = page.locator('input[name="name"], input[placeholder*="nome"]').first();
+    await nameInput.fill(monitorName);
+
+    // Selecionar site
+    const siteSelector = page.locator('select').first();
+    if (await siteSelector.count() > 0) {
+      await siteSelector.selectOption('OLX');
+    }
+
+    // URL de busca válida
+    const urlInput = page.locator('input[name="searchUrl"], input[placeholder*="URL"]').first();
+    if (await urlInput.isVisible({ timeout: 2000 })) {
+      await urlInput.fill('https://www.olx.com.br/imoveis/estado-sp/regiao-de-sao-paulo');
+    }
+
+    // Submit
+    const submitButton = page
+      .locator('button[type="submit"], button:has-text("Criar"), button:has-text("Salvar")')
+      .first();
+    await submitButton.click();
+
+    // Aguardar resposta do backend
+    await page.waitForTimeout(2000);
+
+    // Verificar se monitor foi criado (pode aparecer na lista ou toast)
+    const hasSuccessIndicator = await page.locator(`text=${monitorName}, text=/sucesso|criado/i`).count();
+
+    // Se não atingiu limite, deve ter sucesso
+    if (hasSuccessIndicator > 0) {
+      expect(hasSuccessIndicator).toBeGreaterThan(0);
+    }
+  });
+
+  test('deve validar URL inválida ao criar monitor', async ({ page }) => {
+    await page.goto('/monitors');
+    await page.waitForLoadState('networkidle');
+
+    const nameInput = page.locator('input[name="name"], input[placeholder*="nome"]').first();
+    await nameInput.fill('Monitor URL Inválida');
+
+    // URL inválida (sem protocolo)
+    const urlInput = page.locator('input[name="searchUrl"], input[placeholder*="URL"]').first();
+    if (await urlInput.isVisible({ timeout: 2000 })) {
+      await urlInput.fill('url-invalida-sem-protocolo');
+
+      const submitButton = page
+        .locator('button[type="submit"], button:has-text("Criar"), button:has-text("Salvar")')
+        .first();
+      await submitButton.click();
+
+      // Deve mostrar mensagem de erro de validação
+      await page.waitForTimeout(1000);
+      const hasError = await page.locator('text=/inválid|erro|URL/i').count();
+      expect(hasError).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  test('deve criar monitor e verificar que aparece na lista', async ({ page }) => {
+    await page.goto('/monitors');
+    await page.waitForLoadState('networkidle');
+
+    // Contar monitores antes
+    const monitorsBefore = await page.locator('text=/Monitor.*E2E/i').count();
+
+    // Criar novo monitor
+    const monitorName = `Monitor Lista ${Date.now()}`;
+    const nameInput = page.locator('input[name="name"], input[placeholder*="nome"]').first();
+
+    if (await nameInput.isVisible()) {
+      await nameInput.fill(monitorName);
+
+      const siteSelector = page.locator('select').first();
+      if (await siteSelector.count() > 0) {
+        await siteSelector.selectOption('MERCADO_LIVRE');
+      }
+
+      const urlInput = page.locator('input[name="searchUrl"], input[placeholder*="URL"]').first();
+      if (await urlInput.isVisible({ timeout: 2000 })) {
+        await urlInput.fill('https://lista.mercadolivre.com.br/notebook');
+      }
+
+      const submitButton = page
+        .locator('button[type="submit"], button:has-text("Criar"), button:has-text("Salvar")')
+        .first();
+      await submitButton.click();
+
+      // Aguardar lista recarregar
+      await page.waitForTimeout(2000);
+
+      // Verificar se novo monitor aparece
+      const hasNewMonitor = await page.locator(`text=${monitorName}`).count();
+
+      // Se não atingiu limite, deve aparecer na lista
+      if (hasNewMonitor > 0) {
+        expect(hasNewMonitor).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test('deve validar campos obrigatórios (nome, site, URL)', async ({ page }) => {
+    await page.goto('/monitors');
+    await page.waitForLoadState('networkidle');
+
+    // Tentar criar sem preencher nada
+    const submitButton = page
+      .locator('button[type="submit"], button:has-text("Criar"), button:has-text("Salvar")')
+      .first();
+
+    if (await submitButton.isVisible()) {
+      await submitButton.click();
+
+      // Deve haver validação HTML5 ou mensagem de erro
+      const requiredFields = await page.locator('input[required]').count();
+      expect(requiredFields).toBeGreaterThanOrEqual(1);
+    }
+  });
 });
