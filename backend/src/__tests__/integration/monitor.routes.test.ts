@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../../server';
 import { prisma } from '../../server';
+import { createAuthedUserWithActiveTrial, cleanupTestUser } from '../helpers/auth';
 
 /**
  * Testes de Integração: Rotas de Monitores
@@ -14,7 +15,7 @@ import { prisma } from '../../server';
  *
  * Estratégia:
  * - Usa banco de dados real (test database)
- * - Cria usuário de teste antes dos testes
+ * - Cria usuário com trial ativo para passar no middleware checkTrialExpired
  * - Limpa dados após execução
  */
 
@@ -23,35 +24,18 @@ describe('Monitor Routes - Integration Tests', () => {
   let userId: string;
   let monitorId: string;
 
-  const testUser = {
-    name: 'Monitor Test User',
-    email: `monitor-test-${Date.now()}@test.com`,
-    password: 'TestPassword123!',
-  };
-
   beforeAll(async () => {
     await prisma.$connect();
 
-    // Criar usuário de teste e fazer login
-    const registerResponse = await request(app)
-      .post('/api/auth/register')
-      .send(testUser);
-
-    authToken = registerResponse.body.token;
-    userId = registerResponse.body.user.id;
+    // Criar usuário autenticado com trial ativo (passa no middleware checkTrialExpired)
+    const authedUser = await createAuthedUserWithActiveTrial();
+    authToken = authedUser.token;
+    userId = authedUser.userId;
   });
 
   afterAll(async () => {
-    // Limpar monitores de teste
-    await prisma.monitor.deleteMany({
-      where: { userId },
-    });
-
-    // Limpar usuário de teste
-    await prisma.user.delete({
-      where: { id: userId },
-    }).catch(() => {});
-
+    // Limpar usuário de teste e suas dependências
+    await cleanupTestUser(userId);
     await prisma.$disconnect();
   });
 
@@ -69,12 +53,12 @@ describe('Monitor Routes - Integration Tests', () => {
         });
 
       expect(response.status).toBe(201);
-      expect(response.body).toHaveProperty('monitor');
-      expect(response.body.monitor.name).toBe('Monitor de Teste');
-      expect(response.body.monitor.site).toBe('MERCADO_LIVRE');
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data.name).toBe('Monitor de Teste');
+      expect(response.body.data.site).toBe('MERCADO_LIVRE');
 
       // Guardar ID para outros testes
-      monitorId = response.body.monitor.id;
+      monitorId = response.body.data.id;
     });
 
     it('deve validar campos obrigatórios ao criar monitor', async () => {
@@ -141,9 +125,9 @@ describe('Monitor Routes - Integration Tests', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('monitors');
-      expect(Array.isArray(response.body.monitors)).toBe(true);
-      expect(response.body.monitors.length).toBeGreaterThan(0);
+      expect(response.body).toHaveProperty('data');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThan(0);
     });
 
     it('deve retornar apenas monitores do usuário autenticado', async () => {
@@ -153,7 +137,7 @@ describe('Monitor Routes - Integration Tests', () => {
 
       expect(response.status).toBe(200);
       // Todos os monitores devem pertencer ao usuário
-      response.body.monitors.forEach((monitor: any) => {
+      response.body.data.forEach((monitor: any) => {
         expect(monitor.userId).toBe(userId);
       });
     });
@@ -177,9 +161,9 @@ describe('Monitor Routes - Integration Tests', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('monitor');
-      expect(response.body.monitor.name).toBe('Monitor Atualizado');
-      expect(response.body.monitor.active).toBe(false);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data.name).toBe('Monitor Atualizado');
+      expect(response.body.data.active).toBe(false);
     });
 
     it('deve validar campos ao atualizar monitor', async () => {
@@ -195,22 +179,13 @@ describe('Monitor Routes - Integration Tests', () => {
     });
 
     it('deve retornar erro ao atualizar monitor de outro usuário', async () => {
-      // Criar outro usuário
-      const otherUser = await request(app)
-        .post('/api/auth/register')
-        .send({
-          name: 'Other User',
-          email: `other-${Date.now()}@test.com`,
-          password: 'TestPassword123!',
-        });
-
-      const otherToken = otherUser.body.token;
-      const otherUserId = otherUser.body.user.id;
+      // Criar outro usuário com trial ativo
+      const otherUser = await createAuthedUserWithActiveTrial();
 
       // Tentar atualizar monitor do primeiro usuário
       const response = await request(app)
         .put(`/api/monitors/${monitorId}`)
-        .set('Authorization', `Bearer ${otherToken}`)
+        .set('Authorization', `Bearer ${otherUser.token}`)
         .send({
           name: 'Tentativa de Atualizar Monitor Alheio',
         });
@@ -219,7 +194,7 @@ describe('Monitor Routes - Integration Tests', () => {
       expect(response.body).toHaveProperty('error');
 
       // Limpar outro usuário
-      await prisma.user.delete({ where: { id: otherUserId } }).catch(() => {});
+      await cleanupTestUser(otherUser.userId);
     });
 
     it('deve requerer autenticação para atualizar monitor', async () => {
@@ -243,10 +218,10 @@ describe('Monitor Routes - Integration Tests', () => {
         .send({
           name: 'Monitor Para Deletar',
           site: 'OLX',
-          mode: 'NEW_LISTINGS',
+          searchUrl: 'https://www.olx.com.br/estado-sp/regiao-de-sao-paulo',
         });
 
-      const monitorToDelete = createResponse.body.monitor.id;
+      const monitorToDelete = createResponse.body.data.id;
 
       // Deletar
       const response = await request(app)
@@ -274,28 +249,19 @@ describe('Monitor Routes - Integration Tests', () => {
     });
 
     it('deve retornar erro ao deletar monitor de outro usuário', async () => {
-      // Criar outro usuário
-      const otherUser = await request(app)
-        .post('/api/auth/register')
-        .send({
-          name: 'Other User',
-          email: `other-delete-${Date.now()}@test.com`,
-          password: 'TestPassword123!',
-        });
-
-      const otherToken = otherUser.body.token;
-      const otherUserId = otherUser.body.user.id;
+      // Criar outro usuário com trial ativo
+      const otherUser = await createAuthedUserWithActiveTrial();
 
       // Tentar deletar monitor do primeiro usuário
       const response = await request(app)
         .delete(`/api/monitors/${monitorId}`)
-        .set('Authorization', `Bearer ${otherToken}`);
+        .set('Authorization', `Bearer ${otherUser.token}`);
 
       expect(response.status).toBe(403);
       expect(response.body).toHaveProperty('error');
 
       // Limpar outro usuário
-      await prisma.user.delete({ where: { id: otherUserId } }).catch(() => {});
+      await cleanupTestUser(otherUser.userId);
     });
 
     it('deve requerer autenticação para deletar monitor', async () => {
