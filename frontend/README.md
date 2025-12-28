@@ -187,6 +187,73 @@ Os testes unitários de `analytics.ts` cobrem:
 
 Rodar testes: `npm test -- src/lib/__tests__/analytics.test.ts`
 
+### 🔍 Monitoramento Externo - UptimeRobot
+
+O RadarOne utiliza **UptimeRobot** para monitoramento externo 24/7 da aplicação em produção. Monitora uptime, performance e disponibilidade.
+
+#### Por que UptimeRobot?
+
+- ✅ **Gratuito** até 50 monitores (plano free)
+- ✅ **Monitoramento 24/7** com verificações a cada 5 minutos
+- ✅ **Alertas instantâneos** via Email, SMS, Telegram, Slack
+- ✅ **Status page público** para compartilhar com usuários
+- ✅ **Histórico de uptime** e relatórios mensais
+- ✅ **Integração com endpoint /health** do backend
+
+#### 🎯 Configuração Rápida
+
+**1. Criar conta:** [UptimeRobot](https://uptimerobot.com)
+
+**2. Adicionar monitores:**
+- **Frontend:** `https://seu-dominio.com` (HTTP/HTTPS)
+- **Backend:** `https://api.seu-dominio.com/health` (HTTP/HTTPS + Keyword)
+- **Status:** Verificar resposta `"status": "ok"`
+
+**3. Configurar alertas:**
+- Email do time de operações
+- Telegram bot para notificações imediatas
+- Slack webhook (opcional)
+
+**4. Configurar intervalo:**
+- Plano free: 5 minutos
+- Plano pago: 1 minuto (recomendado para produção)
+
+#### 📊 Monitores Recomendados
+
+| Monitor | Tipo | URL | Keyword | Intervalo |
+|---------|------|-----|---------|-----------|
+| Frontend | HTTPS | https://seu-dominio.com | - | 5 min |
+| Backend Health | HTTPS | https://api/health | "ok" | 5 min |
+| Backend API | HTTPS | https://api/api/monitors | - | 5 min |
+
+#### ⚠️ Playbook de Downtime
+
+Quando UptimeRobot detectar downtime:
+
+**1. Verificação inicial (1 min):**
+- Acessar aplicação manualmente
+- Verificar se erro é real ou falso positivo
+
+**2. Se downtime confirmado:**
+- Verificar logs no Render Dashboard
+- Verificar status do PostgreSQL
+- Verificar últimos deploys
+
+**3. Ações imediatas:**
+- Redeploy manual se necessário
+- Verificar variáveis de ambiente
+- Escalar para plano superior se necessário
+
+**4. Comunicação:**
+- Atualizar status page
+- Notificar usuários afetados
+- Documentar incidente
+
+#### 📋 Documentação Completa
+
+Para guia detalhado de setup e playbook operacional completo:
+- [UptimeRobot Setup Guide](./docs/UPTIMEROBOT_SETUP.md)
+
 ## 📱 Páginas
 
 - `/login` - Login
