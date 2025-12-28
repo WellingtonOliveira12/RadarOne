@@ -249,6 +249,14 @@ export const DashboardPage: React.FC = () => {
               Ver plano atual, fazer upgrade ou cancelar
             </p>
           </Link>
+
+          <Link to="/manual" style={styles.actionCard}>
+            <div style={styles.actionIcon}>📖</div>
+            <h3 style={styles.actionTitle}>Ajuda e Suporte</h3>
+            <p style={styles.actionDescription}>
+              Manual, FAQ e contato para tirar suas dúvidas
+            </p>
+          </Link>
         </section>
 
         {/* Usage Warning */}
