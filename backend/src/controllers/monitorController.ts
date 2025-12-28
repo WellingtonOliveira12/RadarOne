@@ -266,32 +266,31 @@ export async function updateMonitor(
   } catch (error: any) {
     console.error('Error in updateMonitor:', error);
 
-    // Erros de validação de plano
-    if (
-      error.message.includes('limit') ||
-      error.message.includes('plan') ||
-      error.message.includes('Upgrade')
-    ) {
-      res.status(403).json({
-        error: 'Limite do plano excedido',
-        message: error.message,
-      });
-      return;
-    }
+    const errorMessage = error.message?.toLowerCase() || '';
 
     // Monitor não encontrado
-    if (error.message.includes('not found')) {
-      res.status(404).json({
-        error: 'Monitor não encontrado',
-        message: error.message,
-      });
+    if (errorMessage.includes('não encontrado') || errorMessage.includes('not found')) {
+      sendError(res, 404, ErrorCodes.MONITOR_NOT_FOUND, 'Monitor não encontrado');
       return;
     }
 
-    res.status(400).json({
-      error: 'Falha ao atualizar monitor',
-      message: error.message,
-    });
+    // Acesso negado
+    if (errorMessage.includes('acesso negado') || errorMessage.includes('access denied')) {
+      sendError(res, 403, ErrorCodes.FORBIDDEN, 'Acesso negado');
+      return;
+    }
+
+    // Erros de validação de plano
+    if (
+      errorMessage.includes('limit') ||
+      errorMessage.includes('plan') ||
+      errorMessage.includes('upgrade')
+    ) {
+      sendError(res, 403, ErrorCodes.PLAN_LIMIT_EXCEEDED, error.message);
+      return;
+    }
+
+    sendError(res, 400, ErrorCodes.VALIDATION_ERROR, error.message);
   }
 }
 
@@ -326,18 +325,19 @@ export async function deleteMonitor(
   } catch (error: any) {
     console.error('Error in deleteMonitor:', error);
 
-    if (error.message.includes('not found')) {
-      res.status(404).json({
-        error: 'Monitor não encontrado',
-        message: error.message,
-      });
+    const errorMessage = error.message?.toLowerCase() || '';
+
+    if (errorMessage.includes('não encontrado') || errorMessage.includes('not found')) {
+      sendError(res, 404, ErrorCodes.MONITOR_NOT_FOUND, 'Monitor não encontrado');
       return;
     }
 
-    res.status(500).json({
-      error: 'Falha ao excluir monitor',
-      message: error.message,
-    });
+    if (errorMessage.includes('acesso negado') || errorMessage.includes('access denied')) {
+      sendError(res, 403, ErrorCodes.FORBIDDEN, 'Acesso negado');
+      return;
+    }
+
+    sendError(res, 500, ErrorCodes.INTERNAL_SERVER_ERROR, 'Falha ao excluir monitor');
   }
 }
 

@@ -143,11 +143,18 @@ export async function updateMonitor(
   data: UpdateMonitorInput
 ) {
   try {
-    // Verifica se monitor existe e pertence ao usuário
-    const existingMonitor = await getMonitorById(userId, monitorId);
+    // Primeiro verifica se o monitor existe (sem filtro de userId)
+    const existingMonitor = await prisma.monitor.findUnique({
+      where: { id: monitorId },
+    });
 
     if (!existingMonitor) {
-      throw new Error('Monitor não encontrado ou acesso negado');
+      throw new Error('Monitor não encontrado');
+    }
+
+    // Verifica se pertence ao usuário
+    if (existingMonitor.userId !== userId) {
+      throw new Error('Acesso negado');
     }
 
     // Se está alterando o site, valida
@@ -206,11 +213,18 @@ export async function updateMonitor(
  */
 export async function deleteMonitor(userId: string, monitorId: string) {
   try {
-    // Verifica se monitor existe e pertence ao usuário
-    const existingMonitor = await getMonitorById(userId, monitorId);
+    // Primeiro verifica se o monitor existe (sem filtro de userId)
+    const monitor = await prisma.monitor.findUnique({
+      where: { id: monitorId },
+    });
 
-    if (!existingMonitor) {
-      throw new Error('Monitor não encontrado ou acesso negado');
+    if (!monitor) {
+      throw new Error('Monitor não encontrado');
+    }
+
+    // Verifica se pertence ao usuário
+    if (monitor.userId !== userId) {
+      throw new Error('Acesso negado');
     }
 
     // Deleta o monitor (cascade vai deletar logs e ads relacionados)
