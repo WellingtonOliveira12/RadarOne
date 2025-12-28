@@ -19,6 +19,10 @@ interface JwtPayload {
 /**
  * Middleware de autenticação JWT
  * Verifica se o token é válido e adiciona userId ao request
+ *
+ * Códigos HTTP:
+ * - 401: Token não fornecido, inválido ou expirado (não autenticado)
+ * - 403: Seria usado para "autenticado mas sem permissão" (não usado aqui)
  */
 export const authenticateToken = (
   req: Request,
@@ -43,7 +47,8 @@ export const authenticateToken = (
     req.userId = decoded.userId;
     next();
   } catch (error) {
-    res.status(403).json({ error: 'Token inválido ou expirado' });
+    // Token inválido ou expirado = 401 (não autenticado)
+    res.status(401).json({ error: 'Token inválido ou expirado' });
   }
 };
 
