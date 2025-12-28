@@ -79,7 +79,7 @@ describe('Auth Routes - Integration Tests', () => {
           password: testPassword,
         });
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(409); // 409 Conflict é o correto para duplicação
       expect(response.body).toHaveProperty('error');
     });
 

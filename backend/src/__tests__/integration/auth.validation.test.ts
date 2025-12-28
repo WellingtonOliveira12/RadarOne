@@ -36,7 +36,7 @@ describe('Auth Validation Integration Tests', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('número');
+      expect(response.body.error.message).toContain('número');
     });
 
     it('should reject weak password (too short)', async () => {
@@ -49,7 +49,7 @@ describe('Auth Validation Integration Tests', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('8 caracteres');
+      expect(response.body.error.message).toContain('8 caracteres');
     });
 
     it('should reject weak password "123"', async () => {
@@ -99,7 +99,7 @@ describe('Auth Validation Integration Tests', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('email');
+      expect(response.body.error.message).toContain('email');
     });
   });
 

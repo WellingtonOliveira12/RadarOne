@@ -180,7 +180,7 @@ describe('Subscription Middleware Tests', () => {
         .set('Authorization', `Bearer ${expiredAuthToken}`);
 
       expect(response.status).toBe(403);
-      expect(response.body.errorCode).toBe('TRIAL_EXPIRED');
+      expect(response.body.error.code).toBe('TRIAL_EXPIRED');
     });
   });
 });

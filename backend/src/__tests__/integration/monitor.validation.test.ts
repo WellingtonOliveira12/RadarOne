@@ -44,7 +44,7 @@ describe('Monitor Validation Integration Tests', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.message).toContain('http://');
+      expect(response.body.error.message).toContain('http://');
     });
 
     it('should reject URL without protocol', async () => {
@@ -58,7 +58,7 @@ describe('Monitor Validation Integration Tests', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.message).toContain('http://');
+      expect(response.body.error.message).toContain('http://');
     });
 
     it('should reject URL with spaces', async () => {
@@ -72,7 +72,7 @@ describe('Monitor Validation Integration Tests', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.message).toContain('espaços');
+      expect(response.body.error.message).toContain('espaços');
     });
 
     it('should accept valid URL', async () => {
