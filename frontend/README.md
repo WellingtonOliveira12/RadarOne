@@ -31,28 +31,161 @@ frontend/
 2. Configurar `.env`: `cp .env.example .env`
 3. Executar: `npm run dev`
 
-### 📊 Google Analytics (Opcional)
+### 📊 Google Analytics 4 - Configuração Completa
 
-Para habilitar analytics em produção:
+O RadarOne utiliza **Google Analytics 4 (GA4)** para rastrear eventos importantes da aplicação. Analytics é **opcional** e pode ser habilitado em produção.
 
-1. Crie uma propriedade GA4 em [Google Analytics](https://analytics.google.com)
-2. Copie o ID de medição (formato: `G-XXXXXXXXXX`)
-3. Configure no `.env`:
-   ```bash
-   VITE_ANALYTICS_ID=G-XXXXXXXXXX
-   ```
+#### 🎯 Passo 1: Criar Propriedade GA4
+
+1. Acesse [Google Analytics](https://analytics.google.com)
+2. Clique em **Admin** (engrenagem no canto inferior esquerdo)
+3. Clique em **Criar Propriedade**
+4. Preencha os dados:
+   - **Nome da propriedade:** RadarOne Produção
+   - **Fuso horário:** America/Sao_Paulo
+   - **Moeda:** Real brasileiro (BRL)
+5. Clique em **Avançar** e configure os detalhes do negócio
+6. Em **Configuração de coleta de dados**, selecione **Web**
+7. Configure o fluxo de dados:
+   - **URL do site:** https://seu-dominio.com
+   - **Nome do fluxo:** RadarOne Web
+8. **Copie o Measurement ID** (formato: `G-XXXXXXXXXX`)
+
+#### 🔧 Passo 2: Configurar em Desenvolvimento (Local)
+
+**Arquivo:** `.env`
+
+```bash
+# Google Analytics 4 - Measurement ID
+VITE_ANALYTICS_ID=G-XXXXXXXXXX
+```
+
+**Comportamento em desenvolvimento:**
+- ✅ Analytics **desabilitado por padrão** (VITE_ANALYTICS_ID vazio)
+- ✅ Eventos aparecem apenas em `console.log` para debug
+- ✅ Script do GA4 **não é carregado** (sem impacto em performance)
+
+#### 🚀 Passo 3: Configurar em Produção (Render.com)
+
+1. Acesse o **Dashboard do Render.com**
+2. Selecione seu serviço de frontend
+3. Vá em **Environment** → **Environment Variables**
+4. Clique em **Add Environment Variable**
+5. Adicione:
+   - **Key:** `VITE_ANALYTICS_ID`
+   - **Value:** `G-XXXXXXXXXX` (seu Measurement ID real)
+6. Clique em **Save Changes**
+7. **Redeploy** o serviço para aplicar as mudanças
+
+**Importante:**
+- ⚠️ Variáveis de ambiente do Vite (`VITE_*`) são incluídas no build
+- ⚠️ **Sempre redeploy** após adicionar/alterar VITE_ANALYTICS_ID
+- ✅ Mudanças aplicam apenas no próximo deploy
+
+#### 📋 Checklist de Validação
+
+Após configurar em produção, valide que analytics está funcionando:
+
+##### ✅ 1. Verificar se Script GA4 Carregou
+
+1. Abra a aplicação em produção
+2. Abra **DevTools** (F12) → aba **Network**
+3. Filtre por `googletagmanager`
+4. **Deve aparecer:** `gtag/js?id=G-XXXXXXXXXX`
+
+##### ✅ 2. Testar Eventos em Tempo Real
+
+1. Acesse [Google Analytics](https://analytics.google.com)
+2. Vá em **Relatórios** → **Tempo real**
+3. Na aplicação em produção:
+   - Faça login
+   - Navegue entre páginas
+   - Clique no menu Ajuda
+   - Crie um monitor
+4. **Validar:** Eventos devem aparecer em "Tempo real" (delay ~5 segundos)
 
 **Eventos rastreados:**
-- ✅ Navegação de páginas (automático)
-- ✅ Login e registro
-- ✅ Criação/edição/exclusão de monitores
-- ✅ Interações com menu Ajuda
-- ✅ Assinaturas e planos
-- ✅ Trial expirado
+- ✅ `page_view` - Navegação de páginas
+- ✅ `login` - Login bem-sucedido
+- ✅ `sign_up` - Registro de usuário
+- ✅ `monitor_created` - Criação de monitor
+- ✅ `monitor_deleted` - Exclusão de monitor
+- ✅ `help_menu_interaction` - Clique no menu Ajuda
+- ✅ `help_page_view` - Visualização de páginas de ajuda
+- ✅ `view_plans` - Visualização de planos
+- ✅ `select_plan` - Seleção de plano
+- ✅ `subscription_created` - Criação de assinatura
+- ✅ `trial_expired` - Trial expirado
 
-**Desenvolvimento:** Analytics desabilitado por padrão (apenas console.log)
+##### ✅ 3. Validar Privacidade (LGPD Compliance)
 
-**Privacidade:** Implementado com `anonymize_ip: true` (LGPD compliance)
+**Verificar anonymize_ip:**
+1. Abra **DevTools** → aba **Console**
+2. Digite: `dataLayer`
+3. **Validar:** Deve ter `anonymize_ip: true` nos eventos
+
+**Verificar ausência de PII:**
+1. Em **GA4 Tempo Real** → clique em um evento
+2. **Validar:** Nenhum parâmetro deve conter:
+   - ❌ Emails
+   - ❌ Nomes completos
+   - ❌ CPF/CNPJ
+   - ❌ IDs de usuário
+   - ✅ OK: IDs de plano, nomes de sites, ações genéricas
+
+**Parâmetros seguros (exemplos):**
+- `site: "MERCADO_LIVRE"` ✅
+- `action: "open"` ✅
+- `plan_name: "PRO"` ✅
+- `email: "user@example.com"` ❌ (nunca enviado)
+
+##### ✅ 4. Usar Google Tag Assistant (Debug)
+
+1. Instale a extensão: [Tag Assistant](https://tagassistant.google.com/)
+2. Abra a aplicação em produção
+3. Clique na extensão → **Connect**
+4. Navegue pela aplicação
+5. **Validar:**
+   - Tag GA4 está disparando ✅
+   - Eventos estão sendo enviados ✅
+   - Sem erros de configuração ✅
+
+#### 🛠️ Troubleshooting
+
+**Eventos não aparecem em Tempo Real:**
+- Verificar se `VITE_ANALYTICS_ID` está configurado corretamente
+- Verificar se fez redeploy após adicionar variável
+- Abrir DevTools → Network e verificar se script GA4 carregou
+- Esperar 5-10 segundos (delay normal do GA4)
+
+**Script GA4 não carrega:**
+- Verificar se variável `VITE_ANALYTICS_ID` tem prefixo `VITE_`
+- Verificar se fez redeploy (variáveis Vite são build-time)
+- Testar em aba anônima (extensões podem bloquear)
+
+**Eventos duplicados:**
+- Verificar se `initAnalytics()` é chamado apenas uma vez
+- Verificar `console.log` para mensagem "Já foi inicializado"
+
+**Dados de produção vs desenvolvimento:**
+- Em desenvolvimento: apenas `console.log` (sem envio ao GA4)
+- Em produção: eventos enviados ao GA4 se `VITE_ANALYTICS_ID` configurado
+
+#### 📚 Documentação Adicional
+
+- [Google Analytics 4 - Documentação Oficial](https://developers.google.com/analytics/devguides/collection/ga4)
+- [Eventos Recomendados GA4](https://support.google.com/analytics/answer/9267735)
+- [LGPD e Google Analytics](https://support.google.com/analytics/answer/9019185)
+
+#### 🧪 Testes Unitários
+
+Os testes unitários de `analytics.ts` cobrem:
+- ✅ 51 testes
+- ✅ 95.45% de cobertura de funções
+- ✅ Validação de payloads sem PII
+- ✅ Comportamento quando desabilitado
+
+Rodar testes: `npm test -- src/lib/__tests__/analytics.test.ts`
 
 ## 📱 Páginas
 
