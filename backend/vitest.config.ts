@@ -6,6 +6,9 @@ export default defineConfig({
     // Ambiente de execução
     environment: 'node',
 
+    // Arquivo de setup executado antes dos testes
+    setupFiles: ['./src/__tests__/setup.ts'],
+
     // Diretórios e padrões de arquivos de teste
     include: ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'src/**/__tests__/**/*.test.ts'],
     exclude: ['node_modules', 'dist', 'build'],
