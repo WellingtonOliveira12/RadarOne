@@ -19,6 +19,12 @@ import { MonitorsPage } from './pages/MonitorsPage';
 import { NotificationSettingsPage } from './pages/NotificationSettingsPage';
 import { NotificationHistoryPage } from './pages/NotificationHistoryPage';
 import { SubscriptionSettingsPage } from './pages/SubscriptionSettingsPage';
+import { TelegramConnectionPage } from './pages/TelegramConnectionPage';
+
+// Páginas de ajuda (públicas)
+import { ManualPage } from './pages/ManualPage';
+import { FAQPage } from './pages/FAQPage';
+import { ContactPage } from './pages/ContactPage';
 
 // Páginas admin
 import { AdminJobsPage } from './pages/AdminJobsPage';
@@ -56,6 +62,11 @@ export function AppRouter() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/health" element={<HealthCheckPage />} />
+
+          {/* Páginas de ajuda (públicas) */}
+          <Route path="/manual" element={<ManualPage />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/contact" element={<ContactPage />} />
 
           {/* Rotas protegidas */}
           <Route
@@ -95,6 +106,14 @@ export function AppRouter() {
             element={
               <ProtectedRoute>
                 <SubscriptionSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/telegram/connect"
+            element={
+              <ProtectedRoute>
+                <TelegramConnectionPage />
               </ProtectedRoute>
             }
           />
