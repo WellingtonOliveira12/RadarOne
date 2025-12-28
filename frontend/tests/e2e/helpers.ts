@@ -55,7 +55,7 @@ export async function clearStorage(page: Page) {
  * 2. Preenche credenciais REAIS
  * 3. Submete formulário
  * 4. Backend valida e retorna JWT REAL
- * 5. Frontend salva token no localStorage
+ * 5. RadarOne salva token no localStorage
  * 6. Aguarda redirecionamento para /monitors ou /dashboard
  *
  * @param page - Página do Playwright

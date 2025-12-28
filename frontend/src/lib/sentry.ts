@@ -1,5 +1,5 @@
 /**
- * Sentry Configuration - Frontend
+ * Sentry Configuration - RadarOne Frontend
  *
  * Captura e rastreia erros do frontend em produção
  */

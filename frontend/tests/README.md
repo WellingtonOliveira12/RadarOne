@@ -8,7 +8,7 @@ Guia completo para rodar e configurar testes E2E com Playwright.
 
 1. **Backend rodando** em `http://localhost:3000` (ou configurar `VITE_API_BASE_URL`)
 2. **Banco de dados** de desenvolvimento/teste configurado
-3. **Frontend** rodará automaticamente via Playwright (`npm run dev`)
+3. **RadarOne Frontend** rodará automaticamente via Playwright (`npm run dev`)
 4. **Usuário de teste** criado no banco (veja seção de Setup)
 
 ---

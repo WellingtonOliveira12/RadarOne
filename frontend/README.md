@@ -1,6 +1,6 @@
-# RadarOne - Frontend
+# RadarOne Frontend
 
-Frontend do sistema RadarOne - Interface web para gerenciamento de monitores de anúncios.
+Interface web do RadarOne - Plataforma de monitoramento de anúncios com alertas inteligentes.
 
 ## 🚀 Tecnologias
 
