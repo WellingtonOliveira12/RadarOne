@@ -1,0 +1,55 @@
+name: Post-deploy audit
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      PROD_URL: https://radarone.com.br
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Basic connectivity (home + GA4 presence)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          URL="${PROD_URL}"
+          echo "🔍 Auditando: $URL"
+
+          fail(){ echo "❌ $1"; exit 1; }
+
+          status=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          [[ "$status" == "200" || "$status" == "304" ]] || fail "Home não respondeu (status=$status)"
+
+          html=$(curl -s "$URL")
+          echo "$html" | grep -q "googletagmanager.com/gtag/js?id=G-" || fail "gtag.js não encontrado"
+          echo "$html" | grep -q "gtag('config'" || fail "gtag('config') não encontrado"
+
+          echo "✅ Home e GA4 OK"
+
+      - name: Critical routes audit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          URL="${PROD_URL}"
+          fail(){ echo "❌ $1"; exit 1; }
+
+          for path in /login /dashboard; do
+            sc=$(curl -s -o /dev/null -w "%{http_code}" "$URL$path")
+            [[ "$sc" == "200" || "$sc" == "302" || "$sc" == "304" ]] || fail "Rota $path falhou (status=$sc)"
+            echo "✅ $path (status=$sc)"
+          done
+
+          echo "✅ Auditoria pós-deploy OK"
