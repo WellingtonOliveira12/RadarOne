@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
-  Container,
   FormControl,
   FormLabel,
   FormErrorMessage,
@@ -21,6 +20,7 @@ import { resetPassword } from '../services/auth';
 import { resetPasswordSchema } from '../validation/authSchemas';
 import { showSuccess, showError } from '../lib/toast';
 import { trackEvent } from '../lib/analytics';
+import { PublicLayout } from '../components/PublicLayout';
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -90,7 +90,7 @@ export function ResetPasswordPage() {
   // Se não houver token, mostrar erro
   if (!token) {
     return (
-      <Container maxW="md" py={12}>
+      <PublicLayout maxWidth="md">
         <VStack spacing={6} align="stretch">
           <Heading size="lg" textAlign="center">
             Redefinir Senha
@@ -111,14 +111,14 @@ export function ResetPasswordPage() {
             Voltar para o Login
           </Button>
         </VStack>
-      </Container>
+      </PublicLayout>
     );
   }
 
   // Se já redefiniu com sucesso
   if (success) {
     return (
-      <Container maxW="md" py={12}>
+      <PublicLayout maxWidth="md">
         <VStack spacing={6} align="stretch">
           <Heading size="lg" textAlign="center">
             Senha Redefinida!
@@ -147,13 +147,13 @@ export function ResetPasswordPage() {
             Ir para Login
           </Button>
         </VStack>
-      </Container>
+      </PublicLayout>
     );
   }
 
   // Formulário de redefinição
   return (
-    <Container maxW="md" py={12}>
+    <PublicLayout maxWidth="md">
       <VStack spacing={6} align="stretch">
         <Heading size="lg" textAlign="center">
           Redefinir Senha
@@ -217,6 +217,6 @@ export function ResetPasswordPage() {
           </ChakraLink>
         </Text>
       </VStack>
-    </Container>
+    </PublicLayout>
   );
 }

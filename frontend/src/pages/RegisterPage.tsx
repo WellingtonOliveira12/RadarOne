@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { trackSignUp } from '../lib/analytics';
 import { TELEGRAM_BOT_USERNAME, TELEGRAM_BOT_LINK } from '../constants/app';
+import { PublicLayout } from '../components/PublicLayout';
 import * as responsive from '../styles/responsive';
 
 /**
@@ -144,16 +145,7 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <>
-      {/* Header com Logo Clicável */}
-      <div style={styles.header}>
-        <div style={styles.headerContent}>
-          <Link to="/" style={styles.logo}>
-            RadarOne
-          </Link>
-        </div>
-      </div>
-
+    <PublicLayout maxWidth="container.md">
       {/* Container do Formulário */}
       <div style={styles.container}>
         <div style={styles.card}>
@@ -353,7 +345,7 @@ export const RegisterPage: React.FC = () => {
           </p>
         </div>
       </div>
-    </>
+    </PublicLayout>
   );
 };
 
@@ -374,9 +366,6 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 'calc(100vh - 60px)',
-    backgroundColor: '#f5f5f5',
-    padding: responsive.spacing.lg,
   },
   card: {
     ...responsive.card,

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
-  Container,
   FormControl,
   FormLabel,
   FormErrorMessage,
@@ -21,6 +20,7 @@ import { forgotPassword } from '../services/auth';
 import { forgotPasswordSchema } from '../validation/authSchemas';
 import { showSuccess, showError } from '../lib/toast';
 import { trackEvent, maskEmail } from '../lib/analytics';
+import { PublicLayout } from '../components/PublicLayout';
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -79,7 +79,7 @@ export function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <Container maxW="md" py={12}>
+      <PublicLayout maxWidth="md">
         <VStack spacing={6} align="stretch">
           <Heading size="lg" textAlign="center">
             Email Enviado!
@@ -112,12 +112,12 @@ export function ForgotPasswordPage() {
             Voltar para Login
           </Button>
         </VStack>
-      </Container>
+      </PublicLayout>
     );
   }
 
   return (
-    <Container maxW="md" py={12}>
+    <PublicLayout maxWidth="md">
       <VStack spacing={6} align="stretch">
         <Heading size="lg" textAlign="center">
           Esqueceu a Senha?
@@ -169,6 +169,6 @@ export function ForgotPasswordPage() {
           </ChakraLink>
         </Text>
       </VStack>
-    </Container>
+    </PublicLayout>
   );
 }

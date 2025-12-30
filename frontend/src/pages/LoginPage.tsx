@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link as RouterLink } from 'react-router-dom';
 import {
   Box,
   Button,
-  Container,
   FormControl,
   FormLabel,
   Heading,
@@ -19,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../lib/toast';
 import { trackLogin } from '../lib/analytics';
 import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
+import { PublicLayout } from '../components/PublicLayout';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -75,38 +75,21 @@ export function LoginPage() {
   }
 
   return (
-    <Box minH="100vh" bg="gray.50">
-      {/* Header com Logo Clicável */}
-      <Box bg="white" borderBottom="1px" borderColor="gray.200" py={4}>
-        <Container maxW="container.xl">
-          <ChakraLink
-            href="/"
-            fontSize="2xl"
-            fontWeight="bold"
-            color="gray.800"
-            _hover={{ textDecoration: 'none', color: 'blue.500' }}
-          >
-            RadarOne
-          </ChakraLink>
-        </Container>
-      </Box>
+    <PublicLayout maxWidth="md">
+      <VStack spacing={6} align="stretch">
+        <Heading size="lg" textAlign="center">
+          Login
+        </Heading>
 
-      {/* Formulário de Login */}
-      <Container maxW="md" py={12}>
-        <VStack spacing={6} align="stretch">
-          <Heading size="lg" textAlign="center">
-            Login
-          </Heading>
-
-          {/* Banner informando motivo do redirect (se houver) */}
-          {reason && (
-            <Alert status="warning" borderRadius="md">
-              <AlertIcon />
-              <AlertDescription>
-                {getSubscriptionMessage(reason)}
-              </AlertDescription>
-            </Alert>
-          )}
+        {/* Banner informando motivo do redirect (se houver) */}
+        {reason && (
+          <Alert status="warning" borderRadius="md">
+            <AlertIcon />
+            <AlertDescription>
+              {getSubscriptionMessage(reason)}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Box
           as="form"
@@ -157,6 +140,13 @@ export function LoginPage() {
                 Esqueceu a senha?
               </ChakraLink>
             </Text>
+
+            <Text fontSize="sm" textAlign="center" color="gray.600">
+              Não tem uma conta?{' '}
+              <ChakraLink as={RouterLink} to="/register" color="blue.500">
+                Criar conta
+              </ChakraLink>
+            </Text>
           </VStack>
         </Box>
 
@@ -167,7 +157,6 @@ export function LoginPage() {
           </Alert>
         )}
       </VStack>
-    </Container>
-    </Box>
+    </PublicLayout>
   );
 }

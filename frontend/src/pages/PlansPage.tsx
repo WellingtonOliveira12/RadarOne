@@ -138,8 +138,17 @@ export const PlansPage: React.FC = () => {
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.headerContent}>
-          <Link to="/" style={styles.logo}>
-            RadarOne
+          <Link to="/" style={styles.logoContainer}>
+            <img
+              src="/brand/radarone-logo.png"
+              alt="RadarOne Logo"
+              style={styles.logoImage}
+              onError={(e) => {
+                // Fallback caso logo não carregue
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <span style={styles.logoText}>RadarOne</span>
           </Link>
           {user ? (
             <Link to="/dashboard" style={styles.navLink}>
@@ -284,6 +293,21 @@ const styles = {
     alignItems: 'center',
     flexWrap: 'wrap' as const,
     gap: responsive.spacing.sm,
+  },
+  logoContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: responsive.spacing.xs,
+    textDecoration: 'none',
+  },
+  logoImage: {
+    height: 'clamp(32px, 5vw, 40px)',
+    width: 'auto',
+    objectFit: 'contain' as const,
+  },
+  logoText: {
+    ...responsive.typography.h2,
+    margin: 0,
   },
   logo: {
     ...responsive.typography.h2,
