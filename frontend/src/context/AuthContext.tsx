@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { login as authLogin, register as authRegister } from '../services/auth';
 import { saveToken, clearToken, getToken } from '../services/tokenStorage';
+import { useSessionTimeout } from '../hooks/useSessionTimeout';
 
 /**
  * Contexto de Autenticação
@@ -81,11 +82,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setUser(response.user);
   };
 
-  const logout = () => {
+  const logout = useCallback((reason?: string) => {
     setUser(null);
     clearToken();
-    window.location.href = '/login';
-  };
+
+    // Redirecionar para login com motivo (se fornecido)
+    const loginUrl = reason ? `/login?reason=${reason}` : '/login';
+    window.location.href = loginUrl;
+  }, []);
 
   const register = async (data: {
     email: string;
@@ -100,6 +104,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Após registrar, fazer login automaticamente
     await login(data.email, data.password);
   };
+
+  // Timeout de inatividade (30 minutos padrão, configurável via env)
+  const timeoutMinutes = Number(import.meta.env.VITE_SESSION_TIMEOUT_MINUTES) || 30;
+
+  useSessionTimeout(() => {
+    // Deslogar por inatividade
+    logout('session_expired');
+  }, timeoutMinutes);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, register }}>

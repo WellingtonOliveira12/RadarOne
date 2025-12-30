@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -18,9 +18,13 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../lib/toast';
 import { trackLogin } from '../lib/analytics';
+import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const reason = searchParams.get('reason');
+
   const { login: loginAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -93,6 +97,16 @@ export function LoginPage() {
           <Heading size="lg" textAlign="center">
             Login
           </Heading>
+
+          {/* Banner informando motivo do redirect (se houver) */}
+          {reason && (
+            <Alert status="warning" borderRadius="md">
+              <AlertIcon />
+              <AlertDescription>
+                {getSubscriptionMessage(reason)}
+              </AlertDescription>
+            </Alert>
+          )}
 
         <Box
           as="form"
