@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/AppError';
 import { ErrorCodes } from '../constants/errorCodes';
-import logger from '../logger';
+import { logAppError, logUnexpectedError } from '../utils/loggerHelpers';
 
 /**
  * Middleware global de tratamento de erros
@@ -25,27 +25,27 @@ export const errorHandler = (
       response.details = err.details;
     }
 
-    // Log estruturado
-    logger.error({
+    // Log estruturado com helper type-safe
+    logAppError({
       errorCode: err.errorCode,
       message: err.message,
       statusCode: err.statusCode,
       path: req.path,
       method: req.method,
       userId: (req as any).userId,
-    }, 'AppError');
+    });
 
     res.status(err.statusCode).json(response);
     return;
   }
 
   // Erro desconhecido/não tratado → INTERNAL_ERROR
-  logger.error({
+  logUnexpectedError({
     error: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method,
-  }, 'Unexpected error');
+  });
 
   res.status(500).json({
     errorCode: ErrorCodes.INTERNAL_ERROR,
