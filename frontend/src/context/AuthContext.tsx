@@ -49,8 +49,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const token = getToken();
       if (token) {
-        // TODO: implementar getMe endpoint se necessário
-        // Por ora, apenas verifica se tem token
+        // Carregar dados do usuário do backend
+        const response = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/auth/me`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData.user);
+        } else {
+          // Token inválido, limpar
+          clearToken();
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar usuário:', error);

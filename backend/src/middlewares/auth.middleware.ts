@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../server';
 import { logWithUser } from '../logger';
+import { AppError } from '../errors/AppError';
 
 // Estende o tipo Request para incluir userId
 declare global {
@@ -30,8 +31,7 @@ export const authenticateToken = (
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
     if (!token) {
-      res.status(401).json({ error: 'Token não fornecido' });
-      return;
+      throw AppError.invalidToken('Token de autenticação não fornecido');
     }
 
     const secret = process.env.JWT_SECRET;
@@ -43,7 +43,11 @@ export const authenticateToken = (
     req.userId = decoded.userId;
     next();
   } catch (error) {
-    res.status(403).json({ error: 'Token inválido ou expirado' });
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      next(AppError.invalidToken('Token de autenticação inválido ou expirado'));
+    }
   }
 };
 
@@ -94,8 +98,7 @@ export const checkTrialExpired = async (
 ): Promise<void> => {
   try {
     if (!req.userId) {
-      res.status(401).json({ error: 'Não autenticado' });
-      return;
+      throw AppError.unauthorized('Usuário não autenticado');
     }
 
     // Buscar assinatura ativa ou trial do usuário
@@ -114,11 +117,7 @@ export const checkTrialExpired = async (
 
     // Se não tem assinatura, bloquear acesso
     if (!subscription) {
-      res.status(403).json({
-        error: 'Você precisa assinar um plano para acessar este recurso.',
-        errorCode: 'NO_SUBSCRIPTION'
-      });
-      return;
+      throw AppError.subscriptionRequired('Você precisa assinar um plano para acessar este recurso');
     }
 
     // Se é trial e já expirou, bloquear acesso
@@ -139,18 +138,13 @@ export const checkTrialExpired = async (
           userAgent: req.headers['user-agent'],
         });
 
-        res.status(403).json({
-          error: 'Seu período de teste gratuito expirou. Assine um plano para continuar.',
-          errorCode: 'TRIAL_EXPIRED'
-        });
-        return;
+        throw AppError.trialExpired('Seu período de teste gratuito expirou. Assine um plano para continuar');
       }
     }
 
     // Se passou por todas as verificações, permitir acesso
     next();
   } catch (error) {
-    console.error('Erro ao verificar trial:', error);
-    res.status(500).json({ error: 'Erro ao verificar acesso' });
+    next(error);
   }
 };

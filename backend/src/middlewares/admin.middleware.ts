@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../server';
+import { AppError } from '../errors/AppError';
 
 /**
  * Middleware para verificar se o usuário autenticado é ADMIN
@@ -13,7 +14,7 @@ export async function requireAdmin(
   try {
     // Verificar se o usuário está autenticado (req.userId setado pelo authenticateToken)
     if (!req.userId) {
-      return res.status(401).json({ error: 'Usuário não autenticado' });
+      throw AppError.unauthorized('Usuário não autenticado');
     }
 
     // Buscar usuário no banco
@@ -28,24 +29,23 @@ export async function requireAdmin(
 
     // Verificar se usuário existe
     if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
+      throw new AppError(404, 'USER_NOT_FOUND', 'Usuário não encontrado');
     }
 
     // Verificar se usuário não está bloqueado
     if (user.blocked) {
-      return res.status(403).json({ error: 'Usuário bloqueado' });
+      throw AppError.forbidden('Usuário bloqueado. Entre em contato com o suporte');
     }
 
     // Verificar se usuário tem role de ADMIN
     if (user.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+      throw AppError.forbidden('Acesso negado. Apenas administradores');
     }
 
     // Usuário é admin, permitir acesso
     next();
 
   } catch (error) {
-    console.error('Erro no middleware requireAdmin:', error);
-    return res.status(500).json({ error: 'Erro ao verificar permissões' });
+    next(error);
   }
 }

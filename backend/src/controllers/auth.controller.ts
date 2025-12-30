@@ -1,3 +1,4 @@
+import { ErrorCodes } from '../constants/errorCodes';
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
@@ -51,7 +52,7 @@ export class AuthController {
       if (existingUser) {
         res.status(409).json({
           error: 'Você já tem cadastro. Faça login para entrar.',
-          errorCode: 'USER_ALREADY_EXISTS'
+          errorCode: ErrorCodes.USER_ALREADY_EXISTS
         });
         return;
       }
@@ -66,7 +67,7 @@ export class AuthController {
         if (existingCpf) {
           res.status(409).json({
             error: 'Você já tem cadastro. Faça login para entrar.',
-            errorCode: 'USER_ALREADY_EXISTS'
+            errorCode: ErrorCodes.USER_ALREADY_EXISTS
           });
           return;
         }
@@ -299,7 +300,7 @@ export class AuthController {
           // DEV: retornar erro específico
           res.status(404).json({
             error: 'E-mail não cadastrado',
-            errorCode: 'EMAIL_NOT_FOUND'
+            errorCode: ErrorCodes.EMAIL_NOT_FOUND
           });
           return;
         } else {

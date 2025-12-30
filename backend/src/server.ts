@@ -52,6 +52,9 @@ import logger from './logger';
 // Importa scheduler de jobs
 import { startScheduler } from './jobs/scheduler';
 
+// Importa middleware de erro padronizado
+import { errorHandler } from './middlewares/errorHandler.middleware';
+
 const app: Application = express();
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -255,30 +258,17 @@ app.get('/api/test', (req: Request, res: Response) => {
 // ERROR HANDLING
 // ============================================
 
-// Rota não encontrada
+// Rota não encontrada (padronizado com errorCode)
 app.use((req: Request, res: Response) => {
   res.status(404).json({
-    error: 'Rota não encontrada',
+    errorCode: 'NOT_FOUND',
+    message: 'Rota não encontrada',
     path: req.path
   });
 });
 
-// Handler de erros global
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  const requestLogger = req.logger || logger;
-  requestLogger.error({
-    err,
-    requestId: req.requestId,
-    method: req.method,
-    url: req.url,
-  }, 'Unhandled error');
-
-  res.status(500).json({
-    error: 'Erro interno do servidor',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
-    requestId: req.requestId,
-  });
-});
+// Handler de erros global (SEMPRE retorna errorCode)
+app.use(errorHandler);
 
 // ============================================
 // INICIALIZAÇÃO

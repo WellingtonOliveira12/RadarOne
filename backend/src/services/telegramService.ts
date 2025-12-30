@@ -435,22 +435,34 @@ export async function getTelegramStatus(userId: string): Promise<{ connected: bo
  */
 export async function disconnectTelegram(userId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // Desativar TelegramAccount
-    await prisma.telegramAccount.updateMany({
-      where: { userId },
-      data: { active: false }
+    // DELETAR TelegramAccount completamente (em vez de apenas marcar como inativo)
+    // Isso permite reconexão limpa sem estado inconsistente
+    await prisma.telegramAccount.deleteMany({
+      where: { userId }
     });
 
-    // Atualizar NotificationSettings
+    // Atualizar NotificationSettings (limpar todos os campos relacionados)
     await prisma.notificationSettings.updateMany({
       where: { userId },
       data: {
         telegramEnabled: false,
-        telegramChatId: null
+        telegramChatId: null,
+        telegramUsername: null  // Adicionar limpeza do username também
       }
     });
 
-    console.log('[TelegramService] Telegram desconectado', { userId });
+    // Invalidar tokens de conexão pendentes deste usuário
+    await prisma.telegramConnectToken.updateMany({
+      where: {
+        userId,
+        status: 'PENDING'
+      },
+      data: {
+        status: 'EXPIRED'
+      }
+    });
+
+    console.log('[TelegramService] Telegram desconectado completamente', { userId });
 
     return { success: true };
   } catch (error: any) {
