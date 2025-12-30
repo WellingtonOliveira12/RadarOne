@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../server';
-import { logWithUser } from '../logger';
+import { logWithUser } from '../utils/loggerHelpers';
 import { AppError } from '../errors/AppError';
 
 // Estende o tipo Request para incluir userId

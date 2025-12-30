@@ -103,3 +103,19 @@ export function logSimpleWarning(message: string): void {
 export function logSimpleError(message: string): void {
   logger.error(message);
 }
+
+/**
+ * Child logger com contexto adicional
+ * Útil para adicionar requestId ou userId em todos os logs de uma requisição
+ */
+export function createChildLogger(context: Record<string, unknown>) {
+  return logger.child(context);
+}
+
+/**
+ * Helper para logar com contexto de usuário
+ */
+export function logWithUser(userId: string, level: 'info' | 'warn' | 'error', message: string, data?: Record<string, unknown>) {
+  const childLogger = createChildLogger({ userId });
+  childLogger[level](data, message);
+}

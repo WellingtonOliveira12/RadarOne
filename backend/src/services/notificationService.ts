@@ -2,7 +2,7 @@ import { prisma } from '../server';
 import { getUserTelegramAccount, sendTelegramMessage } from './telegramService';
 import { sendNewListingEmail } from './emailService';
 import { Monitor, NotificationChannel, NotificationStatus } from '@prisma/client';
-import logger from '../logger';
+import { logError, logInfo, logWarning } from '../utils/loggerHelpers';
 
 /**
  * Serviço de Notificações
@@ -52,7 +52,7 @@ async function logNotification(
     });
   } catch (err) {
     // Não quebrar o fluxo se o log falhar
-    logger.error({ err, userId, channel }, 'Failed to log notification');
+    logError('Failed to log notification', { err, userId, channel });
   }
 }
 
@@ -70,7 +70,7 @@ export async function notifyNewListing(
 ) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
-    logger.warn({ userId }, 'User not found for notification');
+    logWarning('User not found for notification', { userId });
     return;
   }
 
@@ -95,7 +95,7 @@ export async function notifyNewListing(
         .then(async (result) => {
           const sent = result.success;
           if (sent) {
-            logger.info({ userId, channel: 'telegram' }, 'Telegram notification sent successfully');
+            logInfo('Telegram notification sent successfully', { userId, channel: 'telegram' });
             await logNotification(
               userId,
               NotificationChannel.TELEGRAM,
@@ -105,7 +105,7 @@ export async function notifyNewListing(
               NotificationStatus.SUCCESS
             );
           } else {
-            logger.warn({ userId, channel: 'telegram' }, 'Telegram notification failed');
+            logWarning('Telegram notification failed', { userId, channel: 'telegram' });
             await logNotification(
               userId,
               NotificationChannel.TELEGRAM,
@@ -119,7 +119,7 @@ export async function notifyNewListing(
           return { channel: 'telegram', sent };
         })
         .catch(async (err) => {
-          logger.error({ err, userId, channel: 'telegram' }, 'Error sending Telegram notification');
+          logError('Error sending Telegram notification', { err, userId, channel: 'telegram' });
           await logNotification(
             userId,
             NotificationChannel.TELEGRAM,
@@ -144,7 +144,7 @@ export async function notifyNewListing(
         .then(async (result) => {
           const sent = result.success;
           if (sent) {
-            logger.info({ userId, channel: 'email', email: sanitizeEmail(user.email) }, 'Email notification sent successfully');
+            logInfo('Email notification sent successfully', { userId, channel: 'email', email: sanitizeEmail(user.email) });
             await logNotification(
               userId,
               NotificationChannel.EMAIL,
@@ -154,7 +154,7 @@ export async function notifyNewListing(
               NotificationStatus.SUCCESS
             );
           } else {
-            logger.warn({ userId, channel: 'email', email: sanitizeEmail(user.email) }, 'Email notification failed');
+            logWarning('Email notification failed', { userId, channel: 'email', email: sanitizeEmail(user.email) });
             await logNotification(
               userId,
               NotificationChannel.EMAIL,
@@ -168,7 +168,7 @@ export async function notifyNewListing(
           return { channel: 'email', sent };
         })
         .catch(async (err) => {
-          logger.error({ err, userId, channel: 'email', email: sanitizeEmail(user.email) }, 'Error sending email notification');
+          logError('Error sending email notification', { err, userId, channel: 'email', email: sanitizeEmail(user.email) });
           await logNotification(
             userId,
             NotificationChannel.EMAIL,
@@ -185,7 +185,7 @@ export async function notifyNewListing(
 
   // Executar todas as notificações em paralelo
   if (notificationPromises.length === 0) {
-    logger.warn({ userId }, 'No notification channels available for user');
+    logWarning('No notification channels available for user', { userId });
     return;
   }
 
@@ -193,7 +193,7 @@ export async function notifyNewListing(
 
   // Log dos resultados
   const successCount = results.filter((r) => r.status === 'fulfilled').length;
-  logger.info({ userId, successCount, totalChannels: results.length }, 'Notifications sent');
+  logInfo('Notifications sent', { userId, successCount, totalChannels: results.length });
 
   // Opcional: retornar estatísticas
   return {

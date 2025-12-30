@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { randomUUID } from 'crypto';
-import { createChildLogger } from '../logger';
+import { createChildLogger } from '../utils/loggerHelpers';
 
 /**
  * Middleware de Request ID

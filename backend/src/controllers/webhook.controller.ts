@@ -7,7 +7,7 @@ import {
   KIWIFY_SUBSCRIPTION_STATUS_MAP,
 } from '../types/kiwify';
 import { sendSubscriptionExpiredEmail, sendTrialExpiredEmail } from '../services/emailService';
-import logger from '../logger';
+import { logError, logSimpleError, logSimpleWarning } from '../utils/loggerHelpers';
 
 /**
  * Webhook Controller - Processa eventos da Kiwify
@@ -31,10 +31,10 @@ export class WebhookController {
     if (!secret) {
       const isProduction = process.env.NODE_ENV === 'production';
       if (isProduction) {
-        logger.error('KIWIFY_WEBHOOK_SECRET not configured in production - REJECTING webhook');
+        logSimpleError('KIWIFY_WEBHOOK_SECRET not configured in production - REJECTING webhook');
         return false; // Em produção, REJEITAR sem secret
       }
-      logger.warn('KIWIFY_WEBHOOK_SECRET not configured - skipping validation (dev only)');
+      logSimpleWarning('KIWIFY_WEBHOOK_SECRET not configured - skipping validation (dev only)');
       return true; // Em dev, aceitar sem validação
     }
 
@@ -48,7 +48,7 @@ export class WebhookController {
         Buffer.from(calculatedSignature)
       );
     } catch (error) {
-      logger.error({ err: error }, 'Failed to validate webhook signature');
+      logError('Failed to validate webhook signature', { err: error });
       return false;
     }
   }

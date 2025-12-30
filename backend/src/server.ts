@@ -46,8 +46,8 @@ import { apiRateLimiter } from './middlewares/rateLimit.middleware';
 // Importa middleware de requestId
 import { requestIdMiddleware } from './middlewares/requestId.middleware';
 
-// Importa logger
-import logger from './logger';
+// Importa logger helpers
+import { logInfo, logError, logSimpleInfo } from './utils/loggerHelpers';
 
 // Importa scheduler de jobs
 import { startScheduler } from './jobs/scheduler';
@@ -227,7 +227,7 @@ app.use('/api/telegram', telegramRoutes); // Telegram webhook (SEM JWT - usa sec
 // ============================================
 app.post('/api/telegram/webhook', (req: Request, res: Response, next: NextFunction) => {
   // Log para confirmar que o handler explícito foi chamado
-  logger.info({
+  logInfo('DEBUG: Hit explicit /api/telegram/webhook handler (BYPASS)', {
     method: req.method,
     path: req.path,
     query: req.query,
@@ -235,7 +235,7 @@ app.post('/api/telegram/webhook', (req: Request, res: Response, next: NextFuncti
       'content-type': req.get('content-type'),
       'user-agent': req.get('user-agent')
     }
-  }, 'DEBUG: Hit explicit /api/telegram/webhook handler (BYPASS)');
+  });
 
   // Se chegou aqui, significa que o problema foi o router não estar montado
   // Chama o controller diretamente
@@ -278,7 +278,7 @@ const startServer = async () => {
   try {
     // Testa conexão com o banco
     await prisma.$connect();
-    logger.info('Database connected successfully');
+    logSimpleInfo('Database connected successfully');
 
     // Define URL pública para produção
     const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
@@ -286,18 +286,18 @@ const startServer = async () => {
 
     // Inicia o servidor (0.0.0.0 para aceitar conexões externas na Render)
     app.listen(PORT, '0.0.0.0', () => {
-      logger.info({
+      logInfo('Server started successfully', {
         port: PORT,
         env: process.env.NODE_ENV || 'development',
         url: PUBLIC_URL,
         webhookUrl: isProduction ? `${PUBLIC_URL}/api/webhooks/kiwify` : undefined,
-      }, 'Server started successfully');
+      });
 
       // Inicia o scheduler de jobs automáticos
       startScheduler();
     });
   } catch (error) {
-    logger.error({ err: error }, 'Failed to start server');
+    logError('Failed to start server', { err: error });
     await prisma.$disconnect();
     process.exit(1);
   }
@@ -305,13 +305,13 @@ const startServer = async () => {
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  logger.info('Shutting down server (SIGINT)...');
+  logSimpleInfo('Shutting down server (SIGINT)...');
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  logger.info('Shutting down server (SIGTERM)...');
+  logSimpleInfo('Shutting down server (SIGTERM)...');
   await prisma.$disconnect();
   process.exit(0);
 });
