@@ -26,26 +26,26 @@ export const errorHandler = (
     }
 
     // Log estruturado
-    logger.error('AppError', {
+    logger.error({
       errorCode: err.errorCode,
       message: err.message,
       statusCode: err.statusCode,
       path: req.path,
       method: req.method,
       userId: (req as any).userId,
-    });
+    }, 'AppError');
 
     res.status(err.statusCode).json(response);
     return;
   }
 
   // Erro desconhecido/não tratado → INTERNAL_ERROR
-  logger.error('Unexpected error', {
+  logger.error({
     error: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method,
-  });
+  }, 'Unexpected error');
 
   res.status(500).json({
     errorCode: ErrorCodes.INTERNAL_ERROR,
