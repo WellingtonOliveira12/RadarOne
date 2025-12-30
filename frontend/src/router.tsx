@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { RequireSubscriptionRoute } from './components/RequireSubscriptionRoute';
+import { RedirectIfAuthenticated } from './components/RedirectIfAuthenticated';
 import { AdminProtectedRoute } from './components/AdminProtectedRoute';
 import { initAnalytics, trackPageView } from './lib/analytics';
 
@@ -57,8 +58,22 @@ export function AppRouter() {
           {/* Rotas públicas */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/plans" element={<PlansPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/login"
+            element={
+              <RedirectIfAuthenticated>
+                <LoginPage />
+              </RedirectIfAuthenticated>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <RedirectIfAuthenticated>
+                <RegisterPage />
+              </RedirectIfAuthenticated>
+            }
+          />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/health" element={<HealthCheckPage />} />
