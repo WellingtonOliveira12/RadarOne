@@ -45,7 +45,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
         borderColor="gray.200"
         position="sticky"
         top={0}
-        zIndex={100}
+        zIndex={1000}
       >
         <Container maxW="container.xl" py={4} px={{ base: 4, md: 6 }}>
           <Flex justify="space-between" align="center" flexWrap="wrap" gap={3}>
