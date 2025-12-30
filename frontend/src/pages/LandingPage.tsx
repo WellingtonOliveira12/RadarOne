@@ -1,333 +1,323 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
+import {
+  Box,
+  Container,
+  Flex,
+  Heading,
+  Text,
+  Button,
+  Image,
+  SimpleGrid,
+  VStack,
+  HStack,
+  Link,
+  Icon,
+  List,
+  ListItem,
+  ListIcon,
+} from '@chakra-ui/react';
+import { CheckCircleIcon } from '@chakra-ui/icons';
 
 /**
  * Landing Page - Página inicial pública do RadarOne
+ * Redesenhada com Chakra UI para consistência visual
  */
 
 export const LandingPage: React.FC = () => {
   return (
-    <div style={styles.container}>
+    <Box minH="100vh" bg="gray.50">
       {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <h1 style={styles.logo}>RadarOne</h1>
-          <nav style={styles.nav}>
-            <Link to="/plans" style={styles.navLink}>
-              Planos
+      <Box
+        as="header"
+        bg="white"
+        borderBottom="1px"
+        borderColor="gray.200"
+        position="sticky"
+        top={0}
+        zIndex={100}
+      >
+        <Container maxW="container.xl" py={4} px={{ base: 4, md: 6 }}>
+          <Flex justify="space-between" align="center" flexWrap="wrap" gap={3}>
+            {/* Logo */}
+            <Link as={RouterLink} to="/" _hover={{ textDecoration: 'none' }}>
+              <HStack spacing={{ base: 2, md: 3 }}>
+                <Image
+                  src="/brand/radarone-logo.png"
+                  alt="RadarOne Logo"
+                  h={{ base: '32px', md: '40px' }}
+                  objectFit="contain"
+                  fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%233b82f6'/%3E%3C/svg%3E"
+                />
+                <Heading as="h1" size={{ base: 'sm', md: 'md' }} color="gray.800" m={0}>
+                  RadarOne
+                </Heading>
+              </HStack>
             </Link>
-            <Link to="/login" style={styles.navLink}>
-              Entrar
-            </Link>
-            <Link to="/register" style={styles.navLinkButton}>
-              Criar conta
-            </Link>
-          </nav>
-        </div>
-      </header>
+
+            {/* Navigation */}
+            <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
+              <Link
+                as={RouterLink}
+                to="/plans"
+                fontSize="sm"
+                fontWeight="medium"
+                color="gray.600"
+                _hover={{ color: 'blue.600' }}
+              >
+                Planos
+              </Link>
+              <Link
+                as={RouterLink}
+                to="/login"
+                fontSize="sm"
+                fontWeight="medium"
+                color="gray.600"
+                _hover={{ color: 'blue.600' }}
+              >
+                Entrar
+              </Link>
+              <Button
+                as={RouterLink}
+                to="/register"
+                colorScheme="blue"
+                size="sm"
+              >
+                Criar conta
+              </Button>
+            </HStack>
+          </Flex>
+        </Container>
+      </Box>
 
       {/* Hero Section */}
-      <section style={styles.hero}>
-        <h1 style={styles.heroTitle}>
-          Encontre as melhores oportunidades antes da concorrência
-        </h1>
-        <p style={styles.heroSubtitle}>
-          Monitore anúncios de <strong>iPhone, carros, imóveis e muito mais</strong> no OLX,
-          Mercado Livre e Facebook. Receba alertas em tempo real e seja o primeiro a fechar negócio.
-        </p>
-        <div style={styles.heroButtons}>
-          <Link to="/register" style={styles.primaryButton}>
-            Começar agora - 7 dias grátis
-          </Link>
-          <Link to="/plans" style={styles.secondaryButton}>
-            Ver planos
-          </Link>
-        </div>
-      </section>
+      <Box as="section" py={{ base: 12, md: 20 }} px={{ base: 4, md: 6 }}>
+        <Container maxW="container.md" textAlign="center">
+          {/* Logo Hero */}
+          <Flex justify="center" mb={{ base: 6, md: 8 }}>
+            <Image
+              src="/brand/radarone-logo.png"
+              alt="RadarOne"
+              h={{ base: '80px', md: '120px' }}
+              objectFit="contain"
+              fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Crect width='120' height='120' fill='%233b82f6'/%3E%3C/svg%3E"
+            />
+          </Flex>
+
+          {/* Headline */}
+          <Heading
+            as="h1"
+            size={{ base: 'xl', md: '2xl' }}
+            color="gray.800"
+            mb={4}
+            lineHeight="shorter"
+          >
+            Encontre as melhores oportunidades antes da concorrência
+          </Heading>
+
+          {/* Subheadline */}
+          <Text
+            fontSize={{ base: 'md', md: 'lg' }}
+            color="gray.600"
+            mb={8}
+            lineHeight="tall"
+          >
+            Monitore anúncios de <strong>iPhone, carros, imóveis e muito mais</strong> no OLX,
+            Mercado Livre e Facebook. Receba alertas em tempo real e seja o primeiro a fechar negócio.
+          </Text>
+
+          {/* CTAs */}
+          <HStack spacing={4} justify="center" flexWrap="wrap">
+            <Button
+              as={RouterLink}
+              to="/register"
+              colorScheme="blue"
+              size="lg"
+              px={8}
+            >
+              Começar agora - 7 dias grátis
+            </Button>
+            <Button
+              as={RouterLink}
+              to="/plans"
+              variant="outline"
+              colorScheme="blue"
+              size="lg"
+              px={8}
+            >
+              Ver planos
+            </Button>
+          </HStack>
+        </Container>
+      </Box>
 
       {/* Features Section */}
-      <section style={styles.features}>
-        <h2 style={styles.sectionTitle}>Ideal para vendedores e revendedores</h2>
-        <div style={styles.featuresGrid}>
-          <div style={styles.featureCard}>
-            <div style={styles.featureIcon}>📱</div>
-            <h3 style={styles.featureTitle}>Revenda de iPhone</h3>
-            <p style={styles.featureText}>
-              Monitore anúncios de iPhone usados, pegue os melhores preços antes
-              da concorrência e revenda com lucro.
-            </p>
-          </div>
+      <Box as="section" bg="white" py={{ base: 12, md: 16 }} px={{ base: 4, md: 6 }}>
+        <Container maxW="container.xl">
+          <VStack spacing={2} mb={12} textAlign="center">
+            <Heading as="h2" size={{ base: 'lg', md: 'xl' }} color="gray.800">
+              Ideal para vendedores e revendedores
+            </Heading>
+          </VStack>
 
-          <div style={styles.featureCard}>
-            <div style={styles.featureIcon}>🚗</div>
-            <h3 style={styles.featureTitle}>Carros e Motos</h3>
-            <p style={styles.featureText}>
-              Acompanhe anúncios de veículos na sua região. Receba alerta
-              instantâneo quando aparecer um bom negócio.
-            </p>
-          </div>
+          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8}>
+            {/* Feature 1 */}
+            <Box
+              bg="white"
+              p={8}
+              borderRadius="xl"
+              boxShadow="md"
+              textAlign="center"
+              _hover={{ boxShadow: 'lg', transform: 'translateY(-4px)' }}
+              transition="all 0.3s"
+            >
+              <Text fontSize="5xl" mb={4}>📱</Text>
+              <Heading as="h3" size="md" mb={3} color="gray.800">
+                Revenda de iPhone
+              </Heading>
+              <Text fontSize="sm" color="gray.600" lineHeight="tall">
+                Monitore anúncios de iPhone usados, pegue os melhores preços antes
+                da concorrência e revenda com lucro.
+              </Text>
+            </Box>
 
-          <div style={styles.featureCard}>
-            <div style={styles.featureIcon}>🏠</div>
-            <h3 style={styles.featureTitle}>Imóveis e Terrenos</h3>
-            <p style={styles.featureText}>
-              Encontre imóveis abaixo do preço de mercado. Seja o primeiro
-              a entrar em contato com o vendedor.
-            </p>
-          </div>
-        </div>
-      </section>
+            {/* Feature 2 */}
+            <Box
+              bg="white"
+              p={8}
+              borderRadius="xl"
+              boxShadow="md"
+              textAlign="center"
+              _hover={{ boxShadow: 'lg', transform: 'translateY(-4px)' }}
+              transition="all 0.3s"
+            >
+              <Text fontSize="5xl" mb={4}>🚗</Text>
+              <Heading as="h3" size="md" mb={3} color="gray.800">
+                Carros e Motos
+              </Heading>
+              <Text fontSize="sm" color="gray.600" lineHeight="tall">
+                Acompanhe anúncios de veículos na sua região. Receba alerta
+                instantâneo quando aparecer um bom negócio.
+              </Text>
+            </Box>
+
+            {/* Feature 3 */}
+            <Box
+              bg="white"
+              p={8}
+              borderRadius="xl"
+              boxShadow="md"
+              textAlign="center"
+              _hover={{ boxShadow: 'lg', transform: 'translateY(-4px)' }}
+              transition="all 0.3s"
+            >
+              <Text fontSize="5xl" mb={4}>🏠</Text>
+              <Heading as="h3" size="md" mb={3} color="gray.800">
+                Imóveis e Terrenos
+              </Heading>
+              <Text fontSize="sm" color="gray.600" lineHeight="tall">
+                Encontre imóveis abaixo do preço de mercado. Seja o primeiro
+                a entrar em contato com o vendedor.
+              </Text>
+            </Box>
+          </SimpleGrid>
+        </Container>
+      </Box>
 
       {/* Benefits Section */}
-      <section style={styles.benefits}>
-        <h2 style={styles.sectionTitle}>Por que vendedores escolhem o RadarOne?</h2>
-        <div style={styles.benefitsList}>
-          <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>⚡</span>
-            <span><strong>Alertas em segundos</strong> - Receba notificação via Telegram assim que o anúncio for publicado</span>
-          </div>
-          <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>📱</span>
-            <span><strong>Todos os marketplaces</strong> - OLX, Mercado Livre, Facebook Marketplace, Webmotors e mais</span>
-          </div>
-          <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>🎯</span>
-            <span><strong>Filtros inteligentes</strong> - Monitore por cidade, faixa de preço, palavra-chave e muito mais</span>
-          </div>
-          <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>💰</span>
-            <span><strong>Aumente seu lucro</strong> - Chegue primeiro nos melhores negócios e negocie melhor</span>
-          </div>
-          <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>✅</span>
-            <span><strong>7 dias grátis</strong> - Teste sem compromisso. Cancele quando quiser</span>
-          </div>
-          <div style={styles.benefitItem}>
-            <span style={styles.benefitIcon}>🔒</span>
-            <span><strong>Sem pegadinhas</strong> - Cancele pelo app, sem ligar pra ninguém</span>
-          </div>
-        </div>
-      </section>
+      <Box as="section" py={{ base: 12, md: 16 }} px={{ base: 4, md: 6 }}>
+        <Container maxW="container.md">
+          <VStack spacing={2} mb={10} textAlign="center">
+            <Heading as="h2" size={{ base: 'lg', md: 'xl' }} color="gray.800">
+              Por que vendedores escolhem o RadarOne?
+            </Heading>
+          </VStack>
+
+          <List spacing={4}>
+            <ListItem display="flex" alignItems="flex-start" gap={3}>
+              <Text fontSize="2xl">⚡</Text>
+              <Text fontSize="md" color="gray.700">
+                <strong>Alertas em segundos</strong> - Receba notificação via Telegram assim que o anúncio for publicado
+              </Text>
+            </ListItem>
+
+            <ListItem display="flex" alignItems="flex-start" gap={3}>
+              <Text fontSize="2xl">📱</Text>
+              <Text fontSize="md" color="gray.700">
+                <strong>Todos os marketplaces</strong> - OLX, Mercado Livre, Facebook Marketplace, Webmotors e mais
+              </Text>
+            </ListItem>
+
+            <ListItem display="flex" alignItems="flex-start" gap={3}>
+              <Text fontSize="2xl">🎯</Text>
+              <Text fontSize="md" color="gray.700">
+                <strong>Filtros inteligentes</strong> - Monitore por cidade, faixa de preço, palavra-chave e muito mais
+              </Text>
+            </ListItem>
+
+            <ListItem display="flex" alignItems="flex-start" gap={3}>
+              <Text fontSize="2xl">💰</Text>
+              <Text fontSize="md" color="gray.700">
+                <strong>Aumente seu lucro</strong> - Chegue primeiro nos melhores negócios e negocie melhor
+              </Text>
+            </ListItem>
+
+            <ListItem display="flex" alignItems="flex-start" gap={3}>
+              <Text fontSize="2xl">✅</Text>
+              <Text fontSize="md" color="gray.700">
+                <strong>7 dias grátis</strong> - Teste sem compromisso. Cancele quando quiser
+              </Text>
+            </ListItem>
+
+            <ListItem display="flex" alignItems="flex-start" gap={3}>
+              <Text fontSize="2xl">🔒</Text>
+              <Text fontSize="md" color="gray.700">
+                <strong>Sem pegadinhas</strong> - Cancele pelo app, sem ligar pra ninguém
+              </Text>
+            </ListItem>
+          </List>
+        </Container>
+      </Box>
 
       {/* CTA Section */}
-      <section style={styles.cta}>
-        <h2 style={styles.ctaTitle}>Comece a vender mais hoje mesmo</h2>
-        <p style={styles.ctaSubtitle}>
-          Junte-se a centenas de vendedores que já usam o RadarOne para encontrar as melhores
-          oportunidades. <strong>7 dias grátis</strong>, sem pedir cartão de crédito.
-        </p>
-        <Link to="/register" style={styles.ctaButton}>
-          Criar conta grátis
-        </Link>
-      </section>
+      <Box
+        as="section"
+        bg="blue.500"
+        py={{ base: 12, md: 16 }}
+        px={{ base: 4, md: 6 }}
+        textAlign="center"
+      >
+        <Container maxW="container.md">
+          <Heading as="h2" size={{ base: 'lg', md: 'xl' }} color="white" mb={4}>
+            Comece a vender mais hoje mesmo
+          </Heading>
+          <Text fontSize={{ base: 'md', md: 'lg' }} color="whiteAlpha.900" mb={8} lineHeight="tall">
+            Junte-se a centenas de vendedores que já usam o RadarOne para encontrar as melhores
+            oportunidades. <strong>7 dias grátis</strong>, sem pedir cartão de crédito.
+          </Text>
+          <Button
+            as={RouterLink}
+            to="/register"
+            size="lg"
+            colorScheme="whiteAlpha"
+            bg="white"
+            color="blue.600"
+            _hover={{ bg: 'gray.50' }}
+            px={10}
+          >
+            Criar conta grátis
+          </Button>
+        </Container>
+      </Box>
 
       {/* Footer */}
-      <footer style={styles.footer}>
-        <p style={styles.footerText}>
-          © 2024 RadarOne. Todos os direitos reservados.
-        </p>
-      </footer>
-    </div>
+      <Box as="footer" bg="gray.900" py={8} px={{ base: 4, md: 6 }}>
+        <Container maxW="container.xl">
+          <Text fontSize="sm" color="gray.400" textAlign="center">
+            © 2025 RadarOne. Todos os direitos reservados.
+          </Text>
+        </Container>
+      </Box>
+    </Box>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-    width: '100%',
-  },
-  header: {
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '16px 0',
-  },
-  headerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 clamp(16px, 4vw, 20px)',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap' as const,
-    gap: '12px',
-  },
-  logo: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    margin: 0,
-  },
-  nav: {
-    display: 'flex',
-    gap: 'clamp(8px, 2vw, 16px)',
-    alignItems: 'center',
-    flexWrap: 'wrap' as const,
-  },
-  navLink: {
-    color: '#4b5563',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '500',
-  },
-  navLinkButton: {
-    color: '#fff',
-    backgroundColor: '#3b82f6',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '500',
-    padding: '8px 16px',
-    borderRadius: '6px',
-  },
-  hero: {
-    maxWidth: '800px',
-    margin: '0 auto',
-    padding: 'clamp(40px, 10vw, 80px) clamp(16px, 4vw, 20px)',
-    textAlign: 'center' as const,
-    width: '100%',
-    boxSizing: 'border-box' as const,
-  },
-  heroTitle: {
-    fontSize: 'clamp(28px, 6vw, 48px)', // Responsivo: 28px (mobile) até 48px (desktop)
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: '16px',
-    lineHeight: '1.2',
-  },
-  heroSubtitle: {
-    fontSize: 'clamp(16px, 3.5vw, 20px)', // Responsivo: 16px (mobile) até 20px (desktop)
-    color: '#6b7280',
-    marginBottom: '32px',
-    lineHeight: '1.6',
-  },
-  heroButtons: {
-    display: 'flex',
-    gap: '16px',
-    justifyContent: 'center',
-    flexWrap: 'wrap' as const,
-  },
-  primaryButton: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    padding: '14px 28px',
-    borderRadius: '8px',
-    textDecoration: 'none',
-    fontSize: '16px',
-    fontWeight: '600',
-    display: 'inline-block',
-  },
-  secondaryButton: {
-    backgroundColor: 'white',
-    color: '#3b82f6',
-    padding: '14px 28px',
-    borderRadius: '8px',
-    textDecoration: 'none',
-    fontSize: '16px',
-    fontWeight: '600',
-    display: 'inline-block',
-    border: '2px solid #3b82f6',
-  },
-  features: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: 'clamp(40px, 8vw, 60px) clamp(16px, 4vw, 20px)',
-    width: '100%',
-    boxSizing: 'border-box' as const,
-  },
-  sectionTitle: {
-    fontSize: 'clamp(24px, 5vw, 36px)', // Responsivo: 24px (mobile) até 36px (desktop)
-    fontWeight: 'bold',
-    color: '#1f2937',
-    textAlign: 'center' as const,
-    marginBottom: '48px',
-  },
-  featuresGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '32px',
-  },
-  featureCard: {
-    backgroundColor: 'white',
-    padding: '32px',
-    borderRadius: '12px',
-    textAlign: 'center' as const,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  },
-  featureIcon: {
-    fontSize: '48px',
-    marginBottom: '16px',
-  },
-  featureTitle: {
-    fontSize: '20px',
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: '12px',
-  },
-  featureText: {
-    fontSize: '14px',
-    color: '#6b7280',
-    lineHeight: '1.6',
-  },
-  benefits: {
-    maxWidth: '800px',
-    margin: '0 auto',
-    padding: 'clamp(40px, 8vw, 60px) clamp(16px, 4vw, 20px)',
-    width: '100%',
-    boxSizing: 'border-box' as const,
-  },
-  benefitsList: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '16px',
-  },
-  benefitItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    fontSize: '16px',
-    color: '#374151',
-  },
-  benefitIcon: {
-    fontSize: '20px',
-  },
-  cta: {
-    backgroundColor: '#3b82f6',
-    padding: 'clamp(50px, 10vw, 80px) clamp(16px, 4vw, 20px)',
-    textAlign: 'center' as const,
-    width: '100%',
-    boxSizing: 'border-box' as const,
-  },
-  ctaTitle: {
-    fontSize: 'clamp(24px, 5vw, 36px)', // Responsivo
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: '16px',
-  },
-  ctaSubtitle: {
-    fontSize: 'clamp(16px, 3vw, 18px)',
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: '32px',
-    maxWidth: '600px',
-    margin: '0 auto 32px auto',
-  },
-  ctaButton: {
-    backgroundColor: 'white',
-    color: '#3b82f6',
-    padding: '16px 32px',
-    borderRadius: '8px',
-    textDecoration: 'none',
-    fontSize: '18px',
-    fontWeight: '600',
-    display: 'inline-block',
-  },
-  footer: {
-    backgroundColor: '#1f2937',
-    padding: '32px 20px',
-    textAlign: 'center' as const,
-  },
-  footerText: {
-    color: '#9ca3af',
-    fontSize: '14px',
-    margin: 0,
-  },
 };
