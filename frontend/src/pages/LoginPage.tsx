@@ -53,8 +53,14 @@ export function LoginPage() {
       showSuccess('Login realizado com sucesso!');
       trackLogin('email');
 
-      // Redirecionar imediatamente (não usar setTimeout)
-      navigate('/monitors', { replace: true });
+      // Redirecionar para returnUrl (se salvo) ou /dashboard
+      const returnUrl = sessionStorage.getItem('returnUrl');
+      if (returnUrl) {
+        sessionStorage.removeItem('returnUrl');
+        navigate(returnUrl, { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     } catch (err: any) {
       const errorMessage = err.message || 'Erro ao fazer login';
       setError(errorMessage);
