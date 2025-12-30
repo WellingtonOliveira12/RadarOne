@@ -8,7 +8,6 @@ import {
   Button,
   SimpleGrid,
   VStack,
-  HStack,
   Badge,
   Progress,
   Alert,
@@ -16,7 +15,7 @@ import {
   AlertDescription,
   Link,
   Spinner,
-  useToast,
+  Flex,
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
@@ -49,7 +48,6 @@ interface UserStats {
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const toast = useToast();
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [stats, setStats] = useState<UserStats>({ monitorsCount: 0, sitesCount: 0 });

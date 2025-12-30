@@ -12,12 +12,9 @@ import {
   VStack,
   HStack,
   Link,
-  Icon,
   List,
   ListItem,
-  ListIcon,
 } from '@chakra-ui/react';
-import { CheckCircleIcon } from '@chakra-ui/icons';
 
 /**
  * Landing Page - Página inicial pública do RadarOne
