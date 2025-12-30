@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import { RequireSubscriptionRoute } from './components/RequireSubscriptionRoute';
 import { AdminProtectedRoute } from './components/AdminProtectedRoute';
 import { initAnalytics, trackPageView } from './lib/analytics';
 
@@ -68,53 +68,53 @@ export function AppRouter() {
           <Route path="/faq" element={<FAQPage />} />
           <Route path="/contact" element={<ContactPage />} />
 
-          {/* Rotas protegidas */}
+          {/* Rotas protegidas (requerem autenticação + subscription válida) */}
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <RequireSubscriptionRoute>
                 <DashboardPage />
-              </ProtectedRoute>
+              </RequireSubscriptionRoute>
             }
           />
           <Route
             path="/monitors"
             element={
-              <ProtectedRoute>
+              <RequireSubscriptionRoute>
                 <MonitorsPage />
-              </ProtectedRoute>
+              </RequireSubscriptionRoute>
             }
           />
           <Route
             path="/settings/notifications"
             element={
-              <ProtectedRoute>
+              <RequireSubscriptionRoute>
                 <NotificationSettingsPage />
-              </ProtectedRoute>
+              </RequireSubscriptionRoute>
             }
           />
           <Route
             path="/notifications"
             element={
-              <ProtectedRoute>
+              <RequireSubscriptionRoute>
                 <NotificationHistoryPage />
-              </ProtectedRoute>
+              </RequireSubscriptionRoute>
             }
           />
           <Route
             path="/settings/subscription"
             element={
-              <ProtectedRoute>
+              <RequireSubscriptionRoute>
                 <SubscriptionSettingsPage />
-              </ProtectedRoute>
+              </RequireSubscriptionRoute>
             }
           />
           <Route
             path="/telegram/connect"
             element={
-              <ProtectedRoute>
+              <RequireSubscriptionRoute>
                 <TelegramConnectionPage />
-              </ProtectedRoute>
+              </RequireSubscriptionRoute>
             }
           />
 
