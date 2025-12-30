@@ -5,6 +5,7 @@ import { trackViewPlans, trackSelectPlan, trackTrialExpiredToastShown } from '..
 import { showInfo } from '../lib/toast';
 import { getABMessage, trackABVariantShown } from '../lib/abtest';
 import { getToken } from '../services/tokenStorage';
+import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 import * as responsive from '../styles/responsive';
 
 /**
@@ -174,6 +175,15 @@ export const PlansPage: React.FC = () => {
         )}
 
         {error && <div style={styles.error}>{error}</div>}
+
+        {/* Banner fixo informando motivo do bloqueio (se houver) */}
+        {reason && (
+          <div style={styles.reasonBannerFixed}>
+            <p style={styles.reasonBannerText}>
+              ⚠️ {getSubscriptionMessage(reason)}
+            </p>
+          </div>
+        )}
 
         <div style={styles.plansGrid}>
           {plans.map((plan) => (
@@ -419,6 +429,22 @@ const styles = {
     textAlign: 'center' as const,
   },
   trialExpiredText: {
+    fontSize: responsive.typography.body.fontSize,
+    fontWeight: '600' as const,
+    color: '#92400e',
+    margin: 0,
+  },
+  // Banner fixo para mostrar motivo do bloqueio (reason da URL)
+  reasonBannerFixed: {
+    backgroundColor: '#fef3c7',
+    border: '2px solid #f59e0b',
+    borderRadius: '8px',
+    padding: responsive.spacing.md,
+    marginBottom: responsive.spacing.lg,
+    textAlign: 'center' as const,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  reasonBannerText: {
     fontSize: responsive.typography.body.fontSize,
     fontWeight: '600' as const,
     color: '#92400e',
