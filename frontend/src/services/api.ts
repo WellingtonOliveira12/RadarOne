@@ -13,19 +13,45 @@ export interface RequestOptions {
 }
 
 /**
- * Trata erro de trial expirado redirecionando para /plans
+ * Estrutura padronizada de erro da API
+ * Backend SEMPRE retorna { errorCode, message, details? }
+ */
+export interface ApiError {
+  errorCode: string;
+  message: string;
+  details?: any;
+}
+
+/**
+ * Trata erros de subscription/trial redirecionando para /plans
+ * SEM deslogar o usuário
  * Evita loop se já estiver em /plans
  */
-function handleTrialExpiredError(errorCode?: string, status?: number): void {
-  if (status === 403 && errorCode === 'TRIAL_EXPIRED') {
+function handleSubscriptionError(errorCode?: string, status?: number): void {
+  if (status === 403 && (errorCode === 'TRIAL_EXPIRED' || errorCode === 'SUBSCRIPTION_REQUIRED')) {
     // Evitar loop: não redirecionar se já estiver em /plans
     if (window.location.pathname !== '/plans') {
       // Track redirecionamento para analytics
-      trackRedirectToPlans('trial_expired');
+      trackRedirectToPlans(errorCode === 'TRIAL_EXPIRED' ? 'trial_expired' : 'subscription_required');
 
-      window.location.href = '/plans?reason=trial_expired';
+      window.location.href = '/plans?reason=' + (errorCode === 'TRIAL_EXPIRED' ? 'trial_expired' : 'subscription_required');
     }
   }
+}
+
+/**
+ * Extrai errorCode de forma segura do response
+ * Backend padronizado sempre retorna ApiError
+ */
+function getErrorCode(data: any): string | undefined {
+  // Priorizar errorCode (padrão novo)
+  if (data?.errorCode) {
+    return data.errorCode;
+  }
+
+  // Fallback temporário para formato antigo { error } durante migração
+  // REMOVER após todos endpoints migrarem
+  return undefined;
 }
 
 async function apiRequest<T = any>(
@@ -60,26 +86,41 @@ async function apiRequest<T = any>(
   }
 
   if (!res.ok) {
+    // Backend padronizado: { errorCode, message, details? }
+    // Fallback: { error, message } (formato antigo durante migração)
     const msg =
-      (data && (data.error || data.message)) ||
+      (data && (data.message || data.error)) ||
       `Erro na requisição (${res.status})`;
 
-    // Tratar erro de trial expirado
-    const errorCode = data && data.errorCode;
-    handleTrialExpiredError(errorCode, res.status);
+    const errorCode = getErrorCode(data);
 
-    // Tratar token inválido ou expirado (401/403)
-    if (res.status === 401 || (res.status === 403 && msg.toLowerCase().includes('token'))) {
+    // ============================================
+    // REGRA DETERMINÍSTICA (SEM HEURÍSTICA)
+    // 100% baseada em (status + errorCode)
+    // ============================================
+
+    // 1. Tratar erros de subscription/trial (403) - NÃO DESLOGA
+    handleSubscriptionError(errorCode, res.status);
+
+    // 2. Tratar erros de autenticação (401) - DESLOGA
+    // REGRA DETERMINÍSTICA: 401 E (!errorCode OU errorCode === 'INVALID_TOKEN')
+    // Garante que logout só ocorre em erros 401 válidos
+    const isAuthError =
+      res.status === 401 &&
+      (!errorCode || errorCode === 'INVALID_TOKEN');
+
+    if (isAuthError) {
       clearToken();
       if (window.location.pathname !== '/login') {
         window.location.href = '/login?reason=session_expired';
       }
     }
 
-    // Criar erro com informações adicionais
+    // 3. Criar erro tipado para propagação
     const error: any = new Error(msg);
     error.status = res.status;
     error.errorCode = errorCode;
+    error.message = msg;
     error.data = data;
     error.response = { status: res.status, data };
 
