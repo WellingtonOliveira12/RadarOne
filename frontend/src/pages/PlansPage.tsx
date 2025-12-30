@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { trackViewPlans, trackSelectPlan, trackTrialExpiredToastShown } from '../lib/analytics';
 import { showInfo } from '../lib/toast';
 import { getABMessage, trackABVariantShown } from '../lib/abtest';
 import { getToken } from '../services/tokenStorage';
 import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
+import { PublicLayout } from '../components/PublicLayout';
 import * as responsive from '../styles/responsive';
 
 /**
@@ -127,46 +128,14 @@ export const PlansPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={styles.container}>
+      <PublicLayout maxWidth="container.xl">
         <p>Carregando planos...</p>
-      </div>
+      </PublicLayout>
     );
   }
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <Link to="/" style={styles.logoContainer}>
-            <img
-              src="/brand/radarone-logo.png"
-              alt="RadarOne Logo"
-              style={styles.logoImage}
-              onError={(e) => {
-                // Fallback caso logo não carregue
-                e.currentTarget.style.display = 'none';
-              }}
-            />
-            <span style={styles.logoText}>RadarOne</span>
-          </Link>
-          {user ? (
-            <Link to="/dashboard" style={styles.navLink}>
-              Dashboard
-            </Link>
-          ) : (
-            <div style={styles.nav}>
-              <Link to="/login" style={styles.navLink}>
-                Entrar
-              </Link>
-              <Link to="/register" style={styles.navLinkButton}>
-                Criar conta
-              </Link>
-            </div>
-          )}
-        </div>
-      </header>
-
+    <PublicLayout maxWidth="container.xl" showNav={!user}>
       {/* Plans Section */}
       <section style={styles.plansSection}>
         <h1 style={styles.title}>Escolha o plano ideal para você</h1>
@@ -272,59 +241,11 @@ export const PlansPage: React.FC = () => {
           </p>
         </div>
       </section>
-    </div>
+    </PublicLayout>
   );
 };
 
 const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    padding: responsive.spacing.md,
-  },
-  headerContent: {
-    ...responsive.container,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap' as const,
-    gap: responsive.spacing.sm,
-  },
-  logoContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: responsive.spacing.xs,
-    textDecoration: 'none',
-  },
-  logoImage: {
-    height: 'clamp(32px, 5vw, 40px)',
-    width: 'auto',
-    objectFit: 'contain' as const,
-  },
-  logoText: {
-    ...responsive.typography.h2,
-    margin: 0,
-  },
-  logo: {
-    ...responsive.typography.h2,
-    textDecoration: 'none',
-  },
-  nav: {
-    ...responsive.flexRow,
-  },
-  navLink: {
-    color: '#4b5563',
-    textDecoration: 'none',
-    fontSize: responsive.typography.body.fontSize,
-    fontWeight: '500' as const,
-  },
-  navLinkButton: {
-    ...responsive.buttonPrimary,
-  },
   plansSection: {
     ...responsive.container,
     padding: `${responsive.spacing.xxl} ${responsive.spacing.md}`,
