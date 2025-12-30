@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { AppLayout } from '../components/AppLayout';
+import { PublicLayout } from '../components/PublicLayout';
 
 export const ContactPage: React.FC = () => {
   const { user } = useAuth();
@@ -47,7 +47,7 @@ export const ContactPage: React.FC = () => {
 
   if (success) {
     return (
-      <AppLayout>
+      <PublicLayout maxWidth="container.md">
         <div style={styles.container}>
           <div style={styles.successCard}>
             <div style={styles.successIcon}>✅</div>
@@ -63,18 +63,18 @@ export const ContactPage: React.FC = () => {
               >
                 Enviar outra mensagem
               </button>
-              <Link to="/dashboard" style={styles.secondaryButton}>
-                Voltar ao Dashboard
+              <Link to="/" style={styles.secondaryButton}>
+                Voltar à página inicial
               </Link>
             </div>
           </div>
         </div>
-      </AppLayout>
+      </PublicLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <PublicLayout maxWidth="container.md">
       <div style={styles.container}>
         <h1 style={styles.title}>Fale Conosco</h1>
         <p style={styles.subtitle}>
@@ -196,7 +196,7 @@ export const ContactPage: React.FC = () => {
           </p>
         </div>
       </div>
-    </AppLayout>
+    </PublicLayout>
   );
 };
 

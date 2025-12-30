@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AppLayout } from '../components/AppLayout';
+import { PublicLayout } from '../components/PublicLayout';
 import { TELEGRAM_BOT_USERNAME } from '../constants/app';
 
 export const ManualPage: React.FC = () => {
   return (
-    <AppLayout>
+    <PublicLayout maxWidth="container.xl">
       <div style={styles.container}>
         <h1 style={styles.title}>Manual do RadarOne</h1>
         <p style={styles.subtitle}>
@@ -187,7 +187,7 @@ export const ManualPage: React.FC = () => {
           </ul>
         </section>
       </div>
-    </AppLayout>
+    </PublicLayout>
   );
 };
 

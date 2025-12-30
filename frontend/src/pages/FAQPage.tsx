@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AppLayout } from '../components/AppLayout';
+import { PublicLayout } from '../components/PublicLayout';
 import { TELEGRAM_BOT_USERNAME } from '../constants/app';
 
 interface FAQItem {
@@ -184,7 +184,7 @@ export const FAQPage: React.FC = () => {
   const categories = Array.from(new Set(faqs.map((faq) => faq.category)));
 
   return (
-    <AppLayout>
+    <PublicLayout maxWidth="container.xl">
       <div style={styles.container}>
         <h1 style={styles.title}>Perguntas Frequentes (FAQ)</h1>
         <p style={styles.subtitle}>
@@ -231,7 +231,7 @@ export const FAQPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
+    </PublicLayout>
   );
 };
 
