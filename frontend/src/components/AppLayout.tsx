@@ -27,6 +27,7 @@ import {
 import { HamburgerIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import { useAuth } from '../context/AuthContext';
 import { APP_VERSION } from '../constants/app';
+import { getSubscriptionStatus } from '../utils/subscriptionHelpers';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -38,8 +39,12 @@ interface AppLayoutProps {
  * Refatorado com Chakra UI para responsividade nativa
  */
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const { isOpen, onOpen, onClose } = useDisclosure();
+
+  // Verificar se user tem subscription válida (para mostrar/esconder links internos)
+  const subscriptionStatus = getSubscriptionStatus(user);
+  const hasValidSubscription = subscriptionStatus.hasValidSubscription;
 
   return (
     <Flex direction="column" minH="100vh" bg="gray.50">
@@ -75,20 +80,32 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
             {/* Desktop Navigation */}
             <HStack spacing={4} display={{ base: 'none', md: 'flex' }}>
-              <Link as={RouterLink} to="/dashboard" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
-                Dashboard
-              </Link>
-              <Link as={RouterLink} to="/monitors" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
-                Monitores
-              </Link>
-              <Link as={RouterLink} to="/telegram/connect" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
-                Telegram
-              </Link>
-              <Link as={RouterLink} to="/settings/notifications" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
-                Configurações
-              </Link>
+              {/* Links internos (só aparecem com subscription válida) */}
+              {hasValidSubscription && (
+                <>
+                  <Link as={RouterLink} to="/dashboard" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
+                    Dashboard
+                  </Link>
+                  <Link as={RouterLink} to="/monitors" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
+                    Monitores
+                  </Link>
+                  <Link as={RouterLink} to="/telegram/connect" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
+                    Telegram
+                  </Link>
+                  <Link as={RouterLink} to="/settings/notifications" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
+                    Configurações
+                  </Link>
+                </>
+              )}
 
-              {/* Help Menu */}
+              {/* Link para Planos (aparece se subscription inválida) */}
+              {!hasValidSubscription && (
+                <Link as={RouterLink} to="/plans" fontWeight="medium" color="blue.600" _hover={{ color: 'blue.700' }}>
+                  Ver Planos
+                </Link>
+              )}
+
+              {/* Help Menu (sempre visível) */}
               <Menu>
                 <MenuButton
                   as={Button}
@@ -138,18 +155,32 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           <DrawerHeader>Menu</DrawerHeader>
           <DrawerBody>
             <VStack align="stretch" spacing={4}>
-              <Link as={RouterLink} to="/dashboard" onClick={onClose} fontWeight="medium">
-                Dashboard
-              </Link>
-              <Link as={RouterLink} to="/monitors" onClick={onClose} fontWeight="medium">
-                Monitores
-              </Link>
-              <Link as={RouterLink} to="/telegram/connect" onClick={onClose} fontWeight="medium">
-                Telegram
-              </Link>
-              <Link as={RouterLink} to="/settings/notifications" onClick={onClose} fontWeight="medium">
-                Configurações
-              </Link>
+              {/* Links internos (só aparecem com subscription válida) */}
+              {hasValidSubscription && (
+                <>
+                  <Link as={RouterLink} to="/dashboard" onClick={onClose} fontWeight="medium">
+                    Dashboard
+                  </Link>
+                  <Link as={RouterLink} to="/monitors" onClick={onClose} fontWeight="medium">
+                    Monitores
+                  </Link>
+                  <Link as={RouterLink} to="/telegram/connect" onClick={onClose} fontWeight="medium">
+                    Telegram
+                  </Link>
+                  <Link as={RouterLink} to="/settings/notifications" onClick={onClose} fontWeight="medium">
+                    Configurações
+                  </Link>
+                </>
+              )}
+
+              {/* Link para Planos (aparece se subscription inválida) */}
+              {!hasValidSubscription && (
+                <Link as={RouterLink} to="/plans" onClick={onClose} fontWeight="medium" color="blue.600">
+                  Ver Planos
+                </Link>
+              )}
+
+              {/* Links de ajuda (sempre visíveis) */}
               <Link as={RouterLink} to="/manual" onClick={onClose} fontWeight="medium">
                 📖 Manual
               </Link>
@@ -159,6 +190,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <Link as={RouterLink} to="/contact" onClick={onClose} fontWeight="medium">
                 💬 Fale Conosco
               </Link>
+
               <Button onClick={() => { logout(); onClose(); }} colorScheme="red" mt={4}>
                 Sair
               </Button>
