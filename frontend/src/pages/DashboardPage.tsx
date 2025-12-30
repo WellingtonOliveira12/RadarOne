@@ -1,12 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
+import {
+  Box,
+  Container,
+  Heading,
+  Text,
+  Button,
+  SimpleGrid,
+  VStack,
+  HStack,
+  Badge,
+  Progress,
+  Alert,
+  AlertIcon,
+  AlertDescription,
+  Link,
+  Spinner,
+  useToast,
+} from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
-import * as responsive from '../styles/responsive';
 
 /**
  * Dashboard - Página principal após login
+ * Refatorada com Chakra UI para consistência visual
  */
 
 interface Subscription {
@@ -31,6 +49,7 @@ interface UserStats {
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
+  const toast = useToast();
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [stats, setStats] = useState<UserStats>({ monitorsCount: 0, sitesCount: 0 });
@@ -43,7 +62,6 @@ export const DashboardPage: React.FC = () => {
 
   const loadDashboardData = async () => {
     try {
-      // Usar client API que lida com token automaticamente
       const subData = await api.get('/api/subscriptions/my');
 
       setSubscription({
@@ -55,13 +73,11 @@ export const DashboardPage: React.FC = () => {
         plan: subData.subscription.plan
       });
 
-      // Usar os dados de usage retornados pela API
       setStats({
         monitorsCount: subData.usage.monitorsCreated,
-        sitesCount: 0 // API não retorna sitesCount ainda
+        sitesCount: 0
       });
     } catch (err: any) {
-      // Diagnóstico melhorado em DEV
       const isDev = import.meta.env.DEV;
       if (isDev) {
         console.error('Dashboard: Erro ao carregar dados', {
@@ -92,37 +108,31 @@ export const DashboardPage: React.FC = () => {
   const getStatusBadge = () => {
     if (!subscription) return null;
 
-    const statusColors: Record<string, { bg: string; text: string; label: string }> = {
-      TRIAL: { bg: '#dbeafe', text: '#1e40af', label: '🎁 Período de teste' },
-      ACTIVE: { bg: '#d1fae5', text: '#065f46', label: '✅ Ativo' },
-      PAST_DUE: { bg: '#fed7aa', text: '#92400e', label: '⚠️ Pagamento pendente' },
-      CANCELLED: { bg: '#f3f4f6', text: '#4b5563', label: '❌ Cancelado' },
-      EXPIRED: { bg: '#fee2e2', text: '#991b1b', label: '❌ Expirado' },
-      SUSPENDED: { bg: '#fee2e2', text: '#991b1b', label: '🚫 Suspenso' },
+    const statusConfig: Record<string, { colorScheme: string; label: string }> = {
+      TRIAL: { colorScheme: 'blue', label: '🎁 Período de teste' },
+      ACTIVE: { colorScheme: 'green', label: '✅ Ativo' },
+      PAST_DUE: { colorScheme: 'orange', label: '⚠️ Pagamento pendente' },
+      CANCELLED: { colorScheme: 'gray', label: '❌ Cancelado' },
+      EXPIRED: { colorScheme: 'red', label: '❌ Expirado' },
+      SUSPENDED: { colorScheme: 'red', label: '🚫 Suspenso' },
     };
 
-    const statusStyle = statusColors[subscription.status] || statusColors.ACTIVE;
+    const config = statusConfig[subscription.status] || statusConfig.ACTIVE;
 
     return (
-      <span
-        style={{
-          backgroundColor: statusStyle.bg,
-          color: statusStyle.text,
-          padding: '4px 12px',
-          borderRadius: '6px',
-          fontSize: '13px',
-          fontWeight: '600',
-        }}
-      >
-        {statusStyle.label}
-      </span>
+      <Badge colorScheme={config.colorScheme} fontSize="sm" px={3} py={1} borderRadius="md">
+        {config.label}
+      </Badge>
     );
   };
 
   if (loading) {
     return (
       <AppLayout>
-        <p>Carregando...</p>
+        <Container maxW="container.xl" centerContent py={20}>
+          <Spinner size="xl" color="blue.500" thickness="4px" />
+          <Text mt={4} color="gray.600">Carregando...</Text>
+        </Container>
       </AppLayout>
     );
   }
@@ -132,310 +142,248 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <AppLayout>
+      <Container maxW="container.xl" py={{ base: 6, md: 10 }}>
         {/* Welcome Section */}
-        <section style={styles.welcomeSection}>
-          <h1 style={styles.welcomeTitle}>Olá, {user?.name || 'Usuário'}! 👋</h1>
-          <p style={styles.welcomeSubtitle}>
-            Bem-vindo ao seu painel de controle do RadarOne
-          </p>
-        </section>
+        <VStack align="stretch" spacing={6}>
+          <Box>
+            <Heading as="h1" size={{ base: 'lg', md: 'xl' }} color="gray.800" mb={2}>
+              Olá, {user?.name || 'Usuário'}! 👋
+            </Heading>
+            <Text fontSize={{ base: 'sm', md: 'md' }} color="gray.600">
+              Bem-vindo ao seu painel de controle do RadarOne
+            </Text>
+          </Box>
 
-        {error && (
-          <div style={styles.error}>
-            {error}
-            <button
-              onClick={() => {
-                setError('');
-                loadDashboardData();
-              }}
-              style={styles.retryButton}
-            >
-              Tentar novamente
-            </button>
-          </div>
-        )}
-
-        {/* Subscription Card */}
-        {subscription && (
-          <section style={styles.subscriptionCard}>
-            <div style={styles.cardHeader}>
-              <div>
-                <h2 style={styles.cardTitle}>Seu Plano</h2>
-                <p style={styles.planName}>{subscription.plan.name}</p>
-              </div>
-              <div>{getStatusBadge()}</div>
-            </div>
-
-            {subscription.isTrial && (
-              <div style={styles.trialInfo}>
-                <p style={styles.trialText}>
-                  ⏰ Seu período de teste termina em <strong>{daysLeft} dias</strong>
-                </p>
-              </div>
-            )}
-
-            {showExpiryWarning && (
-              <div style={styles.warningBox}>
-                <p style={styles.warningText}>
-                  ⚠️ Seu plano está para expirar! Clique aqui para renovar ou fazer
-                  upgrade.
-                </p>
-                <Link to="/settings/subscription" style={styles.warningButton}>
-                  Gerenciar assinatura
-                </Link>
-              </div>
-            )}
-
-            <div style={styles.limitsGrid}>
-              <div style={styles.limitCard}>
-                <div style={styles.limitValue}>
-                  {stats.monitorsCount} / {subscription.plan.maxMonitors}
-                </div>
-                <div style={styles.limitLabel}>Monitores</div>
-                <div style={styles.progressBar}>
-                  <div
-                    style={{
-                      ...styles.progressFill,
-                      width: `${(stats.monitorsCount / subscription.plan.maxMonitors) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={styles.limitCard}>
-                <div style={styles.limitValue}>
-                  {stats.sitesCount} / {subscription.plan.maxSites}
-                </div>
-                <div style={styles.limitLabel}>Sites diferentes</div>
-                <div style={styles.progressBar}>
-                  <div
-                    style={{
-                      ...styles.progressFill,
-                      width: `${(stats.sitesCount / subscription.plan.maxSites) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={styles.limitCard}>
-                <div style={styles.limitValue}>{subscription.plan.maxAlertsPerDay}</div>
-                <div style={styles.limitLabel}>Alertas/dia</div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Actions Grid */}
-        <section style={styles.actionsGrid}>
-          <Link to="/monitors" style={styles.actionCard}>
-            <div style={styles.actionIcon}>🔍</div>
-            <h3 style={styles.actionTitle}>Gerenciar Monitores</h3>
-            <p style={styles.actionDescription}>
-              Criar, editar ou excluir seus monitores de anúncios
-            </p>
-          </Link>
-
-          <Link to="/settings/notifications" style={styles.actionCard}>
-            <div style={styles.actionIcon}>🔔</div>
-            <h3 style={styles.actionTitle}>Configurar Notificações</h3>
-            <p style={styles.actionDescription}>
-              Escolha entre Telegram ou e-mail para receber alertas
-            </p>
-          </Link>
-
-          <Link to="/settings/subscription" style={styles.actionCard}>
-            <div style={styles.actionIcon}>💳</div>
-            <h3 style={styles.actionTitle}>Gerenciar Assinatura</h3>
-            <p style={styles.actionDescription}>
-              Ver plano atual, fazer upgrade ou cancelar
-            </p>
-          </Link>
-
-          <Link to="/manual" style={styles.actionCard}>
-            <div style={styles.actionIcon}>📖</div>
-            <h3 style={styles.actionTitle}>Ajuda e Suporte</h3>
-            <p style={styles.actionDescription}>
-              Manual, FAQ e contato para tirar suas dúvidas
-            </p>
-          </Link>
-        </section>
-
-        {/* Usage Warning */}
-        {subscription &&
-          stats.monitorsCount >= subscription.plan.maxMonitors * 0.8 && (
-            <div style={styles.usageWarning}>
-              <p style={styles.usageWarningText}>
-                📊 Você está usando{' '}
-                {Math.round(
-                  (stats.monitorsCount / subscription.plan.maxMonitors) * 100
-                )}
-                % dos seus monitores. Considere fazer upgrade para adicionar mais.
-              </p>
-              <Link to="/plans" style={styles.usageWarningButton}>
-                Ver planos
-              </Link>
-            </div>
+          {/* Error Alert */}
+          {error && (
+            <Alert status="error" borderRadius="lg">
+              <AlertIcon />
+              <AlertDescription flex={1}>{error}</AlertDescription>
+              <Button size="sm" onClick={() => { setError(''); loadDashboardData(); }}>
+                Tentar novamente
+              </Button>
+            </Alert>
           )}
+
+          {/* Subscription Card */}
+          {subscription && (
+            <Box
+              bg="white"
+              p={{ base: 6, md: 8 }}
+              borderRadius="xl"
+              boxShadow="md"
+            >
+              <Flex justify="space-between" align="flex-start" mb={6} flexWrap="wrap" gap={3}>
+                <Box>
+                  <Text fontSize="sm" color="gray.600" mb={1}>
+                    Seu Plano
+                  </Text>
+                  <Heading as="h2" size="lg" color="gray.800">
+                    {subscription.plan.name}
+                  </Heading>
+                </Box>
+                {getStatusBadge()}
+              </Flex>
+
+              {/* Trial Info */}
+              {subscription.isTrial && (
+                <Alert status="info" borderRadius="md" mb={4}>
+                  <AlertIcon />
+                  <AlertDescription>
+                    ⏰ Seu período de teste termina em <strong>{daysLeft} dias</strong>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Expiry Warning */}
+              {showExpiryWarning && (
+                <Alert status="warning" borderRadius="md" mb={4}>
+                  <AlertIcon />
+                  <AlertDescription flex={1}>
+                    ⚠️ Seu plano está para expirar! Clique aqui para renovar ou fazer upgrade.
+                  </AlertDescription>
+                  <Button
+                    as={RouterLink}
+                    to="/settings/subscription"
+                    size="sm"
+                    colorScheme="orange"
+                    ml={2}
+                  >
+                    Gerenciar assinatura
+                  </Button>
+                </Alert>
+              )}
+
+              {/* Limits Grid */}
+              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
+                {/* Monitores */}
+                <Box textAlign="center">
+                  <Text fontSize="3xl" fontWeight="bold" color="gray.800" mb={1}>
+                    {subscription.plan.maxMonitors === 999
+                      ? `${stats.monitorsCount} (Ilimitado)`
+                      : `${stats.monitorsCount} / ${subscription.plan.maxMonitors}`}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Monitores
+                  </Text>
+                  {subscription.plan.maxMonitors !== 999 && (
+                    <Progress
+                      value={(stats.monitorsCount / subscription.plan.maxMonitors) * 100}
+                      colorScheme="blue"
+                      size="sm"
+                      borderRadius="full"
+                    />
+                  )}
+                </Box>
+
+                {/* Sites */}
+                <Box textAlign="center">
+                  <Text fontSize="3xl" fontWeight="bold" color="gray.800" mb={1}>
+                    {subscription.plan.maxSites === 999
+                      ? `${stats.sitesCount} (Ilimitado)`
+                      : `${stats.sitesCount} / ${subscription.plan.maxSites}`}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Sites diferentes
+                  </Text>
+                  {subscription.plan.maxSites !== 999 && (
+                    <Progress
+                      value={(stats.sitesCount / subscription.plan.maxSites) * 100}
+                      colorScheme="blue"
+                      size="sm"
+                      borderRadius="full"
+                    />
+                  )}
+                </Box>
+
+                {/* Alertas */}
+                <Box textAlign="center">
+                  <Text fontSize="3xl" fontWeight="bold" color="gray.800" mb={1}>
+                    {subscription.plan.maxAlertsPerDay === 999 ? 'Ilimitado' : subscription.plan.maxAlertsPerDay}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600">
+                    Alertas/dia
+                  </Text>
+                </Box>
+              </SimpleGrid>
+            </Box>
+          )}
+
+          {/* Actions Grid */}
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
+            {/* Monitor Action */}
+            <Link as={RouterLink} to="/monitors" _hover={{ textDecoration: 'none' }}>
+              <Box
+                bg="white"
+                p={6}
+                borderRadius="xl"
+                boxShadow="md"
+                textAlign="center"
+                _hover={{ boxShadow: 'lg', transform: 'translateY(-2px)' }}
+                transition="all 0.2s"
+                h="full"
+              >
+                <Text fontSize="4xl" mb={3}>🔍</Text>
+                <Heading as="h3" size="sm" mb={2} color="gray.800">
+                  Gerenciar Monitores
+                </Heading>
+                <Text fontSize="sm" color="gray.600">
+                  Criar, editar ou excluir seus monitores de anúncios
+                </Text>
+              </Box>
+            </Link>
+
+            {/* Notifications Action */}
+            <Link as={RouterLink} to="/settings/notifications" _hover={{ textDecoration: 'none' }}>
+              <Box
+                bg="white"
+                p={6}
+                borderRadius="xl"
+                boxShadow="md"
+                textAlign="center"
+                _hover={{ boxShadow: 'lg', transform: 'translateY(-2px)' }}
+                transition="all 0.2s"
+                h="full"
+              >
+                <Text fontSize="4xl" mb={3}>🔔</Text>
+                <Heading as="h3" size="sm" mb={2} color="gray.800">
+                  Configurar Notificações
+                </Heading>
+                <Text fontSize="sm" color="gray.600">
+                  Escolha entre Telegram ou e-mail para receber alertas
+                </Text>
+              </Box>
+            </Link>
+
+            {/* Subscription Action */}
+            <Link as={RouterLink} to="/settings/subscription" _hover={{ textDecoration: 'none' }}>
+              <Box
+                bg="white"
+                p={6}
+                borderRadius="xl"
+                boxShadow="md"
+                textAlign="center"
+                _hover={{ boxShadow: 'lg', transform: 'translateY(-2px)' }}
+                transition="all 0.2s"
+                h="full"
+              >
+                <Text fontSize="4xl" mb={3}>💳</Text>
+                <Heading as="h3" size="sm" mb={2} color="gray.800">
+                  Gerenciar Assinatura
+                </Heading>
+                <Text fontSize="sm" color="gray.600">
+                  Ver plano atual, fazer upgrade ou cancelar
+                </Text>
+              </Box>
+            </Link>
+
+            {/* Help Action */}
+            <Link as={RouterLink} to="/manual" _hover={{ textDecoration: 'none' }}>
+              <Box
+                bg="white"
+                p={6}
+                borderRadius="xl"
+                boxShadow="md"
+                textAlign="center"
+                _hover={{ boxShadow: 'lg', transform: 'translateY(-2px)' }}
+                transition="all 0.2s"
+                h="full"
+              >
+                <Text fontSize="4xl" mb={3}>📖</Text>
+                <Heading as="h3" size="sm" mb={2} color="gray.800">
+                  Ajuda e Suporte
+                </Heading>
+                <Text fontSize="sm" color="gray.600">
+                  Manual, FAQ e contato para tirar suas dúvidas
+                </Text>
+              </Box>
+            </Link>
+          </SimpleGrid>
+
+          {/* Usage Warning */}
+          {subscription &&
+            subscription.plan.maxMonitors !== 999 &&
+            stats.monitorsCount >= subscription.plan.maxMonitors * 0.8 && (
+              <Alert status="warning" borderRadius="lg">
+                <AlertIcon />
+                <AlertDescription flex={1}>
+                  📊 Você está usando{' '}
+                  {Math.round((stats.monitorsCount / subscription.plan.maxMonitors) * 100)}
+                  % dos seus monitores. Considere fazer upgrade para adicionar mais.
+                </AlertDescription>
+                <Button
+                  as={RouterLink}
+                  to="/plans"
+                  size="sm"
+                  colorScheme="yellow"
+                  ml={2}
+                >
+                  Ver planos
+                </Button>
+              </Alert>
+            )}
+        </VStack>
+      </Container>
     </AppLayout>
   );
-};
-
-const styles = {
-  welcomeSection: {
-    marginBottom: responsive.spacing.lg,
-  },
-  welcomeTitle: {
-    ...responsive.typography.h1,
-    marginBottom: responsive.spacing.xs,
-  },
-  welcomeSubtitle: {
-    ...responsive.typography.body,
-  },
-  error: {
-    backgroundColor: '#fee2e2',
-    color: '#991b1b',
-    padding: responsive.spacing.md,
-    borderRadius: '8px',
-    marginBottom: responsive.spacing.md,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: responsive.spacing.sm,
-    flexWrap: 'wrap' as const,
-  },
-  retryButton: {
-    ...responsive.buttonDanger,
-    whiteSpace: 'nowrap' as const,
-  },
-  subscriptionCard: {
-    ...responsive.card,
-    marginBottom: responsive.spacing.lg,
-  },
-  cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: responsive.spacing.md,
-    gap: responsive.spacing.sm,
-    flexWrap: 'wrap' as const,
-  },
-  cardTitle: {
-    ...responsive.typography.h3,
-    color: '#6b7280',
-    marginBottom: responsive.spacing.xs,
-  },
-  planName: {
-    fontSize: 'clamp(24px, 5vw, 28px)',
-    fontWeight: 'bold' as const,
-    color: '#1f2937',
-    margin: 0,
-  },
-  trialInfo: {
-    backgroundColor: '#dbeafe',
-    padding: responsive.spacing.sm,
-    borderRadius: '8px',
-    marginBottom: responsive.spacing.md,
-  },
-  trialText: {
-    ...responsive.typography.small,
-    color: '#1e40af',
-    margin: 0,
-  },
-  warningBox: {
-    backgroundColor: '#fed7aa',
-    padding: responsive.spacing.md,
-    borderRadius: '8px',
-    marginBottom: responsive.spacing.md,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: responsive.spacing.md,
-    flexWrap: 'wrap' as const,
-  },
-  warningText: {
-    ...responsive.typography.small,
-    color: '#92400e',
-    margin: 0,
-    flex: 1,
-  },
-  warningButton: {
-    ...responsive.button,
-    backgroundColor: '#ea580c',
-    color: 'white',
-    textDecoration: 'none',
-  },
-  limitsGrid: {
-    ...responsive.grid,
-    gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
-  },
-  limitCard: {
-    textAlign: 'center' as const,
-  },
-  limitValue: {
-    fontSize: 'clamp(28px, 6vw, 32px)',
-    fontWeight: 'bold' as const,
-    color: '#1f2937',
-    marginBottom: responsive.spacing.xs,
-  },
-  limitLabel: {
-    ...responsive.typography.small,
-    marginBottom: responsive.spacing.sm,
-  },
-  progressBar: {
-    width: '100%',
-    height: '8px',
-    backgroundColor: '#e5e7eb',
-    borderRadius: '4px',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#3b82f6',
-    transition: 'width 0.3s ease',
-  },
-  actionsGrid: {
-    ...responsive.grid,
-    marginBottom: responsive.spacing.lg,
-  },
-  actionCard: {
-    ...responsive.card,
-    textDecoration: 'none',
-    display: 'block',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    cursor: 'pointer',
-  },
-  actionIcon: {
-    fontSize: 'clamp(36px, 8vw, 40px)',
-    marginBottom: responsive.spacing.md,
-  },
-  actionTitle: {
-    ...responsive.typography.h3,
-    marginBottom: responsive.spacing.xs,
-  },
-  actionDescription: {
-    ...responsive.typography.small,
-    margin: 0,
-  },
-  usageWarning: {
-    backgroundColor: '#fef3c7',
-    padding: responsive.spacing.md,
-    borderRadius: '8px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: responsive.spacing.md,
-    flexWrap: 'wrap' as const,
-  },
-  usageWarningText: {
-    ...responsive.typography.small,
-    color: '#92400e',
-    margin: 0,
-    flex: 1,
-  },
-  usageWarningButton: {
-    ...responsive.button,
-    backgroundColor: '#f59e0b',
-    color: 'white',
-    textDecoration: 'none',
-  },
 };

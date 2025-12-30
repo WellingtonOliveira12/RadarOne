@@ -1,11 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
+import {
+  Box,
+  Container,
+  Heading,
+  Text,
+  Button,
+  SimpleGrid,
+  VStack,
+  HStack,
+  Badge,
+  Alert,
+  AlertIcon,
+  AlertDescription,
+  List,
+  ListItem,
+  ListIcon,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  Spinner,
+  useToast,
+} from '@chakra-ui/react';
+import { ChevronRightIcon, CheckCircleIcon } from '@chakra-ui/icons';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import { getToken } from '../services/tokenStorage';
 
 /**
  * Gerenciamento de Assinatura
+ * Refatorada com Chakra UI para consistência visual
  */
 
 interface Plan {
@@ -31,7 +55,8 @@ interface Subscription {
 }
 
 export const SubscriptionSettingsPage: React.FC = () => {
-  useAuth(); // Required for protected route
+  useAuth();
+  const toast = useToast();
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [allPlans, setAllPlans] = useState<Plan[]>([]);
@@ -47,11 +72,8 @@ export const SubscriptionSettingsPage: React.FC = () => {
       const token = getToken();
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-      // Carregar subscription atual
       const subResponse = await fetch(`${API_URL}/api/subscriptions/my`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (subResponse.ok) {
@@ -66,7 +88,6 @@ export const SubscriptionSettingsPage: React.FC = () => {
         });
       }
 
-      // Carregar todos os planos
       const plansResponse = await fetch(`${API_URL}/api/plans`);
       if (plansResponse.ok) {
         const plansData = await plansResponse.json();
@@ -80,8 +101,6 @@ export const SubscriptionSettingsPage: React.FC = () => {
   };
 
   const handleChangePlan = async (planSlug: string) => {
-    // Em desenvolvimento: apenas chamar backend para trocar plano
-    // Em produção futura: redirecionar para URL de checkout externa
     try {
       const token = getToken();
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -99,10 +118,21 @@ export const SubscriptionSettingsPage: React.FC = () => {
         throw new Error(error.error || 'Erro ao alterar plano');
       }
 
-      alert('Plano alterado com sucesso!');
+      toast({
+        title: 'Plano alterado com sucesso!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
       loadData();
     } catch (err: any) {
-      alert('Erro ao alterar plano: ' + err.message);
+      toast({
+        title: 'Erro ao alterar plano',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
@@ -118,37 +148,31 @@ export const SubscriptionSettingsPage: React.FC = () => {
   const getStatusBadge = () => {
     if (!subscription) return null;
 
-    const statusColors: Record<string, { bg: string; text: string; label: string }> = {
-      TRIAL: { bg: '#dbeafe', text: '#1e40af', label: '🎁 Período de teste' },
-      ACTIVE: { bg: '#d1fae5', text: '#065f46', label: '✅ Ativo' },
-      PAST_DUE: { bg: '#fed7aa', text: '#92400e', label: '⚠️ Pagamento pendente' },
-      CANCELLED: { bg: '#f3f4f6', text: '#4b5563', label: '❌ Cancelado' },
-      EXPIRED: { bg: '#fee2e2', text: '#991b1b', label: '❌ Expirado' },
-      SUSPENDED: { bg: '#fee2e2', text: '#991b1b', label: '🚫 Suspenso' },
+    const statusConfig: Record<string, { colorScheme: string; label: string }> = {
+      TRIAL: { colorScheme: 'blue', label: '🎁 Período de teste' },
+      ACTIVE: { colorScheme: 'green', label: '✅ Ativo' },
+      PAST_DUE: { colorScheme: 'orange', label: '⚠️ Pagamento pendente' },
+      CANCELLED: { colorScheme: 'gray', label: '❌ Cancelado' },
+      EXPIRED: { colorScheme: 'red', label: '❌ Expirado' },
+      SUSPENDED: { colorScheme: 'red', label: '🚫 Suspenso' },
     };
 
-    const statusStyle = statusColors[subscription.status] || statusColors.ACTIVE;
+    const config = statusConfig[subscription.status] || statusConfig.ACTIVE;
 
     return (
-      <span
-        style={{
-          backgroundColor: statusStyle.bg,
-          color: statusStyle.text,
-          padding: '6px 14px',
-          borderRadius: '6px',
-          fontSize: '14px',
-          fontWeight: '600',
-        }}
-      >
-        {statusStyle.label}
-      </span>
+      <Badge colorScheme={config.colorScheme} fontSize="sm" px={3} py={1} borderRadius="md">
+        {config.label}
+      </Badge>
     );
   };
 
   if (loading) {
     return (
       <AppLayout>
-        <p>Carregando...</p>
+        <Container maxW="container.xl" centerContent py={20}>
+          <Spinner size="xl" color="blue.500" thickness="4px" />
+          <Text mt={4} color="gray.600">Carregando...</Text>
+        </Container>
       </AppLayout>
     );
   }
@@ -158,377 +182,261 @@ export const SubscriptionSettingsPage: React.FC = () => {
 
   return (
     <AppLayout>
-        <div style={styles.breadcrumb}>
-          <Link to="/dashboard" style={styles.breadcrumbLink}>
-            Dashboard
-          </Link>
-          <span style={styles.breadcrumbSeparator}>/</span>
-          <span style={styles.breadcrumbCurrent}>Gerenciar Assinatura</span>
-        </div>
+      <Container maxW="container.xl" py={{ base: 6, md: 10 }}>
+        <VStack align="stretch" spacing={6}>
+          {/* Breadcrumb */}
+          <Breadcrumb spacing={2} separator={<ChevronRightIcon color="gray.400" />} fontSize="sm">
+            <BreadcrumbItem>
+              <BreadcrumbLink as={RouterLink} to="/dashboard" color="blue.600">
+                Dashboard
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbItem isCurrentPage>
+              <BreadcrumbLink color="gray.600">Gerenciar Assinatura</BreadcrumbLink>
+            </BreadcrumbItem>
+          </Breadcrumb>
 
-        <h1 style={styles.title}>Gerenciar Assinatura</h1>
-        <p style={styles.subtitle}>
-          Veja seu plano atual e faça upgrade ou downgrade quando quiser
-        </p>
+          {/* Header */}
+          <Box>
+            <Heading as="h1" size={{ base: 'lg', md: 'xl' }} color="gray.800" mb={2}>
+              Gerenciar Assinatura
+            </Heading>
+            <Text fontSize={{ base: 'sm', md: 'md' }} color="gray.600">
+              Veja seu plano atual e faça upgrade ou downgrade quando quiser
+            </Text>
+          </Box>
 
-        {error && <div style={styles.error}>{error}</div>}
+          {/* Error Alert */}
+          {error && (
+            <Alert status="error" borderRadius="lg">
+              <AlertIcon />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-        {/* Current Subscription */}
-        {subscription && (
-          <div style={styles.currentPlanCard}>
-            <div style={styles.currentPlanHeader}>
-              <div>
-                <h2 style={styles.currentPlanLabel}>Plano atual</h2>
-                <h3 style={styles.currentPlanName}>{subscription.plan.name}</h3>
-              </div>
-              <div>{getStatusBadge()}</div>
-            </div>
+          {/* Current Subscription */}
+          {subscription && (
+            <Box bg="white" p={{ base: 6, md: 8 }} borderRadius="xl" boxShadow="lg">
+              <Flex justify="space-between" align="flex-start" mb={6} flexWrap="wrap" gap={3}>
+                <Box>
+                  <Text fontSize="sm" color="gray.600" mb={1}>
+                    Plano atual
+                  </Text>
+                  <Heading as="h2" size="lg" color="gray.800">
+                    {subscription.plan.name}
+                  </Heading>
+                </Box>
+                {getStatusBadge()}
+              </Flex>
 
-            {subscription.isTrial && (
-              <div style={styles.trialWarning}>
-                <p style={styles.trialWarningText}>
-                  ⏰ Seu período de teste termina em <strong>{daysLeft} dias</strong>
-                </p>
-              </div>
-            )}
+              {/* Trial Warning */}
+              {subscription.isTrial && (
+                <Alert status="info" borderRadius="md" mb={4}>
+                  <AlertIcon />
+                  <AlertDescription>
+                    ⏰ Seu período de teste termina em <strong>{daysLeft} dias</strong>
+                  </AlertDescription>
+                </Alert>
+              )}
 
-            {showExpiryWarning && (
-              <div style={styles.expiryWarning}>
-                <p style={styles.expiryWarningText}>
-                  ⚠️ Seu plano está para expirar! Escolha um plano abaixo para continuar.
-                </p>
-              </div>
-            )}
+              {/* Expiry Warning */}
+              {showExpiryWarning && (
+                <Alert status="warning" borderRadius="md" mb={4}>
+                  <AlertIcon />
+                  <AlertDescription>
+                    ⚠️ Seu plano está para expirar! Escolha um plano abaixo para continuar.
+                  </AlertDescription>
+                </Alert>
+              )}
 
-            <div style={styles.currentPlanDetails}>
-              <div style={styles.detailItem}>
-                <span style={styles.detailLabel}>Preço:</span>
-                <span style={styles.detailValue}>
-                  {subscription.plan.priceCents === 0
-                    ? 'Grátis'
-                    : `R$ ${(subscription.plan.priceCents / 100).toFixed(2)}/mês`}
-                </span>
-              </div>
-              <div style={styles.detailItem}>
-                <span style={styles.detailLabel}>Monitores:</span>
-                <span style={styles.detailValue}>{subscription.plan.maxMonitors}</span>
-              </div>
-              <div style={styles.detailItem}>
-                <span style={styles.detailLabel}>Sites diferentes:</span>
-                <span style={styles.detailValue}>{subscription.plan.maxSites}</span>
-              </div>
-              <div style={styles.detailItem}>
-                <span style={styles.detailLabel}>Alertas por dia:</span>
-                <span style={styles.detailValue}>{subscription.plan.maxAlertsPerDay}</span>
-              </div>
-              <div style={styles.detailItem}>
-                <span style={styles.detailLabel}>Intervalo de verificação:</span>
-                <span style={styles.detailValue}>{subscription.plan.checkInterval} minutos</span>
-              </div>
-            </div>
-          </div>
-        )}
+              {/* Plan Details */}
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                <Box bg="gray.50" p={4} borderRadius="md">
+                  <Text fontSize="sm" color="gray.600" mb={1}>Preço</Text>
+                  <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                    {subscription.plan.priceCents === 0
+                      ? 'Grátis'
+                      : `R$ ${(subscription.plan.priceCents / 100).toFixed(2)}/mês`}
+                  </Text>
+                </Box>
 
-        {/* All Plans */}
-        <h2 style={styles.sectionTitle}>Todos os planos disponíveis</h2>
-        <p style={styles.sectionSubtitle}>
-          Faça upgrade para ter mais monitores e recursos
-        </p>
+                <Box bg="gray.50" p={4} borderRadius="md">
+                  <Text fontSize="sm" color="gray.600" mb={1}>Monitores</Text>
+                  <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                    {subscription.plan.maxMonitors === 999 ? 'Ilimitado' : subscription.plan.maxMonitors}
+                  </Text>
+                </Box>
 
-        <div style={styles.plansGrid}>
-          {allPlans.map((plan) => {
-            const isCurrentPlan = subscription?.plan.slug === plan.slug;
+                <Box bg="gray.50" p={4} borderRadius="md">
+                  <Text fontSize="sm" color="gray.600" mb={1}>Sites diferentes</Text>
+                  <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                    {subscription.plan.maxSites === 999 ? 'Ilimitado' : subscription.plan.maxSites}
+                  </Text>
+                </Box>
 
-            return (
-              <div
-                key={plan.id}
-                style={{
-                  ...styles.planCard,
-                  ...(plan.isRecommended ? styles.planCardRecommended : {}),
-                  ...(isCurrentPlan ? styles.planCardCurrent : {}),
-                }}
-              >
-                {plan.isRecommended && (
-                  <div style={styles.recommendedBadge}>⭐ Recomendado</div>
-                )}
-                {isCurrentPlan && <div style={styles.currentBadge}>✓ Plano atual</div>}
+                <Box bg="gray.50" p={4} borderRadius="md">
+                  <Text fontSize="sm" color="gray.600" mb={1}>Alertas por dia</Text>
+                  <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                    {subscription.plan.maxAlertsPerDay === 999 ? 'Ilimitado' : subscription.plan.maxAlertsPerDay}
+                  </Text>
+                </Box>
 
-                <h3 style={styles.planName}>{plan.name}</h3>
-                <p style={styles.planDescription}>{plan.description}</p>
+                <Box bg="gray.50" p={4} borderRadius="md">
+                  <Text fontSize="sm" color="gray.600" mb={1}>Intervalo de verificação</Text>
+                  <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                    {subscription.plan.checkInterval} minutos
+                  </Text>
+                </Box>
+              </SimpleGrid>
+            </Box>
+          )}
 
-                <div style={styles.planPrice}>
-                  {plan.priceCents === 0 ? (
-                    <span style={styles.priceValue}>Grátis</span>
-                  ) : (
-                    <>
-                      <span style={styles.priceSymbol}>R$</span>
-                      <span style={styles.priceValue}>
-                        {(plan.priceCents / 100).toFixed(0)}
-                      </span>
-                      <span style={styles.pricePeriod}>/mês</span>
-                    </>
-                  )}
-                </div>
+          {/* All Plans */}
+          <Box>
+            <Heading as="h2" size="md" color="gray.800" mb={2}>
+              Todos os planos disponíveis
+            </Heading>
+            <Text fontSize="sm" color="gray.600" mb={6}>
+              Faça upgrade para ter mais monitores e recursos
+            </Text>
 
-                <ul style={styles.planFeatures}>
-                  <li>✅ {plan.maxMonitors} monitores</li>
-                  <li>✅ {plan.maxSites} sites</li>
-                  <li>✅ {plan.maxAlertsPerDay} alertas/dia</li>
-                  <li>✅ Verificação a cada {plan.checkInterval}min</li>
-                </ul>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+              {allPlans.map((plan) => {
+                const isCurrentPlan = subscription?.plan.slug === plan.slug;
 
-                <button
-                  onClick={() => handleChangePlan(plan.slug)}
-                  disabled={isCurrentPlan}
-                  style={{
-                    ...styles.planButton,
-                    ...(plan.isRecommended ? styles.planButtonRecommended : {}),
-                    ...(isCurrentPlan ? styles.planButtonDisabled : {}),
-                  }}
-                >
-                  {isCurrentPlan ? 'Plano atual' : 'Escolher este plano'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+                return (
+                  <Box
+                    key={plan.id}
+                    bg="white"
+                    p={6}
+                    borderRadius="xl"
+                    boxShadow={plan.isRecommended ? 'xl' : 'md'}
+                    border="2px"
+                    borderColor={
+                      isCurrentPlan ? 'green.400' :
+                      plan.isRecommended ? 'blue.400' :
+                      'transparent'
+                    }
+                    position="relative"
+                    transition="all 0.2s"
+                    _hover={{ transform: 'translateY(-4px)', boxShadow: 'xl' }}
+                  >
+                    {plan.isRecommended && (
+                      <Badge
+                        position="absolute"
+                        top={-3}
+                        left="50%"
+                        transform="translateX(-50%)"
+                        colorScheme="blue"
+                        fontSize="xs"
+                        px={3}
+                        py={1}
+                        borderRadius="full"
+                      >
+                        ⭐ Recomendado
+                      </Badge>
+                    )}
 
-        <div style={styles.footer}>
-          <p style={styles.footerText}>
-            💡 <strong>Nota:</strong> Você pode trocar de plano a qualquer momento. Em
-            desenvolvimento, a troca é instantânea. Em produção, você será redirecionado
-            para o checkout seguro.
-          </p>
-        </div>
+                    {isCurrentPlan && (
+                      <Badge
+                        position="absolute"
+                        top={-3}
+                        right={4}
+                        colorScheme="green"
+                        fontSize="xs"
+                        px={3}
+                        py={1}
+                        borderRadius="full"
+                      >
+                        ✓ Plano atual
+                      </Badge>
+                    )}
+
+                    <VStack align="stretch" spacing={4}>
+                      <Box>
+                        <Heading as="h3" size="md" color="gray.800" mb={1}>
+                          {plan.name}
+                        </Heading>
+                        <Text fontSize="sm" color="gray.600">
+                          {plan.description}
+                        </Text>
+                      </Box>
+
+                      <HStack align="baseline">
+                        {plan.priceCents === 0 ? (
+                          <Text fontSize="3xl" fontWeight="bold" color="gray.800">
+                            Grátis
+                          </Text>
+                        ) : (
+                          <>
+                            <Text fontSize="lg" color="gray.600">R$</Text>
+                            <Text fontSize="3xl" fontWeight="bold" color="gray.800">
+                              {(plan.priceCents / 100).toFixed(0)}
+                            </Text>
+                            <Text fontSize="sm" color="gray.600">/mês</Text>
+                          </>
+                        )}
+                      </HStack>
+
+                      <List spacing={3}>
+                        <ListItem display="flex" alignItems="center">
+                          <ListIcon as={CheckCircleIcon} color="green.500" />
+                          <Text fontSize="sm">
+                            {plan.maxMonitors === 999 ? 'Monitores ilimitados' : `${plan.maxMonitors} ${plan.maxMonitors === 1 ? 'monitor' : 'monitores'}`}
+                          </Text>
+                        </ListItem>
+
+                        <ListItem display="flex" alignItems="center">
+                          <ListIcon as={CheckCircleIcon} color="green.500" />
+                          <Text fontSize="sm">
+                            {plan.maxSites === 999 ? 'Sites ilimitados' : `${plan.maxSites} ${plan.maxSites === 1 ? 'site' : 'sites'}`}
+                          </Text>
+                        </ListItem>
+
+                        <ListItem display="flex" alignItems="center">
+                          <ListIcon as={CheckCircleIcon} color="green.500" />
+                          <Text fontSize="sm">
+                            {plan.maxAlertsPerDay === 999 ? 'Alertas ilimitados' : `Até ${plan.maxAlertsPerDay} alertas/dia`}
+                          </Text>
+                        </ListItem>
+
+                        <ListItem display="flex" alignItems="center">
+                          <ListIcon as={CheckCircleIcon} color="green.500" />
+                          <Text fontSize="sm">
+                            Verificação a cada {plan.checkInterval}min
+                          </Text>
+                        </ListItem>
+                      </List>
+
+                      <Button
+                        onClick={() => handleChangePlan(plan.slug)}
+                        isDisabled={isCurrentPlan}
+                        colorScheme={plan.isRecommended ? 'blue' : 'gray'}
+                        size="md"
+                        w="full"
+                      >
+                        {isCurrentPlan ? 'Plano atual' : 'Escolher este plano'}
+                      </Button>
+                    </VStack>
+                  </Box>
+                );
+              })}
+            </SimpleGrid>
+          </Box>
+
+          {/* Info Footer */}
+          <Alert status="info" borderRadius="lg">
+            <AlertIcon />
+            <Box>
+              <Text fontSize="sm">
+                <strong>💡 Nota:</strong> Você pode trocar de plano a qualquer momento. Em
+                desenvolvimento, a troca é instantânea. Em produção, você será redirecionado
+                para o checkout seguro.
+              </Text>
+            </Box>
+          </Alert>
+        </VStack>
+      </Container>
     </AppLayout>
   );
-};
-
-const styles = {
-  breadcrumb: {
-    marginBottom: '24px',
-    fontSize: '14px',
-  },
-  breadcrumbLink: {
-    color: '#3b82f6',
-    textDecoration: 'none',
-  },
-  breadcrumbSeparator: {
-    margin: '0 8px',
-    color: '#9ca3af',
-  },
-  breadcrumbCurrent: {
-    color: '#6b7280',
-  },
-  title: {
-    fontSize: '32px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: '8px',
-  },
-  subtitle: {
-    fontSize: '16px',
-    color: '#6b7280',
-    marginBottom: '32px',
-  },
-  error: {
-    backgroundColor: '#fee2e2',
-    color: '#991b1b',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-  },
-  currentPlanCard: {
-    backgroundColor: 'white',
-    padding: '32px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    marginBottom: '48px',
-  },
-  currentPlanHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '24px',
-  },
-  currentPlanLabel: {
-    fontSize: '14px',
-    color: '#6b7280',
-    marginBottom: '4px',
-  },
-  currentPlanName: {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    margin: 0,
-  },
-  trialWarning: {
-    backgroundColor: '#dbeafe',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '24px',
-  },
-  trialWarningText: {
-    fontSize: '14px',
-    color: '#1e40af',
-    margin: 0,
-  },
-  expiryWarning: {
-    backgroundColor: '#fed7aa',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '24px',
-  },
-  expiryWarningText: {
-    fontSize: '14px',
-    color: '#92400e',
-    margin: 0,
-  },
-  currentPlanDetails: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '16px',
-  },
-  detailItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px',
-    backgroundColor: '#f9fafb',
-    borderRadius: '6px',
-  },
-  detailLabel: {
-    fontSize: '13px',
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  detailValue: {
-    fontSize: '14px',
-    color: '#1f2937',
-    fontWeight: '600',
-  },
-  sectionTitle: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: '8px',
-  },
-  sectionSubtitle: {
-    fontSize: '14px',
-    color: '#6b7280',
-    marginBottom: '24px',
-  },
-  plansGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-    gap: '24px',
-    marginBottom: '48px',
-  },
-  planCard: {
-    backgroundColor: 'white',
-    padding: '28px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    position: 'relative' as const,
-    border: '2px solid transparent',
-  },
-  planCardRecommended: {
-    border: '2px solid #3b82f6',
-    boxShadow: '0 4px 16px rgba(59,130,246,0.2)',
-  },
-  planCardCurrent: {
-    border: '2px solid #10b981',
-  },
-  recommendedBadge: {
-    position: 'absolute' as const,
-    top: '-12px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    padding: '4px 12px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '600',
-  },
-  currentBadge: {
-    position: 'absolute' as const,
-    top: '-12px',
-    right: '16px',
-    backgroundColor: '#10b981',
-    color: 'white',
-    padding: '4px 12px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '600',
-  },
-  planName: {
-    fontSize: '22px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: '6px',
-  },
-  planDescription: {
-    fontSize: '13px',
-    color: '#6b7280',
-    marginBottom: '20px',
-  },
-  planPrice: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '4px',
-    marginBottom: '20px',
-  },
-  priceSymbol: {
-    fontSize: '18px',
-    color: '#6b7280',
-  },
-  priceValue: {
-    fontSize: '36px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  pricePeriod: {
-    fontSize: '14px',
-    color: '#6b7280',
-  },
-  planFeatures: {
-    listStyle: 'none',
-    padding: 0,
-    margin: '0 0 20px 0',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '10px',
-    fontSize: '13px',
-  },
-  planButton: {
-    width: '100%',
-    padding: '10px',
-    backgroundColor: '#374151',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  planButtonRecommended: {
-    backgroundColor: '#3b82f6',
-  },
-  planButtonDisabled: {
-    backgroundColor: '#d1d5db',
-    cursor: 'not-allowed',
-  },
-  footer: {
-    backgroundColor: '#fffbeb',
-    padding: '16px',
-    borderRadius: '8px',
-    border: '1px solid #fde68a',
-  },
-  footerText: {
-    fontSize: '14px',
-    color: '#78350f',
-    margin: 0,
-    lineHeight: '1.6',
-  },
 };
