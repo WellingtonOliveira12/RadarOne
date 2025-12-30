@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -35,6 +35,9 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
   maxWidth = 'container.xl',
   showNav = false,
 }) => {
+  const location = useLocation();
+  const currentPath = location.pathname;
+
   return (
     <Box minH="100vh" bg="gray.50" display="flex" flexDirection="column">
       {/* Header */}
@@ -73,7 +76,10 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
                   to="/plans"
                   fontSize="sm"
                   fontWeight="medium"
-                  color="gray.600"
+                  color={currentPath === '/plans' ? 'blue.600' : 'gray.600'}
+                  borderBottom={currentPath === '/plans' ? '2px solid' : 'none'}
+                  borderColor="blue.600"
+                  pb={currentPath === '/plans' ? 0.5 : 0}
                   _hover={{ color: 'blue.600' }}
                 >
                   Planos
@@ -83,7 +89,10 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
                   to="/login"
                   fontSize="sm"
                   fontWeight="medium"
-                  color="gray.600"
+                  color={currentPath === '/login' ? 'blue.600' : 'gray.600'}
+                  borderBottom={currentPath === '/login' ? '2px solid' : 'none'}
+                  borderColor="blue.600"
+                  pb={currentPath === '/login' ? 0.5 : 0}
                   _hover={{ color: 'blue.600' }}
                 >
                   Login
@@ -94,7 +103,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
                   fontSize="sm"
                   fontWeight="medium"
                   color="white"
-                  bg="blue.500"
+                  bg={currentPath === '/register' ? 'blue.600' : 'blue.500'}
                   px={3}
                   py={1.5}
                   borderRadius="md"
