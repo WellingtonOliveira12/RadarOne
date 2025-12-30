@@ -2,8 +2,15 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { PublicLayout } from '../components/PublicLayout';
 import { TELEGRAM_BOT_USERNAME } from '../constants/app';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 export const ManualPage: React.FC = () => {
+  // SEO meta
+  usePageMeta({
+    title: 'Manual | RadarOne',
+    description: 'Aprenda a usar o RadarOne com o guia passo a passo completo.',
+  });
+
   return (
     <PublicLayout maxWidth="container.xl">
       <div style={styles.container}>

@@ -3,9 +3,16 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { PublicLayout } from '../components/PublicLayout';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 export const ContactPage: React.FC = () => {
   const { user } = useAuth();
+
+  // SEO meta
+  usePageMeta({
+    title: 'Contato | RadarOne',
+    description: 'Fale com o time do RadarOne para suporte e atendimento.',
+  });
   const [category, setCategory] = useState('Suporte');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');

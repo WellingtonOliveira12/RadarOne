@@ -7,6 +7,7 @@ import { getABMessage, trackABVariantShown } from '../lib/abtest';
 import { getToken } from '../services/tokenStorage';
 import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 import { PublicLayout } from '../components/PublicLayout';
+import { usePageMeta } from '../hooks/usePageMeta';
 import * as responsive from '../styles/responsive';
 
 /**
@@ -39,6 +40,12 @@ export const PlansPage: React.FC = () => {
   const [error, setError] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // SEO meta
+  usePageMeta({
+    title: 'Planos | RadarOne',
+    description: 'Conheça os planos do RadarOne e escolha a opção ideal para monitorar sites e produtos.',
+  });
 
   useEffect(() => {
     loadPlans();

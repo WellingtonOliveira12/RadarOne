@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PublicLayout } from '../components/PublicLayout';
 import { TELEGRAM_BOT_USERNAME } from '../constants/app';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 interface FAQItem {
   question: string;
@@ -11,6 +12,12 @@ interface FAQItem {
 
 export const FAQPage: React.FC = () => {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+
+  // SEO meta
+  usePageMeta({
+    title: 'Perguntas Frequentes | RadarOne',
+    description: 'Tire dúvidas sobre planos, recursos e funcionamento do RadarOne.',
+  });
 
   const toggleFAQ = (index: number) => {
     setExpandedIndex(expandedIndex === index ? null : index);
