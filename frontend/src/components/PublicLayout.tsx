@@ -80,23 +80,27 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
                 </Link>
                 <Link
                   as={RouterLink}
-                  to="/manual"
+                  to="/login"
                   fontSize="sm"
                   fontWeight="medium"
                   color="gray.600"
                   _hover={{ color: 'blue.600' }}
                 >
-                  Manual
+                  Login
                 </Link>
                 <Link
                   as={RouterLink}
-                  to="/contact"
+                  to="/register"
                   fontSize="sm"
                   fontWeight="medium"
-                  color="gray.600"
-                  _hover={{ color: 'blue.600' }}
+                  color="white"
+                  bg="blue.500"
+                  px={3}
+                  py={1.5}
+                  borderRadius="md"
+                  _hover={{ bg: 'blue.600', textDecoration: 'none' }}
                 >
-                  Contato
+                  Criar conta
                 </Link>
               </HStack>
             )}
