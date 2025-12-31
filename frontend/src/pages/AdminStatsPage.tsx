@@ -196,6 +196,82 @@ export const AdminStatsPage: React.FC = () => {
           </Card>
         </SimpleGrid>
 
+        {/* Métricas Estratégicas (FASE 3.4) */}
+        <Card bg="blue.50" borderColor="blue.200" borderWidth="1px">
+          <CardBody>
+            <VStack spacing={4} align="stretch">
+              <Heading size="md" color="blue.800">
+                📊 Métricas Estratégicas
+              </Heading>
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
+                {/* Taxa de Bloqueio (Churn) */}
+                <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
+                  <Stat>
+                    <StatLabel fontSize="sm" color="gray.600">Taxa de Bloqueio</StatLabel>
+                    <StatNumber fontSize="3xl" color={stats.users.total > 0 && (stats.users.blocked / stats.users.total) > 0.1 ? 'red.600' : 'green.600'}>
+                      {stats.users.total > 0
+                        ? `${((stats.users.blocked / stats.users.total) * 100).toFixed(1)}%`
+                        : '0%'}
+                    </StatNumber>
+                    <StatHelpText fontSize="xs">
+                      {stats.users.blocked} de {stats.users.total} usuários
+                    </StatHelpText>
+                  </Stat>
+                </Box>
+
+                {/* Taxa de Ativação */}
+                <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
+                  <Stat>
+                    <StatLabel fontSize="sm" color="gray.600">Taxa de Ativação</StatLabel>
+                    <StatNumber fontSize="3xl" color="green.600">
+                      {stats.users.total > 0
+                        ? `${((stats.users.active / stats.users.total) * 100).toFixed(1)}%`
+                        : '0%'}
+                    </StatNumber>
+                    <StatHelpText fontSize="xs">
+                      {stats.users.active} usuários ativos
+                    </StatHelpText>
+                  </Stat>
+                </Box>
+
+                {/* Monitores por Usuário */}
+                <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
+                  <Stat>
+                    <StatLabel fontSize="sm" color="gray.600">Monitores/Usuário</StatLabel>
+                    <StatNumber fontSize="3xl" color="purple.600">
+                      {stats.users.active > 0
+                        ? (stats.monitors.total / stats.users.active).toFixed(1)
+                        : '0'}
+                    </StatNumber>
+                    <StatHelpText fontSize="xs">
+                      Média por usuário ativo
+                    </StatHelpText>
+                  </Stat>
+                </Box>
+
+                {/* Conversão Trial */}
+                <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
+                  <Stat>
+                    <StatLabel fontSize="sm" color="gray.600">Usuários em Trial</StatLabel>
+                    <StatNumber fontSize="3xl" color="blue.600">
+                      {stats.subscriptions.byStatus['TRIAL'] || 0}
+                    </StatNumber>
+                    <StatHelpText fontSize="xs">
+                      {(() => {
+                        const totalSubs = Object.values(stats.subscriptions.byStatus).reduce((a, b) => a + b, 0);
+                        const trialCount = stats.subscriptions.byStatus['TRIAL'] || 0;
+                        return totalSubs > 0
+                          ? `${((trialCount / totalSubs) * 100).toFixed(1)}% do total`
+                          : '0% do total';
+                      })()}
+                    </StatHelpText>
+                  </Stat>
+                </Box>
+              </SimpleGrid>
+            </VStack>
+          </CardBody>
+        </Card>
+
         {/* Assinaturas por Status */}
         <Card>
           <CardBody>
