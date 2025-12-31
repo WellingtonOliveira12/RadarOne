@@ -833,4 +833,253 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao listar execuções de jobs' });
     }
   }
+
+  /**
+   * 11. Listar cupons com paginação e filtros
+   * GET /api/admin/coupons
+   */
+  static async listCoupons(req: Request, res: Response) {
+    try {
+      const {
+        page = '1',
+        limit = '20',
+        isActive,
+        code
+      } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const skip = (pageNum - 1) * limitNum;
+
+      // Construir filtros
+      const where: any = {};
+
+      if (isActive !== undefined) {
+        where.isActive = isActive === 'true';
+      }
+
+      if (code) {
+        where.code = {
+          contains: (code as string).toUpperCase(),
+          mode: 'insensitive'
+        };
+      }
+
+      // Buscar cupons
+      const [coupons, total] = await Promise.all([
+        prisma.coupon.findMany({
+          where,
+          skip,
+          take: limitNum,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            plan: {
+              select: {
+                id: true,
+                name: true,
+                slug: true
+              }
+            }
+          }
+        }),
+        prisma.coupon.count({ where })
+      ]);
+
+      const totalPages = Math.ceil(total / limitNum);
+
+      return res.json({
+        coupons,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao listar cupons:', error);
+      return res.status(500).json({ error: 'Erro ao listar cupons' });
+    }
+  }
+
+  /**
+   * 12. Criar cupom
+   * POST /api/admin/coupons
+   */
+  static async createCoupon(req: Request, res: Response) {
+    try {
+      const {
+        code,
+        description,
+        discountType,
+        discountValue,
+        appliesToPlanId,
+        maxUses,
+        expiresAt,
+        isActive
+      } = req.body;
+      const adminId = req.userId;
+
+      // Validações
+      if (!code || !discountType || discountValue === undefined) {
+        return res.status(400).json({
+          error: 'Campos obrigatórios: code, discountType, discountValue'
+        });
+      }
+
+      // Validar discountType
+      if (!['PERCENT', 'FIXED'].includes(discountType)) {
+        return res.status(400).json({
+          error: 'discountType deve ser PERCENT ou FIXED'
+        });
+      }
+
+      // Validar discountValue
+      if (discountType === 'PERCENT' && (discountValue < 0 || discountValue > 100)) {
+        return res.status(400).json({
+          error: 'Para desconto percentual, o valor deve estar entre 0 e 100'
+        });
+      }
+
+      if (discountType === 'FIXED' && discountValue < 0) {
+        return res.status(400).json({
+          error: 'Valor de desconto fixo deve ser maior ou igual a 0'
+        });
+      }
+
+      // Verificar se cupom com mesmo código já existe
+      const codeUpper = code.toUpperCase();
+      const existingCoupon = await prisma.coupon.findUnique({
+        where: { code: codeUpper }
+      });
+
+      if (existingCoupon) {
+        return res.status(400).json({
+          error: 'Já existe um cupom com este código'
+        });
+      }
+
+      // Validar plan se fornecido
+      if (appliesToPlanId) {
+        const plan = await prisma.plan.findUnique({
+          where: { id: appliesToPlanId }
+        });
+
+        if (!plan) {
+          return res.status(404).json({
+            error: 'Plano não encontrado'
+          });
+        }
+      }
+
+      // Criar cupom
+      const coupon = await prisma.coupon.create({
+        data: {
+          code: codeUpper,
+          description: description || null,
+          discountType,
+          discountValue,
+          appliesToPlanId: appliesToPlanId || null,
+          maxUses: maxUses || null,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          isActive: isActive !== undefined ? isActive : true,
+          usedCount: 0
+        },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          }
+        }
+      });
+
+      // Log
+      console.log(`[ADMIN LOG] Cupom ${codeUpper} criado por admin ${adminId}`);
+
+      return res.status(201).json({
+        message: 'Cupom criado com sucesso',
+        coupon
+      });
+
+    } catch (error) {
+      console.error('Erro ao criar cupom:', error);
+      return res.status(500).json({ error: 'Erro ao criar cupom' });
+    }
+  }
+
+  /**
+   * 13. Atualizar cupom
+   * PATCH /api/admin/coupons/:id
+   */
+  static async updateCoupon(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const {
+        isActive,
+        maxUses,
+        expiresAt,
+        description
+      } = req.body;
+      const adminId = req.userId;
+
+      // Verificar se cupom existe
+      const coupon = await prisma.coupon.findUnique({
+        where: { id }
+      });
+
+      if (!coupon) {
+        return res.status(404).json({ error: 'Cupom não encontrado' });
+      }
+
+      // Preparar dados para atualização
+      const updateData: any = {};
+
+      if (isActive !== undefined) {
+        updateData.isActive = isActive;
+      }
+
+      if (maxUses !== undefined) {
+        updateData.maxUses = maxUses === null ? null : parseInt(maxUses);
+      }
+
+      if (expiresAt !== undefined) {
+        updateData.expiresAt = expiresAt === null ? null : new Date(expiresAt);
+      }
+
+      if (description !== undefined) {
+        updateData.description = description;
+      }
+
+      // Atualizar cupom
+      const updated = await prisma.coupon.update({
+        where: { id },
+        data: updateData,
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          }
+        }
+      });
+
+      // Log
+      console.log(`[ADMIN LOG] Cupom ${id} atualizado por admin ${adminId}`, updateData);
+
+      return res.json({
+        message: 'Cupom atualizado com sucesso',
+        coupon: updated
+      });
+
+    } catch (error) {
+      console.error('Erro ao atualizar cupom:', error);
+      return res.status(500).json({ error: 'Erro ao atualizar cupom' });
+    }
+  }
 }

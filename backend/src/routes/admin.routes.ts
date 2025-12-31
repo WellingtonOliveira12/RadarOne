@@ -25,4 +25,9 @@ router.get('/monitors', requireAdmin, AdminController.listMonitors);
 // Jobs
 router.get('/jobs', requireAdmin, AdminController.listJobRuns);
 
+// Cupons
+router.get('/coupons', requireAdmin, AdminController.listCoupons);
+router.post('/coupons', requireAdmin, AdminController.createCoupon);
+router.patch('/coupons/:id', requireAdmin, AdminController.updateCoupon);
+
 export default router;
