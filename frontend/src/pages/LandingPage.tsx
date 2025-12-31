@@ -14,7 +14,9 @@ import {
   Link,
   List,
   ListItem,
+  Skeleton,
 } from '@chakra-ui/react';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * Landing Page - Página inicial pública do RadarOne
@@ -22,6 +24,8 @@ import {
  */
 
 export const LandingPage: React.FC = () => {
+  const { user, loading, logout } = useAuth();
+
   return (
     <Box minH="100vh" bg="gray.50">
       {/* Header */}
@@ -52,37 +56,69 @@ export const LandingPage: React.FC = () => {
               </HStack>
             </Link>
 
-            {/* Navigation */}
-            <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
-              <Link
-                as={RouterLink}
-                to="/plans"
-                fontSize="sm"
-                fontWeight="medium"
-                color="gray.600"
-                _hover={{ color: 'blue.600' }}
-              >
-                Planos
-              </Link>
-              <Link
-                as={RouterLink}
-                to="/login"
-                fontSize="sm"
-                fontWeight="medium"
-                color="gray.600"
-                _hover={{ color: 'blue.600' }}
-              >
-                Entrar
-              </Link>
-              <Button
-                as={RouterLink}
-                to="/register"
-                colorScheme="blue"
-                size="sm"
-              >
-                Criar conta
-              </Button>
-            </HStack>
+            {/* Navigation - Adapts based on auth state */}
+            {loading ? (
+              // Loading skeleton while checking auth
+              <HStack spacing={{ base: 2, md: 4 }}>
+                <Skeleton height="20px" width="60px" />
+                <Skeleton height="20px" width="60px" />
+                <Skeleton height="32px" width="100px" borderRadius="md" />
+              </HStack>
+            ) : user ? (
+              // Logged in: show Dashboard + Logout
+              <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
+                <Link
+                  as={RouterLink}
+                  to="/dashboard"
+                  fontSize="sm"
+                  fontWeight="medium"
+                  color="gray.600"
+                  _hover={{ color: 'blue.600' }}
+                >
+                  Dashboard
+                </Link>
+                <Button
+                  onClick={logout}
+                  colorScheme="red"
+                  variant="outline"
+                  size="sm"
+                >
+                  Sair
+                </Button>
+              </HStack>
+            ) : (
+              // Logged out: show Plans + Login + Register
+              <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
+                <Link
+                  as={RouterLink}
+                  to="/plans"
+                  fontSize="sm"
+                  fontWeight="medium"
+                  color="gray.600"
+                  _hover={{ color: 'blue.600' }}
+                >
+                  Planos
+                </Link>
+                <Link
+                  as={RouterLink}
+                  to="/login"
+                  fontSize="sm"
+                  fontWeight="medium"
+                  color="gray.600"
+                  _hover={{ color: 'blue.600' }}
+                >
+                  Entrar
+                </Link>
+                <Button
+                  as={RouterLink}
+                  to="/register"
+                  colorScheme="blue"
+                  size="sm"
+                >
+                  Criar conta
+                </Button>
+              </HStack>
+            )}
           </Flex>
         </Container>
       </Box>

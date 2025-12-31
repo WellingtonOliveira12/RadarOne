@@ -274,6 +274,13 @@ export class AuthController {
         return;
       }
 
+      // CRITICAL: Prevent caching of auth/session endpoints
+      // Without these headers, browsers may return 304 Not Modified
+      // causing stale session data to appear in the UI
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
       res.json({ user });
     } catch (error) {
       console.error('Erro ao buscar dados do usuário:', error);

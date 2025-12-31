@@ -9,8 +9,11 @@ import {
   Heading,
   Link,
   Text,
+  Button,
+  Skeleton,
 } from '@chakra-ui/react';
 import { APP_VERSION } from '../constants/app';
+import { useAuth } from '../context/AuthContext';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -37,6 +40,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
 }) => {
   const location = useLocation();
   const currentPath = location.pathname;
+  const { user, loading, logout } = useAuth();
 
   return (
     <Box minH="100vh" bg="gray.50" display="flex" flexDirection="column">
@@ -68,50 +72,82 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
               </HStack>
             </Link>
 
-            {/* Navigation (opcional) */}
+            {/* Navigation - Adapts based on auth state when showNav is true */}
             {showNav && (
-              <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
-                <Link
-                  as={RouterLink}
-                  to="/plans"
-                  fontSize="sm"
-                  fontWeight="medium"
-                  color={currentPath === '/plans' ? 'blue.600' : 'gray.600'}
-                  borderBottom={currentPath === '/plans' ? '2px solid' : 'none'}
-                  borderColor="blue.600"
-                  pb={currentPath === '/plans' ? 0.5 : 0}
-                  _hover={{ color: 'blue.600' }}
-                >
-                  Planos
-                </Link>
-                <Link
-                  as={RouterLink}
-                  to="/login"
-                  fontSize="sm"
-                  fontWeight="medium"
-                  color={currentPath === '/login' ? 'blue.600' : 'gray.600'}
-                  borderBottom={currentPath === '/login' ? '2px solid' : 'none'}
-                  borderColor="blue.600"
-                  pb={currentPath === '/login' ? 0.5 : 0}
-                  _hover={{ color: 'blue.600' }}
-                >
-                  Login
-                </Link>
-                <Link
-                  as={RouterLink}
-                  to="/register"
-                  fontSize="sm"
-                  fontWeight="medium"
-                  color="white"
-                  bg={currentPath === '/register' ? 'blue.600' : 'blue.500'}
-                  px={3}
-                  py={1.5}
-                  borderRadius="md"
-                  _hover={{ bg: 'blue.600', textDecoration: 'none' }}
-                >
-                  Criar conta
-                </Link>
-              </HStack>
+              loading ? (
+                // Loading skeleton while checking auth
+                <HStack spacing={{ base: 2, md: 4 }}>
+                  <Skeleton height="20px" width="60px" />
+                  <Skeleton height="20px" width="60px" />
+                  <Skeleton height="32px" width="100px" borderRadius="md" />
+                </HStack>
+              ) : user ? (
+                // Logged in: show Dashboard + Logout
+                <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
+                  <Link
+                    as={RouterLink}
+                    to="/dashboard"
+                    fontSize="sm"
+                    fontWeight="medium"
+                    color="gray.600"
+                    _hover={{ color: 'blue.600' }}
+                  >
+                    Dashboard
+                  </Link>
+                  <Button
+                    onClick={logout}
+                    colorScheme="red"
+                    variant="outline"
+                    size="sm"
+                  >
+                    Sair
+                  </Button>
+                </HStack>
+              ) : (
+                // Logged out: show default nav
+                <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
+                  <Link
+                    as={RouterLink}
+                    to="/plans"
+                    fontSize="sm"
+                    fontWeight="medium"
+                    color={currentPath === '/plans' ? 'blue.600' : 'gray.600'}
+                    borderBottom={currentPath === '/plans' ? '2px solid' : 'none'}
+                    borderColor="blue.600"
+                    pb={currentPath === '/plans' ? 0.5 : 0}
+                    _hover={{ color: 'blue.600' }}
+                  >
+                    Planos
+                  </Link>
+                  <Link
+                    as={RouterLink}
+                    to="/login"
+                    fontSize="sm"
+                    fontWeight="medium"
+                    color={currentPath === '/login' ? 'blue.600' : 'gray.600'}
+                    borderBottom={currentPath === '/login' ? '2px solid' : 'none'}
+                    borderColor="blue.600"
+                    pb={currentPath === '/login' ? 0.5 : 0}
+                    _hover={{ color: 'blue.600' }}
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    as={RouterLink}
+                    to="/register"
+                    fontSize="sm"
+                    fontWeight="medium"
+                    color="white"
+                    bg={currentPath === '/register' ? 'blue.600' : 'blue.500'}
+                    px={3}
+                    py={1.5}
+                    borderRadius="md"
+                    _hover={{ bg: 'blue.600', textDecoration: 'none' }}
+                  >
+                    Criar conta
+                  </Link>
+                </HStack>
+              )
             )}
           </Flex>
         </Container>
