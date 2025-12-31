@@ -21,7 +21,8 @@
     "trial:expired": "ts-node-dev scripts/setup-trial-scenario.ts --expired",
     "trial:expiring": "ts-node-dev scripts/setup-trial-scenario.ts --expiring=2",
     "trial:active": "ts-node-dev scripts/setup-trial-scenario.ts --active=14",
-    "trial:paid": "ts-node-dev scripts/setup-trial-scenario.ts --paid"
+    "trial:paid": "ts-node-dev scripts/setup-trial-scenario.ts --paid",
+    "create-admin": "ts-node-dev scripts/create-admin.ts"
   },
   "keywords": [],
   "author": "",
