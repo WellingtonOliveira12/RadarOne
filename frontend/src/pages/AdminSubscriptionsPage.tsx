@@ -23,7 +23,20 @@ import {
   Select,
   Button,
   useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  useDisclosure,
+  FormControl,
+  FormLabel,
+  Input,
+  IconButton,
 } from '@chakra-ui/react';
+import { EditIcon } from '@chakra-ui/icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { api } from '../services/api';
 
@@ -107,6 +120,15 @@ export const AdminSubscriptionsPage: React.FC = () => {
 
   const toast = useToast();
 
+  // Modal de edição
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
+  const [editForm, setEditForm] = useState({
+    status: '',
+    validUntil: '',
+  });
+  const [editLoading, setEditLoading] = useState(false);
+
   useEffect(() => {
     loadSubscriptions();
   }, [pagination.page, filters]);
@@ -155,6 +177,82 @@ export const AdminSubscriptionsPage: React.FC = () => {
   };
 
   const hasActiveFilters = filters.status;
+
+  const handleOpenEditModal = (subscription: Subscription) => {
+    setEditingSubscription(subscription);
+    // Converter data para formato input (YYYY-MM-DD)
+    const validUntilDate = new Date(subscription.validUntil);
+    const formattedDate = validUntilDate.toISOString().split('T')[0];
+    setEditForm({
+      status: subscription.status,
+      validUntil: formattedDate,
+    });
+    onOpen();
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSubscription) return;
+
+    try {
+      setEditLoading(true);
+
+      // Preparar dados para envio
+      const updateData: { status?: string; validUntil?: string } = {};
+
+      if (editForm.status !== editingSubscription.status) {
+        updateData.status = editForm.status;
+      }
+
+      // Converter data para ISO string
+      const newValidUntil = new Date(editForm.validUntil).toISOString();
+      if (newValidUntil !== editingSubscription.validUntil) {
+        updateData.validUntil = newValidUntil;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        toast({
+          title: 'Nenhuma alteração',
+          description: 'Nenhum campo foi modificado',
+          status: 'info',
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      await api.patch(`/api/admin/subscriptions/${editingSubscription.id}`, updateData);
+
+      toast({
+        title: 'Sucesso',
+        description: 'Assinatura atualizada com sucesso',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      // Atualizar subscription localmente
+      setSubscriptions((prev) =>
+        prev.map((s) =>
+          s.id === editingSubscription.id
+            ? { ...s, ...updateData, validUntil: updateData.validUntil || s.validUntil }
+            : s
+        )
+      );
+
+      onClose();
+    } catch (err: any) {
+      console.error('Erro ao atualizar subscription:', err);
+      toast({
+        title: 'Erro',
+        description: err.response?.data?.error || 'Erro ao atualizar assinatura',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
   return (
     <AdminLayout>
@@ -247,6 +345,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
                       <Th isNumeric>Valor</Th>
                       <Th>Criado em</Th>
                       <Th>Válido até</Th>
+                      <Th>Ações</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -305,6 +404,16 @@ export const AdminSubscriptionsPage: React.FC = () => {
                               )}
                             </VStack>
                           </Td>
+                          <Td>
+                            <IconButton
+                              aria-label="Editar assinatura"
+                              icon={<EditIcon />}
+                              size="sm"
+                              colorScheme="blue"
+                              variant="ghost"
+                              onClick={() => handleOpenEditModal(subscription)}
+                            />
+                          </Td>
                         </Tr>
                       );
                     })}
@@ -341,6 +450,73 @@ export const AdminSubscriptionsPage: React.FC = () => {
           </HStack>
         )}
       </VStack>
+
+      {/* Modal de Edição */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Editar Assinatura</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              {editingSubscription && (
+                <Box p={4} bg="gray.50" borderRadius="md">
+                  <Text fontWeight="bold">{editingSubscription.user.name}</Text>
+                  <Text fontSize="sm" color="gray.600">
+                    {editingSubscription.user.email}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600">
+                    Plano: {editingSubscription.plan.name}
+                  </Text>
+                </Box>
+              )}
+
+              <FormControl>
+                <FormLabel>Status</FormLabel>
+                <Select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                >
+                  <option value="ACTIVE">Ativo</option>
+                  <option value="TRIAL">Trial</option>
+                  <option value="CANCELLED">Cancelado</option>
+                  <option value="PAST_DUE">Atrasado</option>
+                  <option value="EXPIRED">Expirado</option>
+                  <option value="SUSPENDED">Suspenso</option>
+                </Select>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Válido até</FormLabel>
+                <Input
+                  type="date"
+                  value={editForm.validUntil}
+                  onChange={(e) => setEditForm({ ...editForm, validUntil: e.target.value })}
+                />
+              </FormControl>
+
+              <Alert status="info" borderRadius="md">
+                <AlertIcon />
+                <Box fontSize="sm">
+                  <Text fontWeight="semibold">Atenção</Text>
+                  <Text>
+                    Alterações manuais devem ser feitas com cuidado. Certifique-se de que os
+                    valores estão corretos.
+                  </Text>
+                </Box>
+              </Alert>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onClose} isDisabled={editLoading}>
+              Cancelar
+            </Button>
+            <Button colorScheme="blue" onClick={handleSaveEdit} isLoading={editLoading}>
+              Salvar Alterações
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </AdminLayout>
   );
 };
