@@ -1000,4 +1000,106 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao listar audit logs' });
     }
   }
+
+  /**
+   * 12. Listar configurações do sistema (FASE 3.5)
+   * GET /api/admin/settings
+   */
+  static async listSettings(req: Request, res: Response) {
+    try {
+      const { category } = req.query;
+
+      const where: any = {};
+      if (category) {
+        where.category = category;
+      }
+
+      const settings = await prisma.systemSetting.findMany({
+        where,
+        orderBy: [
+          { category: 'asc' },
+          { key: 'asc' }
+        ]
+      });
+
+      return res.json({ settings });
+
+    } catch (error) {
+      console.error('Erro ao listar configurações:', error);
+      return res.status(500).json({ error: 'Erro ao listar configurações do sistema' });
+    }
+  }
+
+  /**
+   * 13. Atualizar configuração do sistema (FASE 3.5)
+   * PATCH /api/admin/settings/:key
+   */
+  static async updateSetting(req: Request, res: Response) {
+    try {
+      const { key } = req.params;
+      const { value } = req.body;
+      const adminId = req.userId;
+
+      if (!value && value !== '' && value !== false && value !== 0) {
+        return res.status(400).json({ error: 'Valor é obrigatório' });
+      }
+
+      // Buscar dados do admin para audit log
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      // Buscar configuração existente
+      const existingSetting = await prisma.systemSetting.findUnique({
+        where: { key }
+      });
+
+      const beforeData = existingSetting ? { value: existingSetting.value } : null;
+
+      // Atualizar ou criar configuração
+      const setting = await prisma.systemSetting.upsert({
+        where: { key },
+        update: {
+          value: String(value),
+          updatedBy: adminId
+        },
+        create: {
+          key,
+          value: String(value),
+          type: 'STRING',
+          category: 'GENERAL',
+          updatedBy: adminId
+        }
+      });
+
+      const afterData = { value: setting.value };
+
+      // Registrar no audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: AuditAction.SYSTEM_SETTING_UPDATED,
+        targetType: AuditTargetType.SYSTEM,
+        targetId: key,
+        beforeData,
+        afterData,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json({
+        message: 'Configuração atualizada com sucesso',
+        setting
+      });
+
+    } catch (error) {
+      console.error('Erro ao atualizar configuração:', error);
+      return res.status(500).json({ error: 'Erro ao atualizar configuração' });
+    }
+  }
 }

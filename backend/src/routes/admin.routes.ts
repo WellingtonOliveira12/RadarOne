@@ -29,4 +29,8 @@ router.get('/jobs', requireAdmin, AdminController.listJobRuns);
 // Audit Logs (FASE 3.1)
 router.get('/audit-logs', requireAdmin, AdminController.listAuditLogs); // Todos os admins podem visualizar
 
+// System Settings (FASE 3.5)
+router.get('/settings', requireAdmin, AdminController.listSettings);
+router.patch('/settings/:key', requireAdminRole([UserRole.ADMIN_SUPER]), AdminController.updateSetting); // Apenas ADMIN_SUPER
+
 export default router;

@@ -503,3 +503,24 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+// ============================================
+// SYSTEM SETTINGS (FASE 3.5)
+// ============================================
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique // MAINTENANCE_MODE, MAX_MONITORS_GLOBAL, etc
+  value       String // Valor armazenado como string (parse conforme tipo)
+  type        String   @default("STRING") // STRING, NUMBER, BOOLEAN, JSON
+  description String? // Descrição do que essa configuração faz
+  category    String   @default("GENERAL") // GENERAL, LIMITS, FEATURES, MAINTENANCE
+  isPublic    Boolean  @default(false) @map("is_public") // Se pode ser exibido publicamente
+  updatedBy   String?  @map("updated_by") // ID do admin que atualizou
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([key])
+  @@index([category])
+  @@map("system_settings")
+}

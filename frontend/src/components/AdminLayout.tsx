@@ -45,6 +45,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { to: '/admin/subscriptions', label: 'Assinaturas', icon: '💳' },
     { to: '/admin/jobs', label: 'Jobs', icon: '⚙️' },
     { to: '/admin/audit-logs', label: 'Audit Logs', icon: '📝' },
+    { to: '/admin/settings', label: 'Configurações', icon: '⚙️' },
     { to: '/admin/monitors', label: 'Monitores', icon: '📡' },
     { to: '/admin/webhooks', label: 'Webhooks', icon: '🔗' },
     { to: '/admin/coupons', label: 'Cupons', icon: '🎟️' },
