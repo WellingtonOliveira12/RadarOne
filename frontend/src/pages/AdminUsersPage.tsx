@@ -24,6 +24,14 @@ import {
   Select,
   Button,
   useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
 import { api } from '../services/api';
@@ -103,6 +111,12 @@ export const AdminUsersPage: React.FC = () => {
   });
 
   const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
+  // Estados para ações
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [actionType, setActionType] = useState<'block' | 'unblock' | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -152,6 +166,57 @@ export const AdminUsersPage: React.FC = () => {
   };
 
   const hasActiveFilters = filters.status || filters.role || filters.email;
+
+  // Funções para ações (FASE 3.3)
+  const handleOpenBlockModal = (user: User) => {
+    setSelectedUser(user);
+    setActionType('block');
+    onOpen();
+  };
+
+  const handleOpenUnblockModal = (user: User) => {
+    setSelectedUser(user);
+    setActionType('unblock');
+    onOpen();
+  };
+
+  const handleConfirmAction = async () => {
+    if (!selectedUser || !actionType) return;
+
+    try {
+      setActionLoading(true);
+
+      const endpoint = actionType === 'block'
+        ? `/api/admin/users/${selectedUser.id}/block`
+        : `/api/admin/users/${selectedUser.id}/unblock`;
+
+      await api.post(endpoint);
+
+      toast({
+        title: 'Sucesso',
+        description: `Usuário ${actionType === 'block' ? 'bloqueado' : 'desbloqueado'} com sucesso`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      // Recarregar lista de usuários
+      await loadUsers();
+
+      onClose();
+    } catch (err: any) {
+      console.error(`Erro ao ${actionType} usuário:`, err);
+      toast({
+        title: 'Erro',
+        description: err.response?.data?.error || `Erro ao ${actionType === 'block' ? 'bloquear' : 'desbloquear'} usuário`,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   return (
     <AdminLayout>
@@ -268,6 +333,7 @@ export const AdminUsersPage: React.FC = () => {
                       <Th>Assinatura</Th>
                       <Th isNumeric>Monitores</Th>
                       <Th>Cadastro</Th>
+                      <Th>Ações</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -325,6 +391,27 @@ export const AdminUsersPage: React.FC = () => {
                               {formatDate(user.createdAt)}
                             </Text>
                           </Td>
+                          <Td>
+                            <HStack spacing={2}>
+                              {user.blocked ? (
+                                <Button
+                                  size="xs"
+                                  colorScheme="green"
+                                  onClick={() => handleOpenUnblockModal(user)}
+                                >
+                                  Desbloquear
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="xs"
+                                  colorScheme="red"
+                                  onClick={() => handleOpenBlockModal(user)}
+                                >
+                                  Bloquear
+                                </Button>
+                              )}
+                            </HStack>
+                          </Td>
                         </Tr>
                       );
                     })}
@@ -360,6 +447,80 @@ export const AdminUsersPage: React.FC = () => {
           </HStack>
         )}
       </VStack>
+
+      {/* Modal de Confirmação (FASE 3.3) */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            {actionType === 'block' ? 'Bloquear Usuário' : 'Desbloquear Usuário'}
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {selectedUser && (
+              <VStack align="stretch" spacing={4}>
+                <Alert status={actionType === 'block' ? 'warning' : 'info'} borderRadius="md">
+                  <AlertIcon />
+                  <Box>
+                    <AlertTitle>
+                      {actionType === 'block' ? 'Atenção!' : 'Confirmação'}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {actionType === 'block' ? (
+                        <>
+                          Ao bloquear este usuário:
+                          <br />• O usuário não poderá fazer login
+                          <br />• As assinaturas ativas serão canceladas
+                          <br />• Os monitores ativos serão desativados
+                        </>
+                      ) : (
+                        'O usuário poderá fazer login novamente. Atenção: as assinaturas e monitores NÃO serão reativados automaticamente.'
+                      )}
+                    </AlertDescription>
+                  </Box>
+                </Alert>
+
+                <Box>
+                  <Text fontWeight="bold">Usuário:</Text>
+                  <Text>{selectedUser.name}</Text>
+                  <Text fontSize="sm" color="gray.600">{selectedUser.email}</Text>
+                </Box>
+
+                {actionType === 'block' && (
+                  <>
+                    {selectedUser.subscriptions.length > 0 && (
+                      <Box>
+                        <Text fontWeight="bold" color="red.600">
+                          Assinaturas que serão canceladas: {selectedUser.subscriptions.length}
+                        </Text>
+                      </Box>
+                    )}
+                    {selectedUser._count.monitors > 0 && (
+                      <Box>
+                        <Text fontWeight="bold" color="orange.600">
+                          Monitores que serão desativados: {selectedUser._count.monitors}
+                        </Text>
+                      </Box>
+                    )}
+                  </>
+                )}
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onClose} isDisabled={actionLoading}>
+              Cancelar
+            </Button>
+            <Button
+              colorScheme={actionType === 'block' ? 'red' : 'green'}
+              onClick={handleConfirmAction}
+              isLoading={actionLoading}
+            >
+              Confirmar {actionType === 'block' ? 'Bloqueio' : 'Desbloqueio'}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </AdminLayout>
   );
 };
