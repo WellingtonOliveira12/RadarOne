@@ -17,6 +17,10 @@ build/
 .env.test.local
 .env.production.local
 
+# Credentials (NEVER commit)
+ADMIN_CREDENTIALS.md
+*CREDENTIALS*
+
 # Logs
 logs
 *.log
