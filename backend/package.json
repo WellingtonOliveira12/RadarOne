@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "npm run lint && tsc",
+    "build": "prisma generate && npm run lint && tsc",
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
     "test": "vitest",

@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { logInfo, logError } from './loggerHelpers';
-
-const prisma = new PrismaClient();
+import { prisma } from '../server';
 
 /**
  * Tipos de ação para audit log

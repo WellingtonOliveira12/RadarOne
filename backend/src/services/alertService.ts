@@ -9,11 +9,10 @@
  * - Integração com Audit Log
  */
 
-import { PrismaClient, AlertSeverity, AdminAlert } from '@prisma/client';
+import { AlertSeverity, AdminAlert } from '@prisma/client';
 import { CreateAlertParams, AlertTypeValue, getDefaultSeverity, getAlertMessage } from '../types/alerts';
 import { logInfo, logError } from '../utils/loggerHelpers';
-
-const prisma = new PrismaClient();
+import { prisma } from '../server';
 
 /**
  * Cria um alerta administrativo
