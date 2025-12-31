@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../server';
+import { logAdminAction, AuditAction, AuditTargetType, getClientIp } from '../utils/auditLog';
 
 export class AdminController {
   /**
@@ -196,6 +197,16 @@ export class AdminController {
       const { id } = req.params;
       const adminId = req.userId; // ID do admin que executou a ação
 
+      // Buscar dados do admin para o audit log
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
       // Verificar se usuário existe
       const user = await prisma.user.findUnique({
         where: { id },
@@ -216,6 +227,13 @@ export class AdminController {
       if (user.blocked) {
         return res.status(400).json({ error: 'Usuário já está bloqueado' });
       }
+
+      // Dados antes do bloqueio
+      const beforeData = {
+        blocked: user.blocked,
+        activeSubscriptions: user.subscriptions.length,
+        activeMonitors: user.monitors.length
+      };
 
       // Executar bloqueio em transação
       await prisma.$transaction(async (tx) => {
@@ -246,9 +264,26 @@ export class AdminController {
             data: { active: false }
           });
         }
+      });
 
-        // 4. Registrar log de ação (criar tabela de logs se necessário)
-        console.log(`[ADMIN LOG] User ${id} bloqueado por admin ${adminId}`);
+      // Dados depois do bloqueio
+      const afterData = {
+        blocked: true,
+        subscriptionsCancelled: user.subscriptions.length,
+        monitorsDeactivated: user.monitors.length
+      };
+
+      // Registrar no audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: AuditAction.USER_BLOCKED,
+        targetType: AuditTargetType.USER,
+        targetId: id,
+        beforeData,
+        afterData,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
       });
 
       return res.json({
@@ -279,6 +314,16 @@ export class AdminController {
       const { id } = req.params;
       const adminId = req.userId;
 
+      // Buscar dados do admin para o audit log
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
       const user = await prisma.user.findUnique({
         where: { id }
       });
@@ -291,14 +336,30 @@ export class AdminController {
         return res.status(400).json({ error: 'Usuário não está bloqueado' });
       }
 
+      // Dados antes
+      const beforeData = { blocked: user.blocked };
+
       // Desbloquear usuário
       await prisma.user.update({
         where: { id },
         data: { blocked: false }
       });
 
-      // Registrar log
-      console.log(`[ADMIN LOG] User ${id} desbloqueado por admin ${adminId}`);
+      // Dados depois
+      const afterData = { blocked: false };
+
+      // Registrar no audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: AuditAction.USER_UNBLOCKED,
+        targetType: AuditTargetType.USER,
+        targetId: id,
+        beforeData,
+        afterData,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
 
       return res.json({
         message: 'Usuário desbloqueado com sucesso',
@@ -404,6 +465,16 @@ export class AdminController {
       const { status, validUntil } = req.body;
       const adminId = req.userId;
 
+      // Buscar dados do admin para o audit log
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
       // Validar se subscription existe
       const subscription = await prisma.subscription.findUnique({
         where: { id }
@@ -412,6 +483,12 @@ export class AdminController {
       if (!subscription) {
         return res.status(404).json({ error: 'Subscription não encontrada' });
       }
+
+      // Dados antes da atualização
+      const beforeData = {
+        status: subscription.status,
+        validUntil: subscription.validUntil
+      };
 
       // Preparar dados para atualização
       const updateData: any = {};
@@ -447,8 +524,24 @@ export class AdminController {
         }
       });
 
-      // Registrar log
-      console.log(`[ADMIN LOG] Subscription ${id} atualizada por admin ${adminId}`, updateData);
+      // Dados depois da atualização
+      const afterData = {
+        status: updated.status,
+        validUntil: updated.validUntil
+      };
+
+      // Registrar no audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: AuditAction.SUBSCRIPTION_UPDATED,
+        targetType: AuditTargetType.SUBSCRIPTION,
+        targetId: id,
+        beforeData,
+        afterData,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
 
       return res.json({
         message: 'Subscription atualizada com sucesso',
@@ -831,6 +924,80 @@ export class AdminController {
     } catch (error) {
       console.error('Erro ao listar execuções de jobs:', error);
       return res.status(500).json({ error: 'Erro ao listar execuções de jobs' });
+    }
+  }
+
+  /**
+   * 11. Listar audit logs (FASE 3.1)
+   * GET /api/admin/audit-logs
+   */
+  static async listAuditLogs(req: Request, res: Response) {
+    try {
+      const {
+        page = '1',
+        limit = '20',
+        adminId,
+        action,
+        targetType,
+        startDate,
+        endDate
+      } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const skip = (pageNum - 1) * limitNum;
+
+      // Construir filtros
+      const where: any = {};
+
+      if (adminId) {
+        where.adminId = adminId;
+      }
+
+      if (action) {
+        where.action = action;
+      }
+
+      if (targetType) {
+        where.targetType = targetType;
+      }
+
+      if (startDate || endDate) {
+        where.createdAt = {};
+        if (startDate) {
+          where.createdAt.gte = new Date(startDate as string);
+        }
+        if (endDate) {
+          where.createdAt.lte = new Date(endDate as string);
+        }
+      }
+
+      // Buscar logs com paginação
+      const [logs, total] = await Promise.all([
+        prisma.auditLog.findMany({
+          where,
+          skip,
+          take: limitNum,
+          orderBy: { createdAt: 'desc' }
+        }),
+        prisma.auditLog.count({ where })
+      ]);
+
+      const totalPages = Math.ceil(total / limitNum);
+
+      return res.json({
+        logs,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao listar audit logs:', error);
+      return res.status(500).json({ error: 'Erro ao listar audit logs' });
     }
   }
 }

@@ -32,6 +32,7 @@ import { AdminJobsPage } from './pages/AdminJobsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminSubscriptionsPage } from './pages/AdminSubscriptionsPage';
+import { AdminAuditLogsPage } from './pages/AdminAuditLogsPage';
 
 // Páginas de teste/debug
 import { HealthCheckPage } from './pages/HealthCheckPage';
@@ -166,6 +167,14 @@ export function AppRouter() {
             element={
               <AdminProtectedRoute>
                 <AdminJobsPage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={
+              <AdminProtectedRoute>
+                <AdminAuditLogsPage />
               </AdminProtectedRoute>
             }
           />

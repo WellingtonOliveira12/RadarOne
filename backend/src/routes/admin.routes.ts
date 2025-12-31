@@ -1,21 +1,22 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/admin.controller';
-import { requireAdmin } from '../middlewares/admin.middleware';
+import { requireAdmin, requireAdminRole } from '../middlewares/admin.middleware';
+import { UserRole } from '@prisma/client';
 
 const router = Router();
 
-// Todas as rotas de admin requerem: authenticate + requireAdmin
+// Todas as rotas de admin requerem: authenticate + requireAdmin/requireAdminRole
 // (authenticate já aplicado no server.ts)
 
 // Usuários
 router.get('/users', requireAdmin, AdminController.listUsers);
 router.get('/users/:id', requireAdmin, AdminController.getUserDetails);
-router.post('/users/:id/block', requireAdmin, AdminController.blockUser);
-router.post('/users/:id/unblock', requireAdmin, AdminController.unblockUser);
+router.post('/users/:id/block', requireAdminRole([UserRole.ADMIN_SUPER]), AdminController.blockUser); // Apenas ADMIN_SUPER
+router.post('/users/:id/unblock', requireAdminRole([UserRole.ADMIN_SUPER]), AdminController.unblockUser); // Apenas ADMIN_SUPER
 
 // Subscriptions
 router.get('/subscriptions', requireAdmin, AdminController.listSubscriptions);
-router.patch('/subscriptions/:id', requireAdmin, AdminController.updateSubscription);
+router.patch('/subscriptions/:id', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), AdminController.updateSubscription); // ADMIN_SUPER ou ADMIN_FINANCE
 
 // Sistema
 router.get('/stats', requireAdmin, AdminController.getSystemStats);
@@ -24,5 +25,8 @@ router.get('/monitors', requireAdmin, AdminController.listMonitors);
 
 // Jobs
 router.get('/jobs', requireAdmin, AdminController.listJobRuns);
+
+// Audit Logs (FASE 3.1)
+router.get('/audit-logs', requireAdmin, AdminController.listAuditLogs); // Todos os admins podem visualizar
 
 export default router;
