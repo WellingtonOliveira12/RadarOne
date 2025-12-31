@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Heading, Card, CardBody, Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, Center, VStack, Text, Button, HStack } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
+import { ExportButton } from '../components/ExportButton';
 import { api } from '../services/api';
 
 interface Monitor { id: string; name: string; site: string; active: boolean; user: { name: string; email: string }; }
@@ -30,7 +31,13 @@ export const AdminMonitorsPage: React.FC = () => {
   return (
     <AdminLayout>
       <VStack spacing={6} align="stretch">
-        <Heading size="lg">Monitores</Heading>
+        <HStack justify="space-between" align="center">
+          <Heading size="lg">Monitores</Heading>
+          <ExportButton
+            endpoint="/api/admin/monitors/export"
+            label="Exportar Monitores"
+          />
+        </HStack>
         <Card>
           <CardBody>
             <Table variant="simple" size="sm">

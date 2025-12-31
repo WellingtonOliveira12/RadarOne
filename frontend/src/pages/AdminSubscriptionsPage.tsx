@@ -25,6 +25,7 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
+import { ExportButton } from '../components/ExportButton';
 import { api } from '../services/api';
 
 interface Subscription {
@@ -163,9 +164,16 @@ export const AdminSubscriptionsPage: React.FC = () => {
           <Heading size="lg" color="gray.800">
             Assinaturas
           </Heading>
-          <Badge colorScheme="blue" fontSize="md" px={3} py={1}>
-            {pagination.total} assinaturas
-          </Badge>
+          <HStack>
+            <Badge colorScheme="blue" fontSize="md" px={3} py={1}>
+              {pagination.total} assinaturas
+            </Badge>
+            <ExportButton
+              endpoint="/api/admin/subscriptions/export"
+              queryParams={filters}
+              label="Exportar Assinaturas"
+            />
+          </HStack>
         </HStack>
 
         {/* Filtros */}

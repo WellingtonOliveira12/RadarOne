@@ -28,6 +28,7 @@ import {
   Divider,
 } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
+import { ExportButton } from '../components/ExportButton';
 import { api } from '../services/api';
 
 interface AdminAlert {
@@ -128,6 +129,11 @@ export const AdminAlertsPage: React.FC = () => {
             <Badge colorScheme="red" fontSize="md" px={3} py={1}>
               Não lidos: {unreadCount}
             </Badge>
+            <ExportButton
+              endpoint="/api/admin/alerts/export"
+              queryParams={{ type: filterType, severity: filterSeverity, isRead: filterStatus === 'read' ? 'true' : filterStatus === 'unread' ? 'false' : undefined }}
+              label="Exportar Alertas"
+            />
           </HStack>
         </HStack>
 

@@ -1508,4 +1508,546 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao buscar estatísticas temporais' });
     }
   }
+
+  /**
+   * 18. Exportar usuários em CSV (FASE 4.3)
+   * GET /api/admin/users/export
+   *
+   * Respeita os mesmos filtros de /api/admin/users
+   */
+  static async exportUsers(req: Request, res: Response) {
+    try {
+      const { status, role, email } = req.query;
+      const adminId = req.userId;
+
+      // Buscar dados do admin para audit log
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      // Construir filtros (mesmos da listagem)
+      const where: any = {};
+
+      if (status === 'blocked') {
+        where.blocked = true;
+      } else if (status === 'active') {
+        where.blocked = false;
+      }
+
+      if (role) {
+        where.role = role;
+      }
+
+      if (email) {
+        where.email = {
+          contains: email as string,
+          mode: 'insensitive'
+        };
+      }
+
+      // Buscar usuários
+      const users = await prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          blocked: true,
+          createdAt: true,
+          cpfLast4: true,
+          subscriptions: {
+            where: { status: 'ACTIVE' },
+            take: 1,
+            select: {
+              plan: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Importar funções do exportService
+      const { generateCSV, getTimestamp } = await import('../services/exportService');
+
+      // Preparar dados para CSV
+      const csvData = users.map(user => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        blocked: user.blocked,
+        cpfLast4: user.cpfLast4 || '',
+        currentPlan: user.subscriptions[0]?.plan.name || 'Nenhum',
+        createdAt: user.createdAt
+      }));
+
+      const headers = {
+        id: 'ID',
+        name: 'Nome',
+        email: 'E-mail',
+        role: 'Perfil',
+        isActive: 'Ativo',
+        blocked: 'Bloqueado',
+        cpfLast4: 'CPF (últimos 4)',
+        currentPlan: 'Plano Atual',
+        createdAt: 'Data de Cadastro'
+      };
+
+      const { csv, filename } = generateCSV(
+        csvData,
+        headers,
+        `usuarios_${getTimestamp()}`
+      );
+
+      // Registrar no audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: 'USERS_EXPORTED',
+        targetType: AuditTargetType.USER,
+        targetId: null,
+        beforeData: null,
+        afterData: { count: users.length, filters: where },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      // Retornar CSV
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('\ufeff' + csv); // BOM para UTF-8
+
+    } catch (error) {
+      console.error('Erro ao exportar usuários:', error);
+      return res.status(500).json({ error: 'Erro ao exportar usuários' });
+    }
+  }
+
+  /**
+   * 19. Exportar subscriptions em CSV (FASE 4.3)
+   * GET /api/admin/subscriptions/export
+   */
+  static async exportSubscriptions(req: Request, res: Response) {
+    try {
+      const { status, planId, userId } = req.query;
+      const adminId = req.userId;
+
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      // Construir filtros
+      const where: any = {};
+
+      if (status) {
+        where.status = status;
+      }
+
+      if (planId) {
+        where.planId = planId;
+      }
+
+      if (userId) {
+        where.userId = userId;
+      }
+
+      // Buscar subscriptions
+      const subscriptions = await prisma.subscription.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              name: true,
+              email: true
+            }
+          },
+          plan: {
+            select: {
+              name: true,
+              priceCents: true
+            }
+          }
+        }
+      });
+
+      const { generateCSV, getTimestamp, formatCurrency } = await import('../services/exportService');
+
+      // Preparar dados
+      const csvData = subscriptions.map(sub => ({
+        id: sub.id,
+        userName: sub.user.name,
+        userEmail: sub.user.email,
+        planName: sub.plan.name,
+        planPrice: formatCurrency(sub.plan.priceCents),
+        status: sub.status,
+        startDate: sub.startDate,
+        validUntil: sub.validUntil || '',
+        isLifetime: sub.isLifetime,
+        isTrial: sub.isTrial,
+        createdAt: sub.createdAt
+      }));
+
+      const headers = {
+        id: 'ID',
+        userName: 'Nome do Usuário',
+        userEmail: 'E-mail',
+        planName: 'Plano',
+        planPrice: 'Preço',
+        status: 'Status',
+        startDate: 'Data de Início',
+        validUntil: 'Válido Até',
+        isLifetime: 'Vitalício',
+        isTrial: 'Trial',
+        createdAt: 'Data de Criação'
+      };
+
+      const { csv, filename } = generateCSV(
+        csvData,
+        headers,
+        `assinaturas_${getTimestamp()}`
+      );
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: 'SUBSCRIPTIONS_EXPORTED',
+        targetType: AuditTargetType.SUBSCRIPTION,
+        targetId: null,
+        beforeData: null,
+        afterData: { count: subscriptions.length, filters: where },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('\ufeff' + csv);
+
+    } catch (error) {
+      console.error('Erro ao exportar subscriptions:', error);
+      return res.status(500).json({ error: 'Erro ao exportar subscriptions' });
+    }
+  }
+
+  /**
+   * 20. Exportar audit logs em CSV (FASE 4.3)
+   * GET /api/admin/audit-logs/export
+   */
+  static async exportAuditLogs(req: Request, res: Response) {
+    try {
+      const { adminId: filterAdminId, action, targetType, startDate, endDate } = req.query;
+      const adminId = req.userId;
+
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      // Construir filtros
+      const where: any = {};
+
+      if (filterAdminId) {
+        where.adminId = filterAdminId;
+      }
+
+      if (action) {
+        where.action = action;
+      }
+
+      if (targetType) {
+        where.targetType = targetType;
+      }
+
+      if (startDate || endDate) {
+        where.createdAt = {};
+        if (startDate) {
+          where.createdAt.gte = new Date(startDate as string);
+        }
+        if (endDate) {
+          where.createdAt.lte = new Date(endDate as string);
+        }
+      }
+
+      // Buscar logs
+      const logs = await prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' }
+      });
+
+      const { generateCSV, getTimestamp } = await import('../services/exportService');
+
+      const csvData = logs.map(log => ({
+        id: log.id,
+        adminEmail: log.adminEmail,
+        action: log.action,
+        targetType: log.targetType,
+        targetId: log.targetId || '',
+        ipAddress: log.ipAddress || '',
+        createdAt: log.createdAt
+      }));
+
+      const headers = {
+        id: 'ID',
+        adminEmail: 'Admin',
+        action: 'Ação',
+        targetType: 'Tipo',
+        targetId: 'ID do Alvo',
+        ipAddress: 'IP',
+        createdAt: 'Data/Hora'
+      };
+
+      const { csv, filename } = generateCSV(
+        csvData,
+        headers,
+        `audit_logs_${getTimestamp()}`
+      );
+
+      // Audit log da exportação
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: 'AUDIT_LOGS_EXPORTED',
+        targetType: AuditTargetType.SYSTEM,
+        targetId: null,
+        beforeData: null,
+        afterData: { count: logs.length, filters: where },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('\ufeff' + csv);
+
+    } catch (error) {
+      console.error('Erro ao exportar audit logs:', error);
+      return res.status(500).json({ error: 'Erro ao exportar audit logs' });
+    }
+  }
+
+  /**
+   * 21. Exportar alertas em CSV (FASE 4.3)
+   * GET /api/admin/alerts/export
+   */
+  static async exportAlerts(req: Request, res: Response) {
+    try {
+      const { type, severity, isRead } = req.query;
+      const adminId = req.userId;
+
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      // Construir filtros
+      const where: any = {};
+
+      if (type) {
+        where.type = type as string;
+      }
+
+      if (severity) {
+        where.severity = severity as string;
+      }
+
+      if (isRead !== undefined) {
+        where.isRead = isRead === 'true';
+      }
+
+      // Buscar alertas
+      const alerts = await prisma.adminAlert.findMany({
+        where,
+        orderBy: { createdAt: 'desc' }
+      });
+
+      const { generateCSV, getTimestamp } = await import('../services/exportService');
+
+      const csvData = alerts.map(alert => ({
+        id: alert.id,
+        type: alert.type,
+        severity: alert.severity,
+        title: alert.title,
+        message: alert.message,
+        source: alert.source || '',
+        isRead: alert.isRead,
+        readBy: alert.readBy || '',
+        createdAt: alert.createdAt
+      }));
+
+      const headers = {
+        id: 'ID',
+        type: 'Tipo',
+        severity: 'Severidade',
+        title: 'Título',
+        message: 'Mensagem',
+        source: 'Origem',
+        isRead: 'Lido',
+        readBy: 'Lido Por',
+        createdAt: 'Data/Hora'
+      };
+
+      const { csv, filename } = generateCSV(
+        csvData,
+        headers,
+        `alertas_${getTimestamp()}`
+      );
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: 'ALERTS_EXPORTED',
+        targetType: AuditTargetType.SYSTEM,
+        targetId: null,
+        beforeData: null,
+        afterData: { count: alerts.length, filters: where },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('\ufeff' + csv);
+
+    } catch (error) {
+      console.error('Erro ao exportar alertas:', error);
+      return res.status(500).json({ error: 'Erro ao exportar alertas' });
+    }
+  }
+
+  /**
+   * 22. Exportar monitores em CSV (FASE 4.3)
+   * GET /api/admin/monitors/export
+   */
+  static async exportMonitors(req: Request, res: Response) {
+    try {
+      const { userId, site, active } = req.query;
+      const adminId = req.userId;
+
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      // Construir filtros
+      const where: any = {};
+
+      if (userId) {
+        where.userId = userId;
+      }
+
+      if (site) {
+        where.site = {
+          contains: site as string,
+          mode: 'insensitive'
+        };
+      }
+
+      if (active !== undefined) {
+        where.active = active === 'true';
+      }
+
+      // Buscar monitores
+      const monitors = await prisma.monitor.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              name: true,
+              email: true
+            }
+          }
+        }
+      });
+
+      const { generateCSV, getTimestamp } = await import('../services/exportService');
+
+      const csvData = monitors.map(monitor => ({
+        id: monitor.id,
+        userName: monitor.user.name,
+        userEmail: monitor.user.email,
+        name: monitor.name,
+        site: monitor.site,
+        active: monitor.active,
+        keywords: monitor.keywords,
+        priceMin: monitor.priceMin || '',
+        priceMax: monitor.priceMax || '',
+        lastCheckedAt: monitor.lastCheckedAt || '',
+        createdAt: monitor.createdAt
+      }));
+
+      const headers = {
+        id: 'ID',
+        userName: 'Nome do Usuário',
+        userEmail: 'E-mail',
+        name: 'Nome do Monitor',
+        site: 'Site',
+        active: 'Ativo',
+        keywords: 'Palavras-chave',
+        priceMin: 'Preço Mínimo',
+        priceMax: 'Preço Máximo',
+        lastCheckedAt: 'Última Verificação',
+        createdAt: 'Data de Criação'
+      };
+
+      const { csv, filename } = generateCSV(
+        csvData,
+        headers,
+        `monitores_${getTimestamp()}`
+      );
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: 'MONITORS_EXPORTED',
+        targetType: AuditTargetType.MONITOR,
+        targetId: null,
+        beforeData: null,
+        afterData: { count: monitors.length, filters: where },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('\ufeff' + csv);
+
+    } catch (error) {
+      console.error('Erro ao exportar monitores:', error);
+      return res.status(500).json({ error: 'Erro ao exportar monitores' });
+    }
+  }
 }

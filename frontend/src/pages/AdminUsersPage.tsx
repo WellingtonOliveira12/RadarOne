@@ -34,6 +34,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
+import { ExportButton } from '../components/ExportButton';
 import { api } from '../services/api';
 
 interface User {
@@ -225,9 +226,16 @@ export const AdminUsersPage: React.FC = () => {
           <Heading size="lg" color="gray.800">
             Usuários
           </Heading>
-          <Badge colorScheme="blue" fontSize="md" px={3} py={1}>
-            {pagination.total} usuários
-          </Badge>
+          <HStack>
+            <Badge colorScheme="blue" fontSize="md" px={3} py={1}>
+              {pagination.total} usuários
+            </Badge>
+            <ExportButton
+              endpoint="/api/admin/users/export"
+              queryParams={filters}
+              label="Exportar Usuários"
+            />
+          </HStack>
         </HStack>
 
         {/* Filtros */}

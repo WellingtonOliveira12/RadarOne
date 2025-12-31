@@ -33,6 +33,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
+import { ExportButton } from '../components/ExportButton';
 import { api } from '../services/api';
 
 interface AuditLog {
@@ -222,14 +223,21 @@ export const AdminAuditLogsPage: React.FC = () => {
   return (
     <AdminLayout>
       <VStack spacing={6} align="stretch">
-        <Box>
-          <Heading size="lg" mb={2}>
-            Audit Logs
-          </Heading>
-          <Text color="gray.600">
-            Histórico completo de ações administrativas no sistema
-          </Text>
-        </Box>
+        <HStack justify="space-between" align="start">
+          <Box>
+            <Heading size="lg" mb={2}>
+              Audit Logs
+            </Heading>
+            <Text color="gray.600">
+              Histórico completo de ações administrativas no sistema
+            </Text>
+          </Box>
+          <ExportButton
+            endpoint="/api/admin/audit-logs/export"
+            queryParams={filters}
+            label="Exportar Logs"
+          />
+        </HStack>
 
         {/* Filtros */}
         <Card>
