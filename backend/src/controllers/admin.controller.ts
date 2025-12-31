@@ -1229,4 +1229,283 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao obter contagem de alertas' });
     }
   }
+
+  /**
+   * 17. Estatísticas temporais (FASE 4.2)
+   * GET /api/admin/stats/temporal?period=7
+   *
+   * Query params:
+   * - period: 7, 30, 60, 90 (dias)
+   *
+   * Retorna métricas comparativas do período atual vs anterior
+   */
+  static async getTemporalStats(req: Request, res: Response) {
+    try {
+      const { period = '7' } = req.query;
+      const periodDays = parseInt(period as string);
+
+      // Validar período
+      if (![7, 30, 60, 90].includes(periodDays)) {
+        return res.status(400).json({ error: 'Período inválido. Use 7, 30, 60 ou 90 dias.' });
+      }
+
+      // Calcular datas
+      const now = new Date();
+      const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+      const previousPeriodStart = new Date(periodStart.getTime() - periodDays * 24 * 60 * 60 * 1000);
+
+      // Métricas do período atual vs anterior
+      const [
+        // Usuários
+        newUsersCurrentPeriod,
+        newUsersPreviousPeriod,
+        totalUsersCurrent,
+        totalUsersPrevious,
+
+        // Monitores
+        newMonitorsCurrentPeriod,
+        newMonitorsPreviousPeriod,
+        activeMonitorsCurrent,
+        activeMonitorsPrevious,
+
+        // Subscriptions
+        newSubscriptionsCurrentPeriod,
+        newSubscriptionsPreviousPeriod,
+        activeSubscriptionsCurrent,
+        activeSubscriptionsPrevious,
+        cancelledCurrentPeriod,
+        cancelledPreviousPeriod,
+
+        // Monitor Logs (Jobs)
+        jobsCurrentPeriod,
+        jobsPreviousPeriod,
+      ] = await Promise.all([
+        // Novos usuários - período atual
+        prisma.user.count({
+          where: { createdAt: { gte: periodStart } }
+        }),
+        // Novos usuários - período anterior
+        prisma.user.count({
+          where: {
+            createdAt: {
+              gte: previousPeriodStart,
+              lt: periodStart
+            }
+          }
+        }),
+        // Total usuários - agora
+        prisma.user.count(),
+        // Total usuários - início do período
+        prisma.user.count({
+          where: { createdAt: { lt: periodStart } }
+        }),
+
+        // Novos monitores - período atual
+        prisma.monitor.count({
+          where: { createdAt: { gte: periodStart } }
+        }),
+        // Novos monitores - período anterior
+        prisma.monitor.count({
+          where: {
+            createdAt: {
+              gte: previousPeriodStart,
+              lt: periodStart
+            }
+          }
+        }),
+        // Monitores ativos - agora
+        prisma.monitor.count({ where: { active: true } }),
+        // Monitores ativos - início do período (aproximação)
+        prisma.monitor.count({
+          where: {
+            active: true,
+            createdAt: { lt: periodStart }
+          }
+        }),
+
+        // Novas subscriptions - período atual
+        prisma.subscription.count({
+          where: { createdAt: { gte: periodStart } }
+        }),
+        // Novas subscriptions - período anterior
+        prisma.subscription.count({
+          where: {
+            createdAt: {
+              gte: previousPeriodStart,
+              lt: periodStart
+            }
+          }
+        }),
+        // Subscriptions ativas - agora
+        prisma.subscription.count({ where: { status: 'ACTIVE' } }),
+        // Subscriptions ativas - início do período (aproximação)
+        prisma.subscription.count({
+          where: {
+            status: 'ACTIVE',
+            createdAt: { lt: periodStart }
+          }
+        }),
+        // Cancelamentos - período atual
+        prisma.subscription.count({
+          where: {
+            status: 'CANCELLED',
+            updatedAt: { gte: periodStart }
+          }
+        }),
+        // Cancelamentos - período anterior
+        prisma.subscription.count({
+          where: {
+            status: 'CANCELLED',
+            updatedAt: {
+              gte: previousPeriodStart,
+              lt: periodStart
+            }
+          }
+        }),
+
+        // Jobs executados - período atual
+        prisma.monitorLog.count({
+          where: { createdAt: { gte: periodStart } }
+        }),
+        // Jobs executados - período anterior
+        prisma.monitorLog.count({
+          where: {
+            createdAt: {
+              gte: previousPeriodStart,
+              lt: periodStart
+            }
+          }
+        }),
+      ]);
+
+      // Jobs com sucesso/falha - período atual
+      const jobsSuccessCurrentPeriod = await prisma.monitorLog.count({
+        where: {
+          createdAt: { gte: periodStart },
+          status: 'SUCCESS'
+        }
+      });
+
+      const jobsFailureCurrentPeriod = await prisma.monitorLog.count({
+        where: {
+          createdAt: { gte: periodStart },
+          status: 'ERROR'
+        }
+      });
+
+      // Jobs com sucesso/falha - período anterior
+      const jobsSuccessPreviousPeriod = await prisma.monitorLog.count({
+        where: {
+          createdAt: {
+            gte: previousPeriodStart,
+            lt: periodStart
+          },
+          status: 'SUCCESS'
+        }
+      });
+
+      const jobsFailurePreviousPeriod = await prisma.monitorLog.count({
+        where: {
+          createdAt: {
+            gte: previousPeriodStart,
+            lt: periodStart
+          },
+          status: 'ERROR'
+        }
+      });
+
+      // Calcular variações percentuais
+      const calculateGrowth = (current: number, previous: number): number => {
+        if (previous === 0) return current > 0 ? 100 : 0;
+        return ((current - previous) / previous) * 100;
+      };
+
+      // Calcular taxa de erro
+      const calculateErrorRate = (errors: number, total: number): number => {
+        if (total === 0) return 0;
+        return (errors / total) * 100;
+      };
+
+      return res.json({
+        period: periodDays,
+        periodStart: periodStart.toISOString(),
+        periodEnd: now.toISOString(),
+
+        users: {
+          current: {
+            total: totalUsersCurrent,
+            newUsers: newUsersCurrentPeriod,
+          },
+          previous: {
+            total: totalUsersPrevious,
+            newUsers: newUsersPreviousPeriod,
+          },
+          growth: {
+            total: calculateGrowth(totalUsersCurrent, totalUsersPrevious),
+            newUsers: calculateGrowth(newUsersCurrentPeriod, newUsersPreviousPeriod),
+          }
+        },
+
+        monitors: {
+          current: {
+            active: activeMonitorsCurrent,
+            newMonitors: newMonitorsCurrentPeriod,
+          },
+          previous: {
+            active: activeMonitorsPrevious,
+            newMonitors: newMonitorsPreviousPeriod,
+          },
+          growth: {
+            active: calculateGrowth(activeMonitorsCurrent, activeMonitorsPrevious),
+            newMonitors: calculateGrowth(newMonitorsCurrentPeriod, newMonitorsPreviousPeriod),
+          }
+        },
+
+        subscriptions: {
+          current: {
+            active: activeSubscriptionsCurrent,
+            new: newSubscriptionsCurrentPeriod,
+            cancelled: cancelledCurrentPeriod,
+          },
+          previous: {
+            active: activeSubscriptionsPrevious,
+            new: newSubscriptionsPreviousPeriod,
+            cancelled: cancelledPreviousPeriod,
+          },
+          growth: {
+            active: calculateGrowth(activeSubscriptionsCurrent, activeSubscriptionsPrevious),
+            new: calculateGrowth(newSubscriptionsCurrentPeriod, newSubscriptionsPreviousPeriod),
+          },
+          churnRate: {
+            current: calculateErrorRate(cancelledCurrentPeriod, activeSubscriptionsCurrent + cancelledCurrentPeriod),
+            previous: calculateErrorRate(cancelledPreviousPeriod, activeSubscriptionsPrevious + cancelledPreviousPeriod),
+          }
+        },
+
+        jobs: {
+          current: {
+            total: jobsCurrentPeriod,
+            success: jobsSuccessCurrentPeriod,
+            failure: jobsFailureCurrentPeriod,
+            errorRate: calculateErrorRate(jobsFailureCurrentPeriod, jobsCurrentPeriod),
+          },
+          previous: {
+            total: jobsPreviousPeriod,
+            success: jobsSuccessPreviousPeriod,
+            failure: jobsFailurePreviousPeriod,
+            errorRate: calculateErrorRate(jobsFailurePreviousPeriod, jobsPreviousPeriod),
+          },
+          growth: {
+            total: calculateGrowth(jobsCurrentPeriod, jobsPreviousPeriod),
+            success: calculateGrowth(jobsSuccessCurrentPeriod, jobsSuccessPreviousPeriod),
+            failure: calculateGrowth(jobsFailureCurrentPeriod, jobsFailurePreviousPeriod),
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas temporais:', error);
+      return res.status(500).json({ error: 'Erro ao buscar estatísticas temporais' });
+    }
+  }
 }

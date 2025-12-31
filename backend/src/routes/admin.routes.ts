@@ -19,6 +19,7 @@ router.get('/subscriptions', requireAdmin, AdminController.listSubscriptions);
 router.patch('/subscriptions/:id', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), AdminController.updateSubscription); // ADMIN_SUPER ou ADMIN_FINANCE
 
 // Sistema
+router.get('/stats/temporal', requireAdmin, AdminController.getTemporalStats); // IMPORTANTE: Vem ANTES de /stats
 router.get('/stats', requireAdmin, AdminController.getSystemStats);
 router.get('/webhooks', requireAdmin, AdminController.listWebhookLogs);
 router.get('/monitors', requireAdmin, AdminController.listMonitors);
