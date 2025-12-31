@@ -49,6 +49,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { to: '/admin/monitors', label: 'Monitores', icon: '📡' },
     { to: '/admin/webhooks', label: 'Webhooks', icon: '🔗' },
     { to: '/admin/coupons', label: 'Cupons', icon: '🎟️' },
+    { to: '/admin/alerts', label: 'Alertas', icon: '🔔' },
   ];
 
   const isActiveLink = (path: string) => location.pathname === path;

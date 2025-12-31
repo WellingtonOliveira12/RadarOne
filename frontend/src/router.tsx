@@ -34,6 +34,10 @@ import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminSubscriptionsPage } from './pages/AdminSubscriptionsPage';
 import { AdminAuditLogsPage } from './pages/AdminAuditLogsPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
+import { AdminMonitorsPage } from './pages/AdminMonitorsPage';
+import { AdminWebhooksPage } from './pages/AdminWebhooksPage';
+import { AdminCouponsPage } from './pages/AdminCouponsPage';
+import { AdminAlertsPage } from './pages/AdminAlertsPage';
 
 // Páginas de teste/debug
 import { HealthCheckPage } from './pages/HealthCheckPage';
@@ -184,6 +188,38 @@ export function AppRouter() {
             element={
               <AdminProtectedRoute>
                 <AdminSettingsPage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/monitors"
+            element={
+              <AdminProtectedRoute>
+                <AdminMonitorsPage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/webhooks"
+            element={
+              <AdminProtectedRoute>
+                <AdminWebhooksPage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/coupons"
+            element={
+              <AdminProtectedRoute>
+                <AdminCouponsPage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/alerts"
+            element={
+              <AdminProtectedRoute>
+                <AdminAlertsPage />
               </AdminProtectedRoute>
             }
           />
