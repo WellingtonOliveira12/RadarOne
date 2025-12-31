@@ -8,6 +8,8 @@ import {
 } from '../types/kiwify';
 import { sendSubscriptionExpiredEmail, sendTrialExpiredEmail } from '../services/emailService';
 import { logError, logSimpleError, logSimpleWarning } from '../utils/loggerHelpers';
+import { createAlertFromType } from '../services/alertService';
+import { AlertType } from '../types/alerts';
 
 /**
  * Webhook Controller - Processa eventos da Kiwify
@@ -148,6 +150,17 @@ export class WebhookController {
             processed: true,
           },
         });
+
+        // FASE 4.1: Criar alerta administrativo
+        await createAlertFromType(
+          AlertType.WEBHOOK_ERROR,
+          `webhook:${req.body.event}`,
+          {
+            event: req.body.event,
+            error: error.message,
+            timestamp: new Date().toISOString(),
+          }
+        );
       } catch (logError) {
         console.error('[WEBHOOK] Erro ao salvar erro no log:', logError);
       }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -19,10 +19,12 @@ import {
   HStack,
   Text,
   Container,
+  Badge,
 } from '@chakra-ui/react';
 import { HamburgerIcon } from '@chakra-ui/icons';
 import { useAuth } from '../context/AuthContext';
 import { APP_VERSION } from '../constants/app';
+import { api } from '../services/api';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -38,6 +40,26 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const location = useLocation();
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
+
+  // Buscar contagem de alertas não lidos (FASE 4.1)
+  useEffect(() => {
+    const fetchUnreadAlerts = async () => {
+      try {
+        const response = await api.get('/api/admin/alerts/unread-count');
+        setUnreadAlerts(response.count);
+      } catch (error) {
+        console.error('Erro ao buscar alertas não lidos:', error);
+      }
+    };
+
+    fetchUnreadAlerts();
+
+    // Atualizar a cada 30 segundos
+    const interval = setInterval(fetchUnreadAlerts, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const adminNavLinks = [
     { to: '/admin/stats', label: 'Dashboard', icon: '📊' },
@@ -133,7 +155,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   borderRadius="md"
                   _hover={{ bg: 'blue.50', color: 'blue.600' }}
                 >
-                  {link.icon} {link.label}
+                  <HStack spacing={2} justify="space-between" w="100%">
+                    <Text>
+                      {link.icon} {link.label}
+                    </Text>
+                    {link.to === '/admin/alerts' && unreadAlerts > 0 && (
+                      <Badge colorScheme="red" borderRadius="full" fontSize="xs">
+                        {unreadAlerts}
+                      </Badge>
+                    )}
+                  </HStack>
                 </Link>
               ))}
               <Link as={RouterLink} to="/dashboard" onClick={onClose} fontWeight="medium" color="blue.600" mt={4}>
@@ -183,7 +214,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   textDecoration: 'none',
                 }}
               >
-                {link.icon} {link.label}
+                <HStack spacing={2} justify="space-between" w="100%">
+                  <Text>
+                    {link.icon} {link.label}
+                  </Text>
+                  {link.to === '/admin/alerts' && unreadAlerts > 0 && (
+                    <Badge colorScheme="red" borderRadius="full" fontSize="xs">
+                      {unreadAlerts}
+                    </Badge>
+                  )}
+                </HStack>
               </Link>
             ))}
           </VStack>

@@ -1104,28 +1104,58 @@ export class AdminController {
   }
 
   /**
-   * 14. Listar alertas administrativos (FASE 3.6)
+   * 14. Listar alertas administrativos (FASE 4.1 - Melhorado)
    * GET /api/admin/alerts
+   *
+   * Query params:
+   * - type: Filtrar por tipo de alerta
+   * - severity: Filtrar por severidade (INFO, WARNING, ERROR, CRITICAL)
+   * - isRead: Filtrar por status de leitura (true/false)
+   * - limit: Limite de resultados (padrão: 50)
+   * - offset: Offset para paginação (padrão: 0)
    */
   static async listAlerts(req: Request, res: Response) {
     try {
-      const { unreadOnly } = req.query;
+      const { type, severity, isRead, limit, offset } = req.query;
 
       const where: any = {};
-      if (unreadOnly === 'true') {
-        where.isRead = false;
+
+      if (type) {
+        where.type = type as string;
       }
 
-      const [alerts, unreadCount] = await Promise.all([
+      if (severity) {
+        where.severity = severity as string;
+      }
+
+      if (isRead !== undefined) {
+        where.isRead = isRead === 'true';
+      }
+
+      const limitNum = limit ? parseInt(limit as string) : 50;
+      const offsetNum = offset ? parseInt(offset as string) : 0;
+
+      const [alerts, total, unreadCount] = await Promise.all([
         prisma.adminAlert.findMany({
           where,
           orderBy: { createdAt: 'desc' },
-          take: 50
+          take: limitNum,
+          skip: offsetNum,
         }),
-        prisma.adminAlert.count({ where: { isRead: false } })
+        prisma.adminAlert.count({ where }),
+        prisma.adminAlert.count({ where: { isRead: false } }),
       ]);
 
-      return res.json({ alerts, unreadCount });
+      return res.json({
+        alerts,
+        total,
+        unreadCount,
+        pagination: {
+          limit: limitNum,
+          offset: offsetNum,
+          hasMore: offsetNum + limitNum < total,
+        },
+      });
 
     } catch (error) {
       console.error('Erro ao listar alertas:', error);
@@ -1134,13 +1164,23 @@ export class AdminController {
   }
 
   /**
-   * 15. Marcar alerta como lido (FASE 3.6)
+   * 15. Marcar alerta como lido (FASE 4.1 - Melhorado)
    * PATCH /api/admin/alerts/:id/read
    */
   static async markAlertAsRead(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const adminId = req.userId;
+
+      // Buscar dados do admin para audit log
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
 
       const alert = await prisma.adminAlert.update({
         where: { id },
@@ -1151,11 +1191,42 @@ export class AdminController {
         }
       });
 
+      // Registrar no audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: 'ALERT_MARKED_READ',
+        targetType: AuditTargetType.SYSTEM,
+        targetId: id,
+        beforeData: { type: alert.type, severity: alert.severity },
+        afterData: { isRead: true, readBy: adminId },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
       return res.json({ message: 'Alerta marcado como lido', alert });
 
     } catch (error) {
       console.error('Erro ao marcar alerta como lido:', error);
       return res.status(500).json({ error: 'Erro ao marcar alerta como lido' });
+    }
+  }
+
+  /**
+   * 16. Obter contagem de alertas não lidos (FASE 4.1)
+   * GET /api/admin/alerts/unread-count
+   */
+  static async getUnreadAlertsCount(req: Request, res: Response) {
+    try {
+      const count = await prisma.adminAlert.count({
+        where: { isRead: false }
+      });
+
+      return res.json({ count });
+
+    } catch (error) {
+      console.error('Erro ao obter contagem de alertas:', error);
+      return res.status(500).json({ error: 'Erro ao obter contagem de alertas' });
     }
   }
 }
