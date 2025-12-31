@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Button, useToast } from '@chakra-ui/react';
 import { DownloadIcon } from '@chakra-ui/icons';
+import { getToken } from '../lib/auth';
 
 interface ExportButtonProps {
   endpoint: string;
@@ -50,7 +51,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
       const url = queryString ? `${endpoint}?${queryString}` : endpoint;
 
       // Fazer request
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch(url, {
         method: 'GET',
         headers: {

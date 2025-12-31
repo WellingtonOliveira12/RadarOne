@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { login as authLogin, register as authRegister } from '../services/auth';
-import { saveToken, clearToken, getToken } from '../services/tokenStorage';
+import { getToken, setToken, clearAuth } from '../lib/auth';
+import { logout as globalLogout } from '../lib/logout';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
 
 /**
@@ -65,12 +66,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           setUser(userData.user);
         } else {
           // Token inválido, limpar
-          clearToken();
+          clearAuth();
         }
       }
     } catch (error) {
       console.error('Erro ao carregar usuário:', error);
-      clearToken();
+      clearAuth();
     } finally {
       setLoading(false);
     }
@@ -78,17 +79,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const login = async (email: string, password: string) => {
     const response = await authLogin(email, password);
-    saveToken(response.token);
+    setToken(response.token);
     setUser(response.user);
   };
 
   const logout = useCallback((reason?: string) => {
+    // Limpa estado local antes do redirect
     setUser(null);
-    clearToken();
 
-    // Redirecionar para login com motivo (se fornecido)
-    const loginUrl = reason ? `/login?reason=${reason}` : '/login';
-    window.location.href = loginUrl;
+    // Chama logout global (limpa auth + redireciona)
+    globalLogout(reason);
   }, []);
 
   const register = async (data: {

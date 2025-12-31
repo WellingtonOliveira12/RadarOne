@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { trackViewPlans, trackSelectPlan, trackTrialExpiredToastShown } from '../lib/analytics';
 import { showInfo } from '../lib/toast';
 import { getABMessage, trackABVariantShown } from '../lib/abtest';
-import { getToken } from '../services/tokenStorage';
+import { getToken } from '../lib/auth';
 import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 import { PublicLayout } from '../components/PublicLayout';
 import { usePageMeta } from '../hooks/usePageMeta';

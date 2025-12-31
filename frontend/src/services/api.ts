@@ -1,5 +1,6 @@
 import { trackRedirectToPlans } from '../lib/analytics';
-import { getToken, clearToken } from './tokenStorage';
+import { getToken } from '../lib/auth';
+import { logout } from '../lib/logout';
 
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com';
@@ -110,10 +111,8 @@ async function apiRequest<T = any>(
       (!errorCode || errorCode === 'INVALID_TOKEN');
 
     if (isAuthError) {
-      clearToken();
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login?reason=session_expired';
-      }
+      // Logout automático usando função global centralizada
+      logout('session_expired');
     }
 
     // 3. Criar erro tipado para propagação

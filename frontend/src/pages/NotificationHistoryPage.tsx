@@ -117,6 +117,12 @@ export function NotificationHistoryPage() {
             </Link>
             <h1 className="text-2xl font-bold text-gray-900">Histórico de Notificações</h1>
           </div>
+          <button
+            onClick={logout}
+            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
+          >
+            Sair
+          </button>
         </div>
       </header>
 

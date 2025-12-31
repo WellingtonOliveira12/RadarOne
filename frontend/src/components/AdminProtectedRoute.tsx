@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getToken } from '../services/tokenStorage';
+import { getToken } from '../lib/auth';
 
 /**
  * Componente para proteger rotas que requerem role ADMIN

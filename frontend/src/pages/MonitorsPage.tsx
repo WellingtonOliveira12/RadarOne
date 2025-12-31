@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { getToken } from '../services/tokenStorage';
+import { getToken } from '../lib/auth';
 import { useAuth } from '../context/AuthContext';
 import { trackMonitorCreated } from '../lib/analytics';
 import { TrialBanner } from '../components/TrialBanner';

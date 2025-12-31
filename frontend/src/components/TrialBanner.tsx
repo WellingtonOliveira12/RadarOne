@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { getToken } from '../services/tokenStorage';
+import { getToken } from '../lib/auth';
 
 /**
  * Banner para mostrar quando o trial está expirando

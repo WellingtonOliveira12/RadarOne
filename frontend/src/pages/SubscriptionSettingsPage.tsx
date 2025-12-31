@@ -26,7 +26,7 @@ import {
 import { ChevronRightIcon, CheckCircleIcon } from '@chakra-ui/icons';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
-import { getToken } from '../services/tokenStorage';
+import { getToken } from '../lib/auth';
 
 /**
  * Gerenciamento de Assinatura
