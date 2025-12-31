@@ -1102,4 +1102,60 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao atualizar configuração' });
     }
   }
+
+  /**
+   * 14. Listar alertas administrativos (FASE 3.6)
+   * GET /api/admin/alerts
+   */
+  static async listAlerts(req: Request, res: Response) {
+    try {
+      const { unreadOnly } = req.query;
+
+      const where: any = {};
+      if (unreadOnly === 'true') {
+        where.isRead = false;
+      }
+
+      const [alerts, unreadCount] = await Promise.all([
+        prisma.adminAlert.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          take: 50
+        }),
+        prisma.adminAlert.count({ where: { isRead: false } })
+      ]);
+
+      return res.json({ alerts, unreadCount });
+
+    } catch (error) {
+      console.error('Erro ao listar alertas:', error);
+      return res.status(500).json({ error: 'Erro ao listar alertas' });
+    }
+  }
+
+  /**
+   * 15. Marcar alerta como lido (FASE 3.6)
+   * PATCH /api/admin/alerts/:id/read
+   */
+  static async markAlertAsRead(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const adminId = req.userId;
+
+      const alert = await prisma.adminAlert.update({
+        where: { id },
+        data: {
+          isRead: true,
+          readBy: adminId,
+          readAt: new Date()
+        }
+      });
+
+      return res.json({ message: 'Alerta marcado como lido', alert });
+
+    } catch (error) {
+      console.error('Erro ao marcar alerta como lido:', error);
+      return res.status(500).json({ error: 'Erro ao marcar alerta como lido' });
+    }
+  }
 }

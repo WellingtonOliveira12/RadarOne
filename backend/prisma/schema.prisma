@@ -524,3 +524,33 @@ model SystemSetting {
   @@index([category])
   @@map("system_settings")
 }
+
+// ============================================
+// ADMIN ALERTS (FASE 3.6)
+// ============================================
+
+model AdminAlert {
+  id        String       @id @default(cuid())
+  type      String // JOB_FAILURE, WEBHOOK_ERROR, SPIKE_MONITORS, MASS_EXPIRATION
+  severity  AlertSeverity @default(INFO)
+  title     String
+  message   String       @db.Text
+  source    String? // Nome do job, webhook, etc que gerou o alerta
+  metadata  Json? // Dados adicionais (erro, contagem, etc)
+  isRead    Boolean      @default(false) @map("is_read")
+  readBy    String?      @map("read_by") // ID do admin que leu
+  readAt    DateTime?    @map("read_at")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@index([isRead])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("admin_alerts")
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}

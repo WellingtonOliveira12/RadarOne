@@ -33,4 +33,8 @@ router.get('/audit-logs', requireAdmin, AdminController.listAuditLogs); // Todos
 router.get('/settings', requireAdmin, AdminController.listSettings);
 router.patch('/settings/:key', requireAdminRole([UserRole.ADMIN_SUPER]), AdminController.updateSetting); // Apenas ADMIN_SUPER
 
+// Admin Alerts (FASE 3.6)
+router.get('/alerts', requireAdmin, AdminController.listAlerts);
+router.patch('/alerts/:id/read', requireAdmin, AdminController.markAlertAsRead);
+
 export default router;
