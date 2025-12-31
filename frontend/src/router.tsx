@@ -29,6 +29,9 @@ import { ContactPage } from './pages/ContactPage';
 
 // Páginas admin
 import { AdminJobsPage } from './pages/AdminJobsPage';
+import { AdminStatsPage } from './pages/AdminStatsPage';
+import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AdminSubscriptionsPage } from './pages/AdminSubscriptionsPage';
 
 // Páginas de teste/debug
 import { HealthCheckPage } from './pages/HealthCheckPage';
@@ -134,6 +137,30 @@ export function AppRouter() {
           />
 
           {/* Rotas admin */}
+          <Route
+            path="/admin/stats"
+            element={
+              <AdminProtectedRoute>
+                <AdminStatsPage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <AdminProtectedRoute>
+                <AdminUsersPage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/subscriptions"
+            element={
+              <AdminProtectedRoute>
+                <AdminSubscriptionsPage />
+              </AdminProtectedRoute>
+            }
+          />
           <Route
             path="/admin/jobs"
             element={
