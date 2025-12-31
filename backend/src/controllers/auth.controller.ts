@@ -189,6 +189,19 @@ export class AuthController {
         return;
       }
 
+      // FASE 4.4: Verifica se usuário tem 2FA habilitado
+      if (user.twoFactorEnabled) {
+        // Retorna resposta especial indicando que 2FA é necessário
+        // Frontend deve pedir código TOTP
+        logInfo('Login requires 2FA verification', { userId: user.id });
+        res.json({
+          requiresTwoFactor: true,
+          userId: user.id, // Temporário para verificação de 2FA
+          message: 'Digite o código do seu aplicativo autenticador'
+        });
+        return;
+      }
+
       // Gera token JWT
       const secret = process.env.JWT_SECRET;
       if (!secret) {
@@ -439,6 +452,413 @@ export class AuthController {
     } catch (error) {
       console.error('Erro ao redefinir senha:', error);
       res.status(500).json({ error: 'Erro ao redefinir senha' });
+    }
+  }
+
+  // ============================================
+  // FASE 4.4 - Two-Factor Authentication (2FA)
+  // ============================================
+
+  /**
+   * Inicia configuração de 2FA
+   * GET /api/auth/2fa/setup
+   * Requer autenticação
+   */
+  static async setup2FA(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, twoFactorEnabled: true }
+      });
+
+      if (!user) {
+        res.status(404).json({ error: 'Usuário não encontrado' });
+        return;
+      }
+
+      if (user.twoFactorEnabled) {
+        res.status(400).json({ error: '2FA já está habilitado' });
+        return;
+      }
+
+      // Gerar secret, QR code e backup codes
+      const twoFactorService = await import('../services/twoFactorService');
+      const setup = await twoFactorService.setupTwoFactor(userId, user.email);
+
+      logInfo('2FA setup initiated', { userId });
+
+      res.json({
+        secret: setup.secret,
+        qrCode: setup.qrCodeDataUrl,
+        backupCodes: setup.backupCodes,
+        message: 'Escaneie o QR Code com seu aplicativo autenticador'
+      });
+    } catch (error) {
+      logError('Failed to setup 2FA', { err: error, requestId: req.requestId });
+      res.status(500).json({ error: 'Erro ao configurar 2FA' });
+    }
+  }
+
+  /**
+   * Confirma e habilita 2FA
+   * POST /api/auth/2fa/enable
+   * Body: { code, secret, backupCodes }
+   */
+  static async enable2FA(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const { code, secret, backupCodes } = req.body;
+
+      if (!code || !secret || !backupCodes) {
+        res.status(400).json({ error: 'Código, secret e backup codes são obrigatórios' });
+        return;
+      }
+
+      // Verificar código fornecido
+      const twoFactorService = await import('../services/twoFactorService');
+      const isValid = twoFactorService.verifyTOTP(secret, code);
+
+      if (!isValid) {
+        res.status(400).json({ error: 'Código inválido. Tente novamente' });
+        return;
+      }
+
+      // Salvar 2FA no banco
+      await twoFactorService.enableTwoFactor(userId, secret, backupCodes);
+
+      logInfo('2FA enabled successfully', { userId });
+
+      res.json({
+        message: '2FA habilitado com sucesso',
+        enabled: true
+      });
+    } catch (error) {
+      logError('Failed to enable 2FA', { err: error, requestId: req.requestId });
+      res.status(500).json({ error: 'Erro ao habilitar 2FA' });
+    }
+  }
+
+  /**
+   * Desabilita 2FA
+   * POST /api/auth/2fa/disable
+   * Body: { password }
+   */
+  static async disable2FA(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const { password } = req.body;
+
+      if (!password) {
+        res.status(400).json({ error: 'Senha é obrigatória para desativar 2FA' });
+        return;
+      }
+
+      // Buscar usuário
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true, twoFactorEnabled: true }
+      });
+
+      if (!user) {
+        res.status(404).json({ error: 'Usuário não encontrado' });
+        return;
+      }
+
+      if (!user.twoFactorEnabled) {
+        res.status(400).json({ error: '2FA não está habilitado' });
+        return;
+      }
+
+      // Verificar senha
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isPasswordValid) {
+        res.status(401).json({ error: 'Senha incorreta' });
+        return;
+      }
+
+      // Desabilitar 2FA
+      const twoFactorService = await import('../services/twoFactorService');
+      await twoFactorService.disableTwoFactor(userId);
+
+      logInfo('2FA disabled successfully', { userId });
+
+      res.json({
+        message: '2FA desabilitado com sucesso',
+        enabled: false
+      });
+    } catch (error) {
+      logError('Failed to disable 2FA', { err: error, requestId: req.requestId });
+      res.status(500).json({ error: 'Erro ao desabilitar 2FA' });
+    }
+  }
+
+  /**
+   * Verifica código 2FA durante login
+   * POST /api/auth/2fa/verify
+   * Body: { userId, code }
+   */
+  static async verify2FA(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId, code } = req.body;
+
+      if (!userId || !code) {
+        res.status(400).json({ error: 'userId e code são obrigatórios' });
+        return;
+      }
+
+      // Verificar código
+      const twoFactorService = await import('../services/twoFactorService');
+      const result = await twoFactorService.verifyTwoFactorCode(userId, code);
+
+      if (!result.valid) {
+        res.status(401).json({ error: 'Código inválido' });
+        return;
+      }
+
+      // Buscar usuário completo
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          subscriptions: {
+            where: { status: 'ACTIVE' },
+            include: { plan: true }
+          }
+        }
+      });
+
+      if (!user) {
+        res.status(404).json({ error: 'Usuário não encontrado' });
+        return;
+      }
+
+      // Atualizar lastLoginAt e lastLoginIp
+      const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          lastLoginAt: new Date(),
+          lastLoginIp: typeof ipAddress === 'string' ? ipAddress : ipAddress[0]
+        }
+      });
+
+      // Gerar token JWT (com timeout diferenciado se aplicável)
+      const secret = process.env.JWT_SECRET;
+      if (!secret) {
+        throw new Error('JWT_SECRET não configurado');
+      }
+
+      // FASE 4.4: Timeout diferenciado para admins
+      const isAdmin = user.role.startsWith('ADMIN');
+      const customTimeout = user.sessionTimeoutMinutes;
+      const defaultExpiry = isAdmin ? '4h' : '7d';
+      const expiresIn = (customTimeout ? `${customTimeout}m` : defaultExpiry) as any;
+      const options: SignOptions = {
+        expiresIn
+      };
+
+      const token = jwt.sign(
+        { userId: user.id, twoFactorVerified: true },
+        secret,
+        options
+      );
+
+      // Remove senha do objeto
+      const { passwordHash: _, ...userWithoutPassword } = user;
+
+      logInfo('2FA verification successful, user logged in', {
+        userId: user.id,
+        isBackupCode: result.isBackupCode
+      });
+
+      if (result.isBackupCode) {
+        res.json({
+          message: 'Login realizado com código de backup. Gere novos códigos em breve!',
+          token,
+          user: userWithoutPassword,
+          warningBackupCode: true
+        });
+      } else {
+        res.json({
+          message: 'Login realizado com sucesso',
+          token,
+          user: userWithoutPassword
+        });
+      }
+    } catch (error) {
+      logError('Failed to verify 2FA', { err: error, requestId: req.requestId });
+      res.status(500).json({ error: 'Erro ao verificar código 2FA' });
+    }
+  }
+
+  /**
+   * Regenera códigos de backup
+   * POST /api/auth/2fa/backup-codes
+   * Body: { password }
+   */
+  static async regenerateBackupCodes(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const { password } = req.body;
+
+      if (!password) {
+        res.status(400).json({ error: 'Senha é obrigatória' });
+        return;
+      }
+
+      // Buscar usuário
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true, twoFactorEnabled: true }
+      });
+
+      if (!user) {
+        res.status(404).json({ error: 'Usuário não encontrado' });
+        return;
+      }
+
+      if (!user.twoFactorEnabled) {
+        res.status(400).json({ error: '2FA não está habilitado' });
+        return;
+      }
+
+      // Verificar senha
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isPasswordValid) {
+        res.status(401).json({ error: 'Senha incorreta' });
+        return;
+      }
+
+      // Regenerar códigos
+      const twoFactorService = await import('../services/twoFactorService');
+      const newBackupCodes = await twoFactorService.regenerateBackupCodes(userId);
+
+      logInfo('Backup codes regenerated', { userId });
+
+      res.json({
+        message: 'Novos códigos de backup gerados',
+        backupCodes: newBackupCodes
+      });
+    } catch (error) {
+      logError('Failed to regenerate backup codes', { err: error, requestId: req.requestId });
+      res.status(500).json({ error: 'Erro ao regenerar códigos de backup' });
+    }
+  }
+
+  /**
+   * Retorna status de 2FA do usuário
+   * GET /api/auth/2fa/status
+   */
+  static async get2FAStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          twoFactorEnabled: true,
+          twoFactorBackupCodes: true
+        }
+      });
+
+      if (!user) {
+        res.status(404).json({ error: 'Usuário não encontrado' });
+        return;
+      }
+
+      res.json({
+        enabled: user.twoFactorEnabled,
+        backupCodesRemaining: user.twoFactorBackupCodes.length
+      });
+    } catch (error) {
+      logError('Failed to get 2FA status', { err: error, requestId: req.requestId });
+      res.status(500).json({ error: 'Erro ao buscar status de 2FA' });
+    }
+  }
+
+  // ============================================
+  // FASE 4.4 - Revalidação de Senha para Ações Críticas
+  // ============================================
+
+  /**
+   * Revalida senha do usuário para ações críticas
+   * POST /api/auth/revalidate-password
+   * Body: { password }
+   */
+  static async revalidatePassword(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const { password } = req.body;
+
+      if (!password) {
+        res.status(400).json({ error: 'Senha é obrigatória' });
+        return;
+      }
+
+      // Buscar usuário
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true }
+      });
+
+      if (!user) {
+        res.status(404).json({ error: 'Usuário não encontrado' });
+        return;
+      }
+
+      // Verificar senha
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isPasswordValid) {
+        res.status(401).json({ error: 'Senha incorreta' });
+        return;
+      }
+
+      // Atualizar timestamp de última validação
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          lastPasswordValidated: new Date()
+        }
+      });
+
+      logInfo('Password revalidated successfully', { userId });
+
+      res.json({
+        message: 'Senha validada com sucesso',
+        validated: true
+      });
+    } catch (error) {
+      logError('Failed to revalidate password', { err: error, requestId: req.requestId });
+      res.status(500).json({ error: 'Erro ao validar senha' });
     }
   }
 }

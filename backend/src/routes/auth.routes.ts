@@ -24,6 +24,31 @@ router.post('/forgot-password', strictRateLimiter, AuthController.requestPasswor
 // POST /api/auth/reset-password - Resetar senha (10 req/15min)
 router.post('/reset-password', authRateLimiter, AuthController.resetPassword);
 
+// ============================================
+// FASE 4.4 - Two-Factor Authentication (2FA)
+// ============================================
+
+// GET /api/auth/2fa/status - Status de 2FA (requer autenticação)
+router.get('/2fa/status', authenticateToken, AuthController.get2FAStatus);
+
+// GET /api/auth/2fa/setup - Iniciar configuração de 2FA (requer autenticação)
+router.get('/2fa/setup', authenticateToken, authRateLimiter, AuthController.setup2FA);
+
+// POST /api/auth/2fa/enable - Habilitar 2FA (requer autenticação)
+router.post('/2fa/enable', authenticateToken, authRateLimiter, AuthController.enable2FA);
+
+// POST /api/auth/2fa/disable - Desabilitar 2FA (requer autenticação e senha)
+router.post('/2fa/disable', authenticateToken, authRateLimiter, AuthController.disable2FA);
+
+// POST /api/auth/2fa/verify - Verificar código 2FA durante login (público)
+router.post('/2fa/verify', authRateLimiter, AuthController.verify2FA);
+
+// POST /api/auth/2fa/backup-codes - Regenerar códigos de backup (requer autenticação e senha)
+router.post('/2fa/backup-codes', authenticateToken, strictRateLimiter, AuthController.regenerateBackupCodes);
+
+// POST /api/auth/revalidate-password - Revalidar senha para ações críticas (requer autenticação)
+router.post('/revalidate-password', authenticateToken, authRateLimiter, AuthController.revalidatePassword);
+
 // TODO: Implementar outras rotas
 // POST /api/auth/refresh-token - Renovar token
 // POST /api/auth/logout - Logout (invalidar token)

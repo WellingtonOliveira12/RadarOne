@@ -25,6 +25,18 @@ model User {
   cpfLast4     String? @map("cpf_last4") // Últimos 4 dígitos para conferência
   blocked      Boolean @default(false) // Se true, usuário não pode acessar
 
+  // 2FA / MFA (FASE 4.4)
+  twoFactorSecret       String?   @map("two_factor_secret") // Secret TOTP (criptografado)
+  twoFactorEnabled      Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorBackupCodes  String[]  @default([]) @map("two_factor_backup_codes") // Códigos de backup (hashed)
+  lastPasswordValidated DateTime? @map("last_password_validated") // Para revalidação de senha
+
+  // Segurança Avançada Admin (FASE 4.4)
+  sessionTimeoutMinutes Int?      @map("session_timeout_minutes") // Timeout customizado (null = padrão)
+  allowedIps            String[]  @default([]) @map("allowed_ips") // Whitelist de IPs (foundation)
+  lastLoginAt           DateTime? @map("last_login_at")
+  lastLoginIp           String?   @map("last_login_ip")
+
   // Controle
   role      UserRole @default(USER)
   isActive  Boolean  @default(true) @map("is_active")

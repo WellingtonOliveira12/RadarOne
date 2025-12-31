@@ -38,6 +38,7 @@ import { AdminMonitorsPage } from './pages/AdminMonitorsPage';
 import { AdminWebhooksPage } from './pages/AdminWebhooksPage';
 import { AdminCouponsPage } from './pages/AdminCouponsPage';
 import { AdminAlertsPage } from './pages/AdminAlertsPage';
+import { Security2FAPage } from './pages/Security2FAPage';
 
 // Páginas de teste/debug
 import { HealthCheckPage } from './pages/HealthCheckPage';
@@ -220,6 +221,14 @@ export function AppRouter() {
             element={
               <AdminProtectedRoute>
                 <AdminAlertsPage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/security"
+            element={
+              <AdminProtectedRoute>
+                <Security2FAPage />
               </AdminProtectedRoute>
             }
           />

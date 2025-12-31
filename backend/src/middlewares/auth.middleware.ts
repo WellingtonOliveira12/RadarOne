@@ -148,3 +148,120 @@ export const checkTrialExpired = async (
     next(error);
   }
 };
+
+// ============================================
+// FASE 4.4 - Segurança Avançada Admin
+// ============================================
+
+/**
+ * Middleware para exigir revalidação recente de senha
+ * Usado em ações críticas de admin (bloquear usuários, cancelar assinaturas, etc)
+ * Deve ser usado APÓS authenticateToken
+ */
+export const requireRecentPasswordValidation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ error: 'Não autenticado' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { lastPasswordValidated: true }
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+
+    // Verificar se senha foi validada nos últimos 15 minutos
+    const VALIDATION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos
+    const now = new Date();
+
+    if (!user.lastPasswordValidated) {
+      res.status(403).json({
+        error: 'Ação crítica requer revalidação de senha',
+        requiresPasswordRevalidation: true
+      });
+      return;
+    }
+
+    const timeSinceValidation = now.getTime() - user.lastPasswordValidated.getTime();
+
+    if (timeSinceValidation > VALIDATION_TIMEOUT_MS) {
+      res.status(403).json({
+        error: 'Sua sessão de segurança expirou. Revalide sua senha para continuar',
+        requiresPasswordRevalidation: true
+      });
+      return;
+    }
+
+    // Senha validada recentemente, permitir acesso
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao verificar revalidação de senha' });
+  }
+};
+
+/**
+ * Middleware para verificar IP whitelist (foundation FASE 4.4)
+ * Verifica se o IP do usuário está na whitelist (se configurada)
+ * Deve ser usado APÓS authenticateToken
+ */
+export const checkIpWhitelist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ error: 'Não autenticado' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { allowedIps: true, role: true }
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+
+    // Se não há whitelist configurada, permitir acesso
+    if (!user.allowedIps || user.allowedIps.length === 0) {
+      next();
+      return;
+    }
+
+    // Obter IP do request
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '') as string;
+    const ip = typeof clientIp === 'string' ? clientIp.split(',')[0].trim() : '';
+
+    // Verificar se IP está na whitelist
+    if (!user.allowedIps.includes(ip)) {
+      logWithUser(req.userId, 'warn', 'IP whitelist violation', {
+        clientIp: ip,
+        allowedIps: user.allowedIps,
+        endpoint: `${req.method} ${req.path}`,
+      });
+
+      res.status(403).json({
+        error: 'Acesso negado. Seu IP não está autorizado',
+        clientIp: ip
+      });
+      return;
+    }
+
+    // IP na whitelist, permitir acesso
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao verificar IP whitelist' });
+  }
+};
