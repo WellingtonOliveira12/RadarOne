@@ -130,13 +130,20 @@ export const AdminSettingsPage: React.FC = () => {
           </Card>
         )}
 
-        <Alert status="warning">
+        <Alert status="info" variant="subtle">
           <AlertIcon />
           <Box>
-            <AlertTitle>Funcionalidade em Desenvolvimento</AlertTitle>
-            <AlertDescription>
-              A edição de configurações via interface será implementada em breve.
-              Por enquanto, as configurações são gerenciadas automaticamente pelo sistema.
+            <AlertTitle mb={1}>Visualização Read-Only</AlertTitle>
+            <AlertDescription fontSize="sm">
+              Esta página exibe as configurações do sistema em modo somente leitura.
+              <br /><br />
+              <strong>Para editar configurações:</strong>
+              <br />
+              • Utilize os serviços do backend (AdminController.updateSetting)
+              <br />
+              • Ou edite diretamente no banco de dados (tabela <code>system_settings</code>)
+              <br />
+              • A interface de edição será implementada em breve
             </AlertDescription>
           </Box>
         </Alert>

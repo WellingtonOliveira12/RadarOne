@@ -1,12 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import {
+  Box,
+  Heading,
+  Card,
+  CardBody,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Badge,
+  Spinner,
+  Center,
+  Alert,
+  AlertIcon,
+  VStack,
+  HStack,
+  Select,
+  Button,
+  Text,
+} from '@chakra-ui/react';
+import { AdminLayout } from '../components/AdminLayout';
 import { api } from '../services/api';
 import { getToken } from '../lib/auth';
 
 /**
  * AdminJobsPage - Dashboard de monitoramento de execuções de jobs
  * Acessível apenas para usuários com role ADMIN
+ * Migrado para usar AdminLayout consistente
  */
 
 interface JobRun {
@@ -33,8 +55,6 @@ interface JobsResponse {
 }
 
 export const AdminJobsPage: React.FC = () => {
-  const { logout } = useAuth();
-
   const [jobs, setJobs] = useState<JobRun[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -95,30 +115,6 @@ export const AdminJobsPage: React.FC = () => {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusStyles: Record<string, { bg: string; text: string }> = {
-      SUCCESS: { bg: '#d1fae5', text: '#065f46' },
-      ERROR: { bg: '#fee2e2', text: '#991b1b' },
-    };
-
-    const style = statusStyles[status] || statusStyles.SUCCESS;
-
-    return (
-      <span
-        style={{
-          backgroundColor: style.bg,
-          color: style.text,
-          padding: '4px 12px',
-          borderRadius: '6px',
-          fontSize: '12px',
-          fontWeight: '600',
-        }}
-      >
-        {status}
-      </span>
-    );
-  };
-
   const getEventLabel = (event: string) => {
     const labels: Record<string, string> = {
       MONTHLY_QUERIES_RESET: '🔄 Reset Mensal',
@@ -151,336 +147,163 @@ export const AdminJobsPage: React.FC = () => {
   };
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <h1 style={styles.logo}>RadarOne Admin</h1>
-          <nav style={styles.nav}>
-            <Link to="/dashboard" style={styles.navLink}>
-              Dashboard
-            </Link>
-            <Link to="/admin/jobs" style={styles.navLink}>
-              Jobs
-            </Link>
-            <button onClick={logout} style={styles.logoutButton}>
-              Sair
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div style={styles.content}>
+    <AdminLayout>
+      <VStack spacing={6} align="stretch">
         {/* Page Title */}
-        <section style={styles.welcomeSection}>
-          <h1 style={styles.welcomeTitle}>Jobs & Monitoramento</h1>
-          <p style={styles.welcomeSubtitle}>
+        <Box>
+          <Heading size="lg" mb={2}>
+            Jobs & Monitoramento
+          </Heading>
+          <Text color="gray.600">
             Visualize e monitore execuções de jobs automatizados
-          </p>
-        </section>
+          </Text>
+        </Box>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <Alert status="error">
+            <AlertIcon />
+            {error}
+          </Alert>
+        )}
 
         {/* Filters */}
-        <section style={styles.filtersSection}>
-          <div style={styles.filterGroup}>
-            <label style={styles.filterLabel}>Job / Evento:</label>
-            <select
-              value={selectedEvent}
-              onChange={handleEventFilterChange}
-              style={styles.filterSelect}
-            >
-              <option value="">Todos</option>
-              <option value="MONTHLY_QUERIES_RESET">Reset Mensal</option>
-              <option value="TRIAL_CHECK">Verificação de Trial</option>
-              <option value="SUBSCRIPTION_CHECK">Verificação de Assinatura</option>
-            </select>
-          </div>
+        <Card>
+          <CardBody>
+            <HStack spacing={4} flexWrap="wrap">
+              <Box>
+                <Text fontSize="sm" fontWeight="semibold" mb={2}>
+                  Job / Evento:
+                </Text>
+                <Select
+                  value={selectedEvent}
+                  onChange={handleEventFilterChange}
+                  size="sm"
+                  minW="200px"
+                >
+                  <option value="">Todos</option>
+                  <option value="MONTHLY_QUERIES_RESET">Reset Mensal</option>
+                  <option value="TRIAL_CHECK">Verificação de Trial</option>
+                  <option value="SUBSCRIPTION_CHECK">Verificação de Assinatura</option>
+                </Select>
+              </Box>
 
-          <div style={styles.filterGroup}>
-            <label style={styles.filterLabel}>Status:</label>
-            <select
-              value={selectedStatus}
-              onChange={handleStatusFilterChange}
-              style={styles.filterSelect}
-            >
-              <option value="">Todos</option>
-              <option value="SUCCESS">Sucesso</option>
-              <option value="ERROR">Erro</option>
-            </select>
-          </div>
-        </section>
+              <Box>
+                <Text fontSize="sm" fontWeight="semibold" mb={2}>
+                  Status:
+                </Text>
+                <Select
+                  value={selectedStatus}
+                  onChange={handleStatusFilterChange}
+                  size="sm"
+                  minW="150px"
+                >
+                  <option value="">Todos</option>
+                  <option value="SUCCESS">Sucesso</option>
+                  <option value="ERROR">Erro</option>
+                </Select>
+              </Box>
+            </HStack>
+          </CardBody>
+        </Card>
 
         {/* Jobs Table */}
-        <section style={styles.tableSection}>
-          {loading ? (
-            <div style={styles.loadingContainer}>
-              <p>Carregando...</p>
-            </div>
-          ) : (
-            <>
-              <table style={styles.table}>
-                <thead>
-                  <tr style={styles.tableHeaderRow}>
-                    <th style={styles.tableHeader}>Job / Evento</th>
-                    <th style={styles.tableHeader}>Status</th>
-                    <th style={styles.tableHeader}>Executado em</th>
-                    <th style={styles.tableHeader}>Registros Atualizados</th>
-                    <th style={styles.tableHeader}>Erro</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {jobs.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={styles.emptyCell}>
-                        Nenhuma execução de job encontrada
-                      </td>
-                    </tr>
-                  ) : (
-                    jobs.map((job) => (
-                      <tr key={job.id} style={styles.tableRow}>
-                        <td style={styles.tableCell}>
-                          {getEventLabel(job.event)}
-                        </td>
-                        <td style={styles.tableCell}>
-                          {getStatusBadge(job.status)}
-                        </td>
-                        <td style={styles.tableCell}>
-                          {formatDate(job.createdAt)}
-                        </td>
-                        <td style={styles.tableCell}>
-                          {job.updatedCount !== undefined
-                            ? job.updatedCount
-                            : '-'}
-                        </td>
-                        <td style={styles.tableCell}>
-                          {job.error ? (
-                            <span
-                              style={styles.errorText}
-                              title={job.error}
+        <Card>
+          <CardBody>
+            {loading ? (
+              <Center py={10}>
+                <Spinner size="xl" color="blue.500" />
+              </Center>
+            ) : (
+              <>
+                <Table variant="simple" size="sm">
+                  <Thead>
+                    <Tr>
+                      <Th>Job / Evento</Th>
+                      <Th>Status</Th>
+                      <Th>Executado em</Th>
+                      <Th>Registros Atualizados</Th>
+                      <Th>Erro</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {jobs.length === 0 ? (
+                      <Tr>
+                        <Td colSpan={5} textAlign="center" py={8} color="gray.500">
+                          Nenhuma execução de job encontrada
+                        </Td>
+                      </Tr>
+                    ) : (
+                      jobs.map((job) => (
+                        <Tr key={job.id}>
+                          <Td>{getEventLabel(job.event)}</Td>
+                          <Td>
+                            <Badge
+                              colorScheme={job.status === 'SUCCESS' ? 'green' : 'red'}
+                              fontSize="xs"
+                              px={2}
+                              py={1}
+                              borderRadius="md"
                             >
-                              {job.error.substring(0, 50)}
-                              {job.error.length > 50 ? '...' : ''}
-                            </span>
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                              {job.status}
+                            </Badge>
+                          </Td>
+                          <Td fontSize="sm">{formatDate(job.createdAt)}</Td>
+                          <Td>{job.updatedCount !== undefined ? job.updatedCount : '-'}</Td>
+                          <Td>
+                            {job.error ? (
+                              <Text
+                                fontSize="xs"
+                                color="red.600"
+                                title={job.error}
+                                noOfLines={1}
+                                maxW="200px"
+                              >
+                                {job.error}
+                              </Text>
+                            ) : (
+                              '-'
+                            )}
+                          </Td>
+                        </Tr>
+                      ))
+                    )}
+                  </Tbody>
+                </Table>
 
-              {/* Pagination */}
-              {pagination.totalPages > 1 && (
-                <div style={styles.pagination}>
-                  <button
-                    onClick={handlePreviousPage}
-                    disabled={pagination.page === 1}
-                    style={{
-                      ...styles.paginationButton,
-                      ...(pagination.page === 1 ? styles.paginationButtonDisabled : {}),
-                    }}
-                  >
-                    ← Anterior
-                  </button>
+                {/* Pagination */}
+                {pagination.totalPages > 1 && (
+                  <HStack justify="space-between" mt={6}>
+                    <Button
+                      onClick={handlePreviousPage}
+                      isDisabled={pagination.page === 1}
+                      size="sm"
+                      colorScheme="blue"
+                      variant="outline"
+                    >
+                      ← Anterior
+                    </Button>
 
-                  <span style={styles.paginationInfo}>
-                    Página {pagination.page} de {pagination.totalPages} (Total:{' '}
-                    {pagination.total})
-                  </span>
+                    <Text fontSize="sm" color="gray.600">
+                      Página {pagination.page} de {pagination.totalPages} (Total:{' '}
+                      {pagination.total})
+                    </Text>
 
-                  <button
-                    onClick={handleNextPage}
-                    disabled={pagination.page === pagination.totalPages}
-                    style={{
-                      ...styles.paginationButton,
-                      ...(pagination.page === pagination.totalPages
-                        ? styles.paginationButtonDisabled
-                        : {}),
-                    }}
-                  >
-                    Próximo →
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      </div>
-    </div>
+                    <Button
+                      onClick={handleNextPage}
+                      isDisabled={pagination.page === pagination.totalPages}
+                      size="sm"
+                      colorScheme="blue"
+                      variant="outline"
+                    >
+                      Próximo →
+                    </Button>
+                  </HStack>
+                )}
+              </>
+            )}
+          </CardBody>
+        </Card>
+      </VStack>
+    </AdminLayout>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '16px 0',
-  },
-  headerContent: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    margin: 0,
-  },
-  nav: {
-    display: 'flex',
-    gap: '16px',
-    alignItems: 'center',
-  },
-  navLink: {
-    color: '#4b5563',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '500',
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    border: 'none',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-  },
-  content: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
-  welcomeSection: {
-    marginBottom: '32px',
-  },
-  welcomeTitle: {
-    fontSize: '32px',
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: '8px',
-  },
-  welcomeSubtitle: {
-    fontSize: '16px',
-    color: '#6b7280',
-  },
-  error: {
-    backgroundColor: '#fee2e2',
-    color: '#991b1b',
-    padding: '16px',
-    borderRadius: '8px',
-    marginBottom: '24px',
-  },
-  filtersSection: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    marginBottom: '24px',
-    display: 'flex',
-    gap: '24px',
-    flexWrap: 'wrap' as const,
-  },
-  filterGroup: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '8px',
-  },
-  filterLabel: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#374151',
-  },
-  filterSelect: {
-    padding: '8px 12px',
-    borderRadius: '6px',
-    border: '1px solid #d1d5db',
-    fontSize: '14px',
-    backgroundColor: 'white',
-    cursor: 'pointer',
-    minWidth: '200px',
-  },
-  tableSection: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    overflow: 'hidden',
-  },
-  loadingContainer: {
-    padding: '40px',
-    textAlign: 'center' as const,
-    color: '#6b7280',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse' as const,
-  },
-  tableHeaderRow: {
-    backgroundColor: '#f9fafb',
-    borderBottom: '2px solid #e5e7eb',
-  },
-  tableHeader: {
-    padding: '16px',
-    textAlign: 'left' as const,
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#374151',
-  },
-  tableRow: {
-    borderBottom: '1px solid #e5e7eb',
-  },
-  tableCell: {
-    padding: '16px',
-    fontSize: '14px',
-    color: '#1f2937',
-  },
-  emptyCell: {
-    padding: '40px',
-    textAlign: 'center' as const,
-    color: '#6b7280',
-    fontSize: '14px',
-  },
-  errorText: {
-    color: '#dc2626',
-    fontSize: '13px',
-    cursor: 'help',
-  },
-  pagination: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px 24px',
-    borderTop: '1px solid #e5e7eb',
-  },
-  paginationButton: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    padding: '10px 20px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-  },
-  paginationButtonDisabled: {
-    backgroundColor: '#d1d5db',
-    cursor: 'not-allowed',
-  },
-  paginationInfo: {
-    fontSize: '14px',
-    color: '#6b7280',
-  },
 };

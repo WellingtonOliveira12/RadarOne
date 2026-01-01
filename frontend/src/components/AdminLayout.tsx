@@ -114,8 +114,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <Text fontSize="sm" color="gray.600">
                 {user?.email}
               </Text>
-              <Link as={RouterLink} to="/dashboard" fontSize="sm" color="blue.600" _hover={{ color: 'blue.700' }}>
-                Voltar ao Dashboard
+              <Link as={RouterLink} to="/admin/stats" fontSize="sm" color="blue.600" _hover={{ color: 'blue.700' }}>
+                Dashboard Admin
               </Link>
               <Button onClick={logout} colorScheme="red" size="sm">
                 Sair
@@ -168,8 +168,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   </HStack>
                 </Link>
               ))}
-              <Link as={RouterLink} to="/dashboard" onClick={onClose} fontWeight="medium" color="blue.600" mt={4}>
-                ← Voltar ao Dashboard
+              <Link as={RouterLink} to="/admin/stats" onClick={onClose} fontWeight="medium" color="blue.600" mt={4}>
+                ← Dashboard Admin
               </Link>
               <Button onClick={() => { logout(); onClose(); }} colorScheme="red" mt={2}>
                 Sair
