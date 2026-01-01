@@ -22,7 +22,9 @@
     "trial:expiring": "ts-node-dev scripts/setup-trial-scenario.ts --expiring=2",
     "trial:active": "ts-node-dev scripts/setup-trial-scenario.ts --active=14",
     "trial:paid": "ts-node-dev scripts/setup-trial-scenario.ts --paid",
-    "create-admin": "ts-node-dev scripts/create-admin.ts"
+    "create-admin": "ts-node-dev scripts/create-admin.ts",
+    "validate:config": "ts-node-dev scripts/validate-production-config.ts",
+    "migrate:cpf-hash": "ts-node-dev scripts/migrate-cpf-to-hash.ts"
   },
   "keywords": [],
   "author": "",

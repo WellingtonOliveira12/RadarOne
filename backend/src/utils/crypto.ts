@@ -46,11 +46,34 @@ function getEncryptionKey(): Buffer {
 }
 
 /**
+ * Gera hash SHA256 do CPF para validação de duplicação
+ * @param plainCpf CPF em texto puro (apenas números, 11 dígitos)
+ * @returns Hash SHA256 em hexadecimal (64 caracteres)
+ *
+ * IMPORTANTE: Este hash é usado para detectar CPFs duplicados sem descriptografar todos os CPFs.
+ * Vantagens:
+ * - Validação rápida (O(1) lookup vs O(n) decryption)
+ * - Não revela o CPF original (hash one-way)
+ * - Permite unique constraint no banco
+ */
+export function hashCpf(plainCpf: string): string {
+  // Remove caracteres não numéricos
+  const cleanCpf = plainCpf.replace(/\D/g, '');
+
+  if (cleanCpf.length !== 11) {
+    throw new Error('CPF deve ter 11 dígitos');
+  }
+
+  // Gera hash SHA256
+  return crypto.createHash('sha256').update(cleanCpf).digest('hex');
+}
+
+/**
  * Criptografa um CPF
  * @param plainCpf CPF em texto puro (apenas números, 11 dígitos)
- * @returns { encrypted: string, last4: string }
+ * @returns { encrypted: string, last4: string, hash: string }
  */
-export function encryptCpf(plainCpf: string): { encrypted: string; last4: string } {
+export function encryptCpf(plainCpf: string): { encrypted: string; last4: string; hash: string } {
   // Remove caracteres não numéricos
   const cleanCpf = plainCpf.replace(/\D/g, '');
 
@@ -77,9 +100,13 @@ export function encryptCpf(plainCpf: string): { encrypted: string; last4: string
   // Formato: iv:authTag:encrypted (todos em hex)
   const result = `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
 
+  // Gera hash SHA256 para validação de duplicação
+  const hash = hashCpf(plainCpf);
+
   return {
     encrypted: result,
-    last4
+    last4,
+    hash
   };
 }
 

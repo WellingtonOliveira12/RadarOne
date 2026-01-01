@@ -44,9 +44,17 @@ export class AuthController {
         }
       }
 
-      // Verifica se usuário já existe (email ou CPF)
-      const existingUser = await prisma.user.findUnique({
-        where: { email }
+      // Normalizar email antes de verificar duplicação
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Verifica se usuário já existe (case-insensitive)
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          email: {
+            equals: normalizedEmail,
+            mode: 'insensitive'
+          }
+        }
       });
 
       if (existingUser) {
@@ -57,11 +65,11 @@ export class AuthController {
         return;
       }
 
-      // Verifica CPF duplicado se fornecido
+      // Verifica CPF duplicado se fornecido (usa hash SHA256 para validação robusta)
       if (cpf) {
         const encrypted = encryptCpf(cpf);
-        const existingCpf = await prisma.user.findFirst({
-          where: { cpfLast4: encrypted.last4 }
+        const existingCpf = await prisma.user.findUnique({
+          where: { cpfHash: encrypted.hash }
         });
 
         if (existingCpf) {
@@ -79,22 +87,25 @@ export class AuthController {
       // Criptografar CPF se fornecido
       let cpfEncrypted: string | undefined;
       let cpfLast4: string | undefined;
+      let cpfHash: string | undefined;
 
       if (cpf) {
         const encrypted = encryptCpf(cpf);
         cpfEncrypted = encrypted.encrypted;
         cpfLast4 = encrypted.last4;
+        cpfHash = encrypted.hash;
       }
 
-      // Cria usuário
+      // Cria usuário (usando email normalizado)
       const user = await prisma.user.create({
         data: {
-          email,
+          email: normalizedEmail,
           passwordHash: hashedPassword,
           name,
           phone,
           cpfEncrypted,
-          cpfLast4
+          cpfLast4,
+          cpfHash
         },
         select: {
           id: true,
@@ -360,11 +371,19 @@ export class AuthController {
       }
 
       // Gerar token JWT para reset de senha
-      // Usa PASSWORD_RESET_SECRET se existir, caso contrário usa JWT_SECRET
-      // IMPORTANTE: Em produção, é recomendado ter uma secret separada
-      const secret = process.env.PASSWORD_RESET_SECRET || process.env.JWT_SECRET;
+      // IMPORTANTE: Em produção, PASSWORD_RESET_SECRET é OBRIGATÓRIA (não usa fallback)
+      const isProduction = process.env.NODE_ENV === 'production';
+      const resetSecret = process.env.PASSWORD_RESET_SECRET;
+      const jwtSecret = process.env.JWT_SECRET;
+
+      if (!resetSecret && isProduction) {
+        // Em produção, exigir PASSWORD_RESET_SECRET separada
+        throw new Error('PASSWORD_RESET_SECRET não configurada (obrigatória em produção)');
+      }
+
+      const secret = resetSecret || jwtSecret;
       if (!secret) {
-        throw new Error('JWT_SECRET não configurado');
+        throw new Error('JWT_SECRET ou PASSWORD_RESET_SECRET devem estar configurados');
       }
 
       const resetToken = jwt.sign(
@@ -413,9 +432,18 @@ export class AuthController {
       }
 
       // Verificar e decodificar o token JWT
-      const secret = process.env.PASSWORD_RESET_SECRET || process.env.JWT_SECRET;
+      // IMPORTANTE: Deve usar a MESMA secret usada para gerar o token
+      const isProduction = process.env.NODE_ENV === 'production';
+      const resetSecret = process.env.PASSWORD_RESET_SECRET;
+      const jwtSecret = process.env.JWT_SECRET;
+
+      if (!resetSecret && isProduction) {
+        throw new Error('PASSWORD_RESET_SECRET não configurada (obrigatória em produção)');
+      }
+
+      const secret = resetSecret || jwtSecret;
       if (!secret) {
-        throw new Error('JWT_SECRET não configurado');
+        throw new Error('JWT_SECRET ou PASSWORD_RESET_SECRET devem estar configurados');
       }
 
       let decoded: any;
