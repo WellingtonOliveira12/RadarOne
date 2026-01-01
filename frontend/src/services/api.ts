@@ -5,7 +5,7 @@ import { logout } from '../lib/logout';
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface RequestOptions {
   method?: HttpMethod;
@@ -136,6 +136,8 @@ export const api = {
     apiRequest<T>(path, { method: 'POST', body, token }),
   put: <T = any>(path: string, body?: any, token?: string | null) =>
     apiRequest<T>(path, { method: 'PUT', body, token }),
+  patch: <T = any>(path: string, body?: any, token?: string | null) =>
+    apiRequest<T>(path, { method: 'PATCH', body, token }),
   delete: <T = any>(path: string, token?: string | null) =>
     apiRequest<T>(path, { method: 'DELETE', token }),
 };

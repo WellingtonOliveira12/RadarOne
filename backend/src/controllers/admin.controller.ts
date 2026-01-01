@@ -2050,4 +2050,455 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao exportar monitores' });
     }
   }
+
+  /**
+   * COUPONS MANAGEMENT (FASE ADMIN CUPONS)
+   */
+
+  /**
+   * GET /api/admin/coupons
+   * Listar todos os cupons com paginação e filtros
+   */
+  static async listCoupons(req: Request, res: Response) {
+    try {
+      const {
+        page = '1',
+        limit = '20',
+        status,
+        code,
+        type
+      } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const skip = (pageNum - 1) * limitNum;
+
+      // Construir filtros dinâmicos
+      const where: any = {};
+
+      if (status === 'active') {
+        where.isActive = true;
+      } else if (status === 'inactive') {
+        where.isActive = false;
+      }
+
+      if (code) {
+        where.code = {
+          contains: (code as string).toUpperCase(),
+          mode: 'insensitive'
+        };
+      }
+
+      if (type) {
+        where.discountType = type;
+      }
+
+      // Buscar cupons com relacionamentos
+      const [coupons, total] = await Promise.all([
+        prisma.coupon.findMany({
+          where,
+          skip,
+          take: limitNum,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            plan: {
+              select: {
+                id: true,
+                name: true,
+                slug: true
+              }
+            },
+            _count: {
+              select: {
+                usageLogs: true
+              }
+            }
+          }
+        }),
+        prisma.coupon.count({ where })
+      ]);
+
+      const totalPages = Math.ceil(total / limitNum);
+
+      return res.json({
+        coupons,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao listar cupons:', error);
+      return res.status(500).json({ error: 'Erro ao listar cupons' });
+    }
+  }
+
+  /**
+   * POST /api/admin/coupons
+   * Criar novo cupom
+   */
+  static async createCoupon(req: Request, res: Response) {
+    try {
+      const {
+        code,
+        description,
+        discountType,
+        discountValue,
+        maxUses,
+        expiresAt,
+        appliesToPlanId
+      } = req.body;
+
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      // Validações
+      if (!code || !discountType || discountValue === undefined) {
+        return res.status(400).json({
+          error: 'Campos obrigatórios: code, discountType, discountValue'
+        });
+      }
+
+      // Code deve ser uppercase e sem espaços
+      const normalizedCode = code.trim().toUpperCase().replace(/\s+/g, '');
+
+      if (normalizedCode.length < 3) {
+        return res.status(400).json({
+          error: 'Código deve ter pelo menos 3 caracteres'
+        });
+      }
+
+      // Validar discountValue
+      if (discountValue <= 0) {
+        return res.status(400).json({
+          error: 'Valor de desconto deve ser maior que 0'
+        });
+      }
+
+      if (discountType === 'PERCENTAGE' && discountValue > 100) {
+        return res.status(400).json({
+          error: 'Desconto percentual não pode ser maior que 100%'
+        });
+      }
+
+      // Verificar se código já existe
+      const existing = await prisma.coupon.findUnique({
+        where: { code: normalizedCode }
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          error: 'Já existe um cupom com este código'
+        });
+      }
+
+      // Validar plano se especificado
+      if (appliesToPlanId) {
+        const plan = await prisma.plan.findUnique({
+          where: { id: appliesToPlanId }
+        });
+
+        if (!plan) {
+          return res.status(400).json({
+            error: 'Plano especificado não encontrado'
+          });
+        }
+      }
+
+      // Validar data de expiração
+      if (expiresAt && new Date(expiresAt) <= new Date()) {
+        return res.status(400).json({
+          error: 'Data de expiração deve ser futura'
+        });
+      }
+
+      // Criar cupom
+      const coupon = await prisma.coupon.create({
+        data: {
+          code: normalizedCode,
+          description: description || null,
+          discountType,
+          discountValue,
+          maxUses: maxUses || null,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          appliesToPlanId: appliesToPlanId || null,
+          isActive: true,
+          usedCount: 0
+        },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          }
+        }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: AuditAction.COUPON_CREATED,
+        targetType: AuditTargetType.COUPON,
+        targetId: coupon.id,
+        beforeData: null,
+        afterData: coupon,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.status(201).json(coupon);
+
+    } catch (error) {
+      console.error('Erro ao criar cupom:', error);
+      return res.status(500).json({ error: 'Erro ao criar cupom' });
+    }
+  }
+
+  /**
+   * PUT /api/admin/coupons/:id
+   * Atualizar cupom existente
+   */
+  static async updateCoupon(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const {
+        description,
+        discountType,
+        discountValue,
+        maxUses,
+        expiresAt,
+        appliesToPlanId
+      } = req.body;
+
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      // Buscar cupom existente
+      const existing = await prisma.coupon.findUnique({
+        where: { id }
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Cupom não encontrado' });
+      }
+
+      // Validações
+      if (discountValue !== undefined && discountValue <= 0) {
+        return res.status(400).json({
+          error: 'Valor de desconto deve ser maior que 0'
+        });
+      }
+
+      if (discountType === 'PERCENTAGE' && discountValue > 100) {
+        return res.status(400).json({
+          error: 'Desconto percentual não pode ser maior que 100%'
+        });
+      }
+
+      // Validar plano se especificado
+      if (appliesToPlanId) {
+        const plan = await prisma.plan.findUnique({
+          where: { id: appliesToPlanId }
+        });
+
+        if (!plan) {
+          return res.status(400).json({
+            error: 'Plano especificado não encontrado'
+          });
+        }
+      }
+
+      // Validar data de expiração
+      if (expiresAt && new Date(expiresAt) <= new Date()) {
+        return res.status(400).json({
+          error: 'Data de expiração deve ser futura'
+        });
+      }
+
+      // Atualizar cupom
+      const updated = await prisma.coupon.update({
+        where: { id },
+        data: {
+          description: description !== undefined ? description : existing.description,
+          discountType: discountType || existing.discountType,
+          discountValue: discountValue !== undefined ? discountValue : existing.discountValue,
+          maxUses: maxUses !== undefined ? maxUses : existing.maxUses,
+          expiresAt: expiresAt !== undefined ? (expiresAt ? new Date(expiresAt) : null) : existing.expiresAt,
+          appliesToPlanId: appliesToPlanId !== undefined ? appliesToPlanId : existing.appliesToPlanId
+        },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          }
+        }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: AuditAction.COUPON_UPDATED,
+        targetType: AuditTargetType.COUPON,
+        targetId: updated.id,
+        beforeData: existing,
+        afterData: updated,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json(updated);
+
+    } catch (error) {
+      console.error('Erro ao atualizar cupom:', error);
+      return res.status(500).json({ error: 'Erro ao atualizar cupom' });
+    }
+  }
+
+  /**
+   * PATCH /api/admin/coupons/:id/toggle
+   * Ativar/Desativar cupom
+   */
+  static async toggleCouponStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      // Buscar cupom existente
+      const existing = await prisma.coupon.findUnique({
+        where: { id }
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Cupom não encontrado' });
+      }
+
+      // Toggle status
+      const updated = await prisma.coupon.update({
+        where: { id },
+        data: {
+          isActive: !existing.isActive
+        },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          }
+        }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: updated.isActive ? AuditAction.COUPON_ACTIVATED : AuditAction.COUPON_DEACTIVATED,
+        targetType: AuditTargetType.COUPON,
+        targetId: updated.id,
+        beforeData: { isActive: existing.isActive },
+        afterData: { isActive: updated.isActive },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json(updated);
+
+    } catch (error) {
+      console.error('Erro ao alternar status do cupom:', error);
+      return res.status(500).json({ error: 'Erro ao alternar status do cupom' });
+    }
+  }
+
+  /**
+   * DELETE /api/admin/coupons/:id
+   * Deletar cupom (soft delete via isActive)
+   */
+  static async deleteCoupon(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      // Buscar cupom existente
+      const existing = await prisma.coupon.findUnique({
+        where: { id },
+        include: {
+          _count: {
+            select: {
+              usageLogs: true
+            }
+          }
+        }
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Cupom não encontrado' });
+      }
+
+      // Se já foi usado, apenas desativar (soft delete)
+      if (existing._count.usageLogs > 0) {
+        const updated = await prisma.coupon.update({
+          where: { id },
+          data: { isActive: false }
+        });
+
+        // Audit log
+        await logAdminAction({
+          adminId: adminId!,
+          adminEmail: admin!.email,
+          action: AuditAction.COUPON_DEACTIVATED,
+          targetType: AuditTargetType.COUPON,
+          targetId: updated.id,
+          beforeData: existing,
+          afterData: { isActive: false, reason: 'Soft delete devido a usos existentes' },
+          ipAddress: getClientIp(req),
+          userAgent: req.get('user-agent')
+        });
+
+        return res.json({
+          message: 'Cupom desativado (possui usos registrados)',
+          coupon: updated
+        });
+      }
+
+      // Se nunca foi usado, pode deletar permanentemente
+      await prisma.coupon.delete({
+        where: { id }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: AuditAction.COUPON_DELETED,
+        targetType: AuditTargetType.COUPON,
+        targetId: id,
+        beforeData: existing,
+        afterData: null,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json({
+        message: 'Cupom deletado permanentemente',
+        deleted: true
+      });
+
+    } catch (error) {
+      console.error('Erro ao deletar cupom:', error);
+      return res.status(500).json({ error: 'Erro ao deletar cupom' });
+    }
+  }
 }
