@@ -45,6 +45,9 @@ router.get('/alerts', requireAdmin, AdminController.listAlerts);
 router.patch('/alerts/:id/read', requireAdmin, AdminController.markAlertAsRead);
 
 // Coupons (FASE ADMIN CUPONS)
+router.get('/coupons/export', requireAdmin, AdminController.exportCoupons); // IMPORTANTE: Vem ANTES de /coupons
+router.patch('/coupons/bulk/toggle', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), AdminController.bulkToggleCoupons); // Bulk toggle
+router.delete('/coupons/bulk', requireAdminRole([UserRole.ADMIN_SUPER]), AdminController.bulkDeleteCoupons); // Bulk delete
 router.get('/coupons', requireAdmin, AdminController.listCoupons);
 router.post('/coupons', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), AdminController.createCoupon); // ADMIN_SUPER ou ADMIN_FINANCE
 router.put('/coupons/:id', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), AdminController.updateCoupon); // ADMIN_SUPER ou ADMIN_FINANCE

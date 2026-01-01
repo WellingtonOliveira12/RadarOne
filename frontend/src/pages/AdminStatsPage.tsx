@@ -65,6 +65,20 @@ interface SystemStats {
     };
     count: number;
   }>;
+  coupons: {
+    total: number;
+    active: number;
+    inactive: number;
+    used: number;
+    expiringSoon: number;
+    topCoupons: Array<{
+      code: string;
+      description: string | null;
+      usedCount: number;
+      discountType: string;
+      discountValue: number;
+    }>;
+  };
 }
 
 interface TemporalStats {
@@ -480,6 +494,118 @@ export const AdminStatsPage: React.FC = () => {
             </CardBody>
           </Card>
         </SimpleGrid>
+
+        {/* Card de Cupons */}
+        <Card bg="orange.50" borderColor="orange.200" borderWidth="1px">
+          <CardBody>
+            <VStack spacing={4} align="stretch">
+              <Heading size="md" color="orange.800">
+                🎟️ Cupons de Desconto
+              </Heading>
+
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
+                <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
+                  <Stat>
+                    <StatLabel fontSize="sm" color="gray.600">
+                      Total de Cupons
+                    </StatLabel>
+                    <StatNumber fontSize="3xl">{stats.coupons.total}</StatNumber>
+                    <StatHelpText fontSize="xs">
+                      {stats.coupons.active} ativos • {stats.coupons.inactive} inativos
+                    </StatHelpText>
+                  </Stat>
+                </Box>
+
+                <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
+                  <Stat>
+                    <StatLabel fontSize="sm" color="gray.600">
+                      Cupons Utilizados
+                    </StatLabel>
+                    <StatNumber fontSize="3xl" color="green.600">
+                      {stats.coupons.used}
+                    </StatNumber>
+                    <StatHelpText fontSize="xs">
+                      {stats.coupons.total > 0
+                        ? `${((stats.coupons.used / stats.coupons.total) * 100).toFixed(1)}%`
+                        : '0%'}{' '}
+                      de utilização
+                    </StatHelpText>
+                  </Stat>
+                </Box>
+
+                <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
+                  <Stat>
+                    <StatLabel fontSize="sm" color="gray.600">
+                      Expirando em Breve
+                    </StatLabel>
+                    <StatNumber
+                      fontSize="3xl"
+                      color={stats.coupons.expiringSoon > 0 ? 'orange.600' : 'gray.600'}
+                    >
+                      {stats.coupons.expiringSoon}
+                    </StatNumber>
+                    <StatHelpText fontSize="xs">Próximos 7 dias</StatHelpText>
+                  </Stat>
+                </Box>
+
+                <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
+                  <Stat>
+                    <StatLabel fontSize="sm" color="gray.600">
+                      Taxa de Ativação
+                    </StatLabel>
+                    <StatNumber fontSize="3xl" color="blue.600">
+                      {stats.coupons.total > 0
+                        ? `${((stats.coupons.active / stats.coupons.total) * 100).toFixed(1)}%`
+                        : '0%'}
+                    </StatNumber>
+                    <StatHelpText fontSize="xs">
+                      {stats.coupons.active} cupons ativos
+                    </StatHelpText>
+                  </Stat>
+                </Box>
+              </SimpleGrid>
+
+              {/* Top Cupons Mais Usados */}
+              {stats.coupons.topCoupons.length > 0 && (
+                <Box mt={4}>
+                  <Heading size="sm" mb={3} color="gray.700">
+                    Top 5 Cupons Mais Utilizados
+                  </Heading>
+                  <Table size="sm" variant="simple">
+                    <Thead>
+                      <Tr>
+                        <Th>Código</Th>
+                        <Th>Descrição</Th>
+                        <Th>Tipo</Th>
+                        <Th isNumeric>Usos</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {stats.coupons.topCoupons.map((coupon) => (
+                        <Tr key={coupon.code}>
+                          <Td fontWeight="bold">{coupon.code}</Td>
+                          <Td maxW="200px" isTruncated>
+                            {coupon.description || '-'}
+                          </Td>
+                          <Td>
+                            <Badge
+                              colorScheme={coupon.discountType === 'PERCENTAGE' ? 'purple' : 'orange'}
+                              fontSize="xs">
+                              {coupon.discountType === 'PERCENTAGE'
+                                ? `${coupon.discountValue}%`
+                                : `R$ ${(coupon.discountValue / 100).toFixed(2)}`}
+                            </Badge>
+                          </Td>
+                          <Td isNumeric fontWeight="semibold">{coupon.usedCount}</Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                </Box>
+              )}
+            </VStack>
+          </CardBody>
+        </Card>
 
         {/* Métricas Estratégicas (FASE 3.4) */}
         <Card bg="blue.50" borderColor="blue.200" borderWidth="1px">

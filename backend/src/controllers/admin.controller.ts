@@ -569,7 +569,11 @@ export class AdminController {
         totalMonitors,
         activeMonitors,
         webhookLogs,
-        topPlans
+        topPlans,
+        totalCoupons,
+        activeCoupons,
+        usedCoupons,
+        expiringCoupons
       ] = await Promise.all([
         // Total de usuários
         prisma.user.count(),
@@ -611,6 +615,32 @@ export class AdminController {
             }
           },
           take: 5
+        }),
+
+        // Total de cupons
+        prisma.coupon.count(),
+
+        // Cupons ativos
+        prisma.coupon.count({ where: { isActive: true } }),
+
+        // Cupons com pelo menos 1 uso
+        prisma.coupon.count({
+          where: {
+            usedCount: {
+              gt: 0
+            }
+          }
+        }),
+
+        // Cupons expirando nos próximos 7 dias
+        prisma.coupon.count({
+          where: {
+            isActive: true,
+            expiresAt: {
+              gte: new Date(),
+              lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            }
+          }
         })
       ]);
 
@@ -649,6 +679,26 @@ export class AdminController {
         })
       );
 
+      // Buscar cupons mais usados
+      const topCoupons = await prisma.coupon.findMany({
+        where: {
+          usedCount: {
+            gt: 0
+          }
+        },
+        orderBy: {
+          usedCount: 'desc'
+        },
+        take: 5,
+        include: {
+          _count: {
+            select: {
+              usageLogs: true
+            }
+          }
+        }
+      });
+
       return res.json({
         users: {
           total: totalUsers,
@@ -670,7 +720,21 @@ export class AdminController {
         webhooks: {
           last7Days: webhookLogs
         },
-        topPlans: topPlansWithDetails
+        topPlans: topPlansWithDetails,
+        coupons: {
+          total: totalCoupons,
+          active: activeCoupons,
+          inactive: totalCoupons - activeCoupons,
+          used: usedCoupons,
+          expiringSoon: expiringCoupons,
+          topCoupons: topCoupons.map(coupon => ({
+            code: coupon.code,
+            description: coupon.description,
+            usedCount: coupon.usedCount,
+            discountType: coupon.discountType,
+            discountValue: coupon.discountValue
+          }))
+        }
       });
 
     } catch (error) {
@@ -2056,6 +2120,128 @@ export class AdminController {
    */
 
   /**
+   * GET /api/admin/coupons/export
+   * Exportar cupons para CSV
+   */
+  static async exportCoupons(req: Request, res: Response) {
+    try {
+      const { status, code, type } = req.query;
+      const adminId = req.userId;
+
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      // Construir filtros
+      const where: any = {};
+
+      if (status === 'active') {
+        where.isActive = true;
+      } else if (status === 'inactive') {
+        where.isActive = false;
+      }
+
+      if (code) {
+        where.code = {
+          contains: (code as string).toUpperCase(),
+          mode: 'insensitive'
+        };
+      }
+
+      if (type) {
+        where.discountType = type;
+      }
+
+      // Buscar cupons
+      const coupons = await prisma.coupon.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          plan: {
+            select: {
+              name: true,
+              slug: true
+            }
+          },
+          _count: {
+            select: {
+              usageLogs: true
+            }
+          }
+        }
+      });
+
+      const { generateCSV, getTimestamp } = await import('../services/exportService');
+
+      const csvData = coupons.map(coupon => ({
+        id: coupon.id,
+        code: coupon.code,
+        description: coupon.description || '',
+        discountType: coupon.discountType === 'PERCENTAGE' ? 'Percentual' : 'Fixo',
+        discountValue: coupon.discountType === 'PERCENTAGE'
+          ? `${coupon.discountValue}%`
+          : `R$ ${(coupon.discountValue / 100).toFixed(2)}`,
+        plan: coupon.plan?.name || 'Todos os planos',
+        maxUses: coupon.maxUses || 'Ilimitado',
+        usedCount: coupon._count.usageLogs,
+        remainingUses: coupon.maxUses ? coupon.maxUses - coupon._count.usageLogs : 'Ilimitado',
+        expiresAt: coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleString('pt-BR') : 'Sem expiração',
+        isActive: coupon.isActive ? 'Ativo' : 'Inativo',
+        createdAt: new Date(coupon.createdAt).toLocaleString('pt-BR'),
+        updatedAt: new Date(coupon.updatedAt).toLocaleString('pt-BR')
+      }));
+
+      const headers = {
+        id: 'ID',
+        code: 'Código',
+        description: 'Descrição',
+        discountType: 'Tipo de Desconto',
+        discountValue: 'Valor do Desconto',
+        plan: 'Plano Aplicável',
+        maxUses: 'Máximo de Usos',
+        usedCount: 'Usos Realizados',
+        remainingUses: 'Usos Restantes',
+        expiresAt: 'Data de Expiração',
+        isActive: 'Status',
+        createdAt: 'Data de Criação',
+        updatedAt: 'Última Atualização'
+      };
+
+      const { csv, filename } = generateCSV(
+        csvData,
+        headers,
+        `cupons_${getTimestamp()}`
+      );
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: 'COUPONS_EXPORTED' as any,
+        targetType: AuditTargetType.COUPON,
+        targetId: null,
+        beforeData: null,
+        afterData: { count: coupons.length, filters: where },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('\ufeff' + csv);
+
+    } catch (error) {
+      console.error('Erro ao exportar cupons:', error);
+      return res.status(500).json({ error: 'Erro ao exportar cupons' });
+    }
+  }
+
+  /**
    * GET /api/admin/coupons
    * Listar todos os cupons com paginação e filtros
    */
@@ -2499,6 +2685,149 @@ export class AdminController {
     } catch (error) {
       console.error('Erro ao deletar cupom:', error);
       return res.status(500).json({ error: 'Erro ao deletar cupom' });
+    }
+  }
+
+  /**
+   * PATCH /api/admin/coupons/bulk/toggle
+   * Ativar/Desativar múltiplos cupons
+   */
+  static async bulkToggleCoupons(req: Request, res: Response) {
+    try {
+      const { couponIds, isActive } = req.body;
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      if (!couponIds || !Array.isArray(couponIds) || couponIds.length === 0) {
+        return res.status(400).json({ error: 'IDs de cupons são obrigatórios' });
+      }
+
+      if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ error: 'isActive deve ser um booleano' });
+      }
+
+      // Atualizar todos de uma vez
+      const result = await prisma.coupon.updateMany({
+        where: {
+          id: {
+            in: couponIds
+          }
+        },
+        data: {
+          isActive
+        }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: isActive ? AuditAction.COUPON_ACTIVATED : AuditAction.COUPON_DEACTIVATED,
+        targetType: AuditTargetType.COUPON,
+        targetId: null,
+        beforeData: { couponIds },
+        afterData: { isActive, count: result.count },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json({
+        message: `${result.count} cupons ${isActive ? 'ativados' : 'desativados'} com sucesso`,
+        count: result.count
+      });
+
+    } catch (error) {
+      console.error('Erro ao alternar múltiplos cupons:', error);
+      return res.status(500).json({ error: 'Erro ao alternar múltiplos cupons' });
+    }
+  }
+
+  /**
+   * DELETE /api/admin/coupons/bulk
+   * Deletar múltiplos cupons
+   */
+  static async bulkDeleteCoupons(req: Request, res: Response) {
+    try {
+      const { couponIds } = req.body;
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      if (!couponIds || !Array.isArray(couponIds) || couponIds.length === 0) {
+        return res.status(400).json({ error: 'IDs de cupons são obrigatórios' });
+      }
+
+      // Buscar cupons com contagem de usos
+      const coupons = await prisma.coupon.findMany({
+        where: {
+          id: {
+            in: couponIds
+          }
+        },
+        include: {
+          _count: {
+            select: {
+              usageLogs: true
+            }
+          }
+        }
+      });
+
+      // Separar em "deletáveis" e "desativáveis"
+      const toDelete = coupons.filter(c => c._count.usageLogs === 0).map(c => c.id);
+      const toDeactivate = coupons.filter(c => c._count.usageLogs > 0).map(c => c.id);
+
+      let deletedCount = 0;
+      let deactivatedCount = 0;
+
+      // Deletar permanentemente os que não foram usados
+      if (toDelete.length > 0) {
+        const deleteResult = await prisma.coupon.deleteMany({
+          where: {
+            id: {
+              in: toDelete
+            }
+          }
+        });
+        deletedCount = deleteResult.count;
+      }
+
+      // Desativar os que já foram usados
+      if (toDeactivate.length > 0) {
+        const deactivateResult = await prisma.coupon.updateMany({
+          where: {
+            id: {
+              in: toDeactivate
+            }
+          },
+          data: {
+            isActive: false
+          }
+        });
+        deactivatedCount = deactivateResult.count;
+      }
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: AuditAction.COUPON_DELETED,
+        targetType: AuditTargetType.COUPON,
+        targetId: null,
+        beforeData: { couponIds, total: couponIds.length },
+        afterData: { deleted: deletedCount, deactivated: deactivatedCount },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json({
+        message: `${deletedCount} cupons deletados, ${deactivatedCount} cupons desativados`,
+        deleted: deletedCount,
+        deactivated: deactivatedCount
+      });
+
+    } catch (error) {
+      console.error('Erro ao deletar múltiplos cupons:', error);
+      return res.status(500).json({ error: 'Erro ao deletar múltiplos cupons' });
     }
   }
 }

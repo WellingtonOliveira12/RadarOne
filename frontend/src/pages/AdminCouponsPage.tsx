@@ -307,6 +307,53 @@ export const AdminCouponsPage: React.FC = () => {
     }
   };
 
+  const handleExportCoupons = async () => {
+    try {
+      const token = getToken();
+
+      const queryParams = new URLSearchParams();
+      if (filterCode) queryParams.append('code', filterCode);
+      if (filterStatus) queryParams.append('status', filterStatus);
+      if (filterType) queryParams.append('type', filterType);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com'}/api/admin/coupons/export?${queryParams.toString()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Erro ao exportar cupons');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cupons_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: 'Cupons exportados com sucesso!',
+        status: 'success',
+        duration: 3000,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao exportar cupons',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
   const openEditModal = (coupon: Coupon) => {
     setEditingCoupon(coupon);
     setFormData({
@@ -436,9 +483,19 @@ export const AdminCouponsPage: React.FC = () => {
                 </Box>
               </HStack>
 
-              <Button colorScheme="blue" onClick={onCreateOpen} size="sm">
-                + Novo Cupom
-              </Button>
+              <HStack spacing={2}>
+                <Button
+                  colorScheme="green"
+                  variant="outline"
+                  onClick={handleExportCoupons}
+                  size="sm"
+                >
+                  📥 Exportar CSV
+                </Button>
+                <Button colorScheme="blue" onClick={onCreateOpen} size="sm">
+                  + Novo Cupom
+                </Button>
+              </HStack>
             </HStack>
           </CardBody>
         </Card>
