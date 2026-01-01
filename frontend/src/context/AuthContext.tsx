@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (token) {
         // Carregar dados do usuário do backend
         const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/auth/me`,
+          `${import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com'}/api/auth/me`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -65,13 +65,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           const userData = await response.json();
           setUser(userData.user);
         } else {
-          // Token inválido, limpar
+          // Token inválido, limpar auth e garantir que user seja null
+          console.log('[AuthContext] Token inválido, limpando autenticação');
           clearAuth();
+          setUser(null);
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar usuário:', error);
+      console.error('[AuthContext] Erro ao carregar usuário:', error);
       clearAuth();
+      setUser(null);
     } finally {
       setLoading(false);
     }

@@ -27,6 +27,7 @@ import { ChevronRightIcon, CheckCircleIcon } from '@chakra-ui/icons';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import { getToken } from '../lib/auth';
+import { API_BASE_URL } from '../constants/app';
 
 /**
  * Gerenciamento de Assinatura
@@ -71,9 +72,8 @@ export const SubscriptionSettingsPage: React.FC = () => {
   const loadData = async () => {
     try {
       const token = getToken();
-      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-      const subResponse = await fetch(`${API_URL}/api/subscriptions/my`, {
+      const subResponse = await fetch(`${API_BASE_URL}/api/subscriptions/my`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -89,7 +89,7 @@ export const SubscriptionSettingsPage: React.FC = () => {
         });
       }
 
-      const plansResponse = await fetch(`${API_URL}/api/plans`);
+      const plansResponse = await fetch(`${API_BASE_URL}/api/plans`);
       if (plansResponse.ok) {
         const plansData = await plansResponse.json();
         setAllPlans(plansData);
@@ -104,8 +104,7 @@ export const SubscriptionSettingsPage: React.FC = () => {
   const handleChangePlan = async (planSlug: string) => {
     try {
       const token = getToken();
-      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_URL}/api/subscriptions/change-plan`, {
+      const response = await fetch(`${API_BASE_URL}/api/subscriptions/change-plan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

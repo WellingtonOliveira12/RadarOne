@@ -12,8 +12,12 @@ export const BUILD_DATE = new Date().toISOString();
 export const IS_PRODUCTION = import.meta.env.PROD;
 export const IS_DEVELOPMENT = import.meta.env.DEV;
 
-// API Base URL
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+/**
+ * URL base da API
+ * Produção: https://radarone.onrender.com
+ * Desenvolvimento: configurar VITE_API_BASE_URL em .env.local
+ */
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com';
 
 // Telegram Bot
 export const TELEGRAM_BOT_USERNAME = 'RadarOneAlertaBot';

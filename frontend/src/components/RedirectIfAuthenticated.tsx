@@ -40,7 +40,14 @@ export const RedirectIfAuthenticated: React.FC<RedirectIfAuthenticatedProps> = (
     return <>{children}</>;
   }
 
-  // Autenticado → verificar subscription e redirecionar
+  // Autenticado → verificar role e subscription
+
+  // ADMINS sempre vão para área administrativa (independente de subscription)
+  if (user.role === 'ADMIN') {
+    return <Navigate to="/admin/stats" replace />;
+  }
+
+  // USERs → verificar subscription
   const subscriptionStatus = getSubscriptionStatus(user);
 
   if (subscriptionStatus.hasValidSubscription) {

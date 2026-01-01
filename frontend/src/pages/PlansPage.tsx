@@ -8,6 +8,7 @@ import { getToken } from '../lib/auth';
 import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 import { PublicLayout } from '../components/PublicLayout';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { API_BASE_URL } from '../constants/app';
 import * as responsive from '../styles/responsive';
 
 /**
@@ -73,8 +74,7 @@ export const PlansPage: React.FC = () => {
   const loadPlans = async () => {
     try {
       // Buscar planos da API
-      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_URL}/api/plans`);
+      const response = await fetch(`${API_BASE_URL}/api/plans`);
       if (!response.ok) {
         throw new Error('Erro ao buscar planos');
       }
@@ -111,8 +111,7 @@ export const PlansPage: React.FC = () => {
     // Se está logado E não tem checkoutUrl, iniciar trial interno
     try {
       const token = getToken();
-      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_URL}/api/subscriptions/start-trial`, {
+      const response = await fetch(`${API_BASE_URL}/api/subscriptions/start-trial`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

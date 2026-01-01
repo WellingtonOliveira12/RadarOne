@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getToken } from '../lib/auth';
+import { API_BASE_URL } from '../constants/app';
 
 /**
  * Componente para proteger rotas que requerem role ADMIN
@@ -26,10 +27,9 @@ export const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ childr
 
       try {
         const token = getToken();
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
         // Tenta acessar endpoint admin para verificar role
-        const response = await fetch(`${API_URL}/api/admin/stats`, {
+        const response = await fetch(`${API_BASE_URL}/api/admin/stats`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
