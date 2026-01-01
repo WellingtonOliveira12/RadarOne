@@ -152,13 +152,24 @@ export class AuthController {
       const { email, password } = req.body;
 
       if (!email || !password) {
+        logInfo('Login attempt with missing credentials', { hasEmail: !!email, hasPassword: !!password });
         res.status(400).json({ error: 'Email e senha são obrigatórios' });
         return;
       }
 
-      // Busca usuário
-      const user = await prisma.user.findUnique({
-        where: { email },
+      // Normalizar email (trim + toLowerCase) para evitar problemas de case/espaços
+      const normalizedEmail = email.trim().toLowerCase();
+
+      logInfo('Login attempt', { email: sanitizeEmail(normalizedEmail), requestId: req.requestId });
+
+      // Busca usuário (case insensitive)
+      const user = await prisma.user.findFirst({
+        where: {
+          email: {
+            equals: normalizedEmail,
+            mode: 'insensitive'
+          }
+        },
         include: {
           subscriptions: {
             where: {
@@ -172,19 +183,30 @@ export class AuthController {
       });
 
       if (!user) {
+        logInfo('Login failed: user not found', { email: sanitizeEmail(normalizedEmail) });
         res.status(401).json({ error: 'Credenciais inválidas' });
         return;
       }
+
+      logInfo('User found, checking password', { userId: user.id, email: sanitizeEmail(user.email) });
 
       // Verifica senha
       const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
       if (!isPasswordValid) {
+        logInfo('Login failed: invalid password', { userId: user.id, email: sanitizeEmail(user.email) });
         res.status(401).json({ error: 'Credenciais inválidas' });
         return;
       }
 
+      logInfo('Password valid, checking user status', { userId: user.id });
+
       // Verifica se usuário está ativo e não bloqueado
       if (!user.isActive || user.blocked) {
+        logInfo('Login blocked: user inactive or blocked', {
+          userId: user.id,
+          isActive: user.isActive,
+          blocked: user.blocked
+        });
         res.status(403).json({ error: 'Usuário bloqueado. Entre em contato com o suporte' });
         return;
       }
