@@ -23,7 +23,7 @@ model User {
   // LGPD e Segurança
   cpfEncrypted String? @map("cpf_encrypted") // CPF criptografado (AES-256-GCM)
   cpfLast4     String? @map("cpf_last4") // Últimos 4 dígitos para conferência
-  cpfHash      String? @unique @map("cpf_hash") // SHA256 hash do CPF (para validação de duplicação)
+  cpfHash      String? @map("cpf_hash") // SHA256 hash do CPF (para validação de duplicação) - NOTA: unique constraint comentada na migration, usar findFirst
   blocked      Boolean @default(false) // Se true, usuário não pode acessar
 
   // 2FA / MFA (FASE 4.4)

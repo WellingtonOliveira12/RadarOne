@@ -66,9 +66,10 @@ export class AuthController {
       }
 
       // Verifica CPF duplicado se fornecido (usa hash SHA256 para validação robusta)
+      // CRÍTICO: usar findFirst porque cpfHash NÃO tem unique constraint no banco (migration comentou)
       if (cpf) {
         const encrypted = encryptCpf(cpf);
-        const existingCpf = await prisma.user.findUnique({
+        const existingCpf = await prisma.user.findFirst({
           where: { cpfHash: encrypted.hash }
         });
 
@@ -97,26 +98,48 @@ export class AuthController {
       }
 
       // Cria usuário (usando email normalizado)
-      const user = await prisma.user.create({
-        data: {
-          email: normalizedEmail,
-          passwordHash: hashedPassword,
-          name,
-          phone,
-          cpfEncrypted,
-          cpfLast4,
-          cpfHash
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          phone: true,
-          cpfLast4: true,
-          role: true,
-          createdAt: true
+      // CRÍTICO: envolver em try/catch para tratar P2002 (race condition de email duplicado)
+      let user;
+      try {
+        user = await prisma.user.create({
+          data: {
+            email: normalizedEmail,
+            passwordHash: hashedPassword,
+            name,
+            phone,
+            cpfEncrypted,
+            cpfLast4,
+            cpfHash
+          },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+            cpfLast4: true,
+            role: true,
+            createdAt: true
+          }
+        });
+      } catch (createError: any) {
+        // Tratar erro de unique constraint (P2002) - race condition
+        if (createError.code === 'P2002') {
+          // Verificar qual campo violou a constraint
+          const target = createError.meta?.target;
+
+          if (target && (target.includes('email') || target.includes('users_email_unique_lower'))) {
+            logInfo('Race condition detected: email already exists', { email: sanitizeEmail(normalizedEmail) });
+            res.status(409).json({
+              error: 'Você já tem cadastro. Faça login para entrar.',
+              errorCode: ErrorCodes.USER_ALREADY_EXISTS
+            });
+            return;
+          }
         }
-      });
+
+        // Se não for P2002 ou for outro campo, re-throw para catch externo
+        throw createError;
+      }
 
       // Enviar e-mail de boas-vindas (não bloqueia o registro se falhar)
       sendWelcomeEmail(user.email, user.name).catch((err) => {
