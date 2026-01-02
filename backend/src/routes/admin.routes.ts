@@ -1,7 +1,23 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { AdminController } from '../controllers/admin.controller';
 import { requireAdmin, requireAdminRole } from '../middlewares/admin.middleware';
 import { UserRole } from '@prisma/client';
+
+// Multer config for CSV upload (memory storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas arquivos CSV são permitidos'));
+    }
+  },
+});
 
 const router = Router();
 
@@ -46,6 +62,8 @@ router.patch('/alerts/:id/read', requireAdmin, AdminController.markAlertAsRead);
 
 // Coupons (FASE ADMIN CUPONS)
 router.get('/coupons/export', requireAdmin, AdminController.exportCoupons); // IMPORTANTE: Vem ANTES de /coupons
+router.get('/coupons/analytics', requireAdmin, AdminController.getCouponAnalytics); // Analytics para gráficos
+router.post('/coupons/import', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), upload.single('file'), AdminController.importCoupons); // CSV Import
 router.patch('/coupons/bulk/toggle', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), AdminController.bulkToggleCoupons); // Bulk toggle
 router.delete('/coupons/bulk', requireAdminRole([UserRole.ADMIN_SUPER]), AdminController.bulkDeleteCoupons); // Bulk delete
 router.get('/coupons', requireAdmin, AdminController.listCoupons);

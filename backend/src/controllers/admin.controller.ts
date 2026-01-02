@@ -2830,4 +2830,298 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao deletar múltiplos cupons' });
     }
   }
+
+  /**
+   * Importa cupons a partir de arquivo CSV
+   * POST /api/admin/coupons/import
+   * Permissão: ADMIN_SUPER ou ADMIN_FINANCE
+   *
+   * Formato CSV esperado:
+   * code,description,discountType,discountValue,maxUses,expiresAt,planSlug
+   * PROMO10,Desconto 10%,PERCENTAGE,10,100,2025-12-31,
+   * SAVE50,Economize 50 reais,FIXED,5000,50,2025-12-31,premium
+   */
+  static async importCoupons(req: Request, res: Response) {
+    try {
+      const userId = req.userId!;
+
+      // Get admin user for email
+      const admin = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      const userEmail = admin.email;
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'Arquivo CSV não fornecido' });
+      }
+
+      const fileContent = req.file.buffer.toString('utf-8');
+      const { parse } = await import('csv-parse/sync');
+
+      // Parse CSV
+      interface CouponCsvRow {
+        code: string;
+        description?: string;
+        discountType: string;
+        discountValue: string;
+        maxUses?: string;
+        expiresAt?: string;
+        planSlug?: string;
+      }
+
+      const records: CouponCsvRow[] = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        bom: true, // Handle UTF-8 BOM
+      });
+
+      if (records.length === 0) {
+        return res.status(400).json({ error: 'Arquivo CSV vazio' });
+      }
+
+      const results = {
+        success: [] as string[],
+        errors: [] as { line: number; code: string; error: string }[],
+        total: records.length,
+      };
+
+      // Process each row
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i];
+        const lineNumber = i + 2; // +2 porque linha 1 é header
+
+        try {
+          // Validações
+          const code = row.code?.trim().toUpperCase();
+          if (!code || code.length < 3) {
+            throw new Error('Código inválido (mínimo 3 caracteres)');
+          }
+
+          const discountType = row.discountType?.toUpperCase();
+          if (!['PERCENTAGE', 'FIXED'].includes(discountType)) {
+            throw new Error('discountType deve ser PERCENTAGE ou FIXED');
+          }
+
+          const discountValue = parseFloat(row.discountValue);
+          if (isNaN(discountValue) || discountValue <= 0) {
+            throw new Error('discountValue deve ser maior que 0');
+          }
+
+          if (discountType === 'PERCENTAGE' && discountValue > 100) {
+            throw new Error('Desconto percentual não pode ser maior que 100');
+          }
+
+          // Check if coupon already exists
+          const existing = await prisma.coupon.findUnique({
+            where: { code },
+          });
+
+          if (existing) {
+            throw new Error('Cupom já existe');
+          }
+
+          // Parse optional fields
+          const maxUses = row.maxUses ? parseInt(row.maxUses) : null;
+          const expiresAt = row.expiresAt ? new Date(row.expiresAt) : null;
+
+          // Validate expiration date
+          if (expiresAt && expiresAt <= new Date()) {
+            throw new Error('Data de expiração deve ser futura');
+          }
+
+          // Find plan by slug if provided
+          let appliesToPlanId = null;
+          if (row.planSlug?.trim()) {
+            const plan = await prisma.plan.findUnique({
+              where: { slug: row.planSlug.trim() },
+            });
+            if (!plan) {
+              throw new Error(`Plano "${row.planSlug}" não encontrado`);
+            }
+            appliesToPlanId = plan.id;
+          }
+
+          // Create coupon
+          await prisma.coupon.create({
+            data: {
+              code,
+              description: row.description?.trim() || null,
+              discountType,
+              discountValue,
+              maxUses,
+              expiresAt,
+              appliesToPlanId,
+              isActive: true,
+            },
+          });
+
+          // Audit log
+          await logAdminAction({
+            adminId: userId,
+            adminEmail: userEmail,
+            action: AuditAction.COUPON_CREATED,
+            targetType: AuditTargetType.COUPON,
+            targetId: code,
+            afterData: { code, discountType, discountValue, source: 'CSV Import' },
+            ipAddress: getClientIp(req),
+            userAgent: req.get('user-agent'),
+          });
+
+          results.success.push(code);
+        } catch (error: any) {
+          results.errors.push({
+            line: lineNumber,
+            code: row.code || 'N/A',
+            error: error.message || String(error),
+          });
+        }
+      }
+
+      return res.json({
+        message: `Importação concluída: ${results.success.length} sucesso, ${results.errors.length} erros`,
+        results,
+      });
+    } catch (error) {
+      console.error('Erro ao importar cupons:', error);
+      return res.status(500).json({ error: 'Erro ao importar cupons via CSV' });
+    }
+  }
+
+  /**
+   * Retorna analytics de cupons para gráficos
+   * GET /api/admin/coupons/analytics?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&groupBy=day|week|month
+   * Permissão: Qualquer ADMIN
+   */
+  static async getCouponAnalytics(req: Request, res: Response) {
+    try {
+      const { startDate, endDate, groupBy = 'day' } = req.query;
+
+      // Define período padrão: últimos 30 dias
+      const start = startDate
+        ? new Date(startDate as string)
+        : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const end = endDate ? new Date(endDate as string) : new Date();
+
+      // Buscar usos de cupons no período
+      const usages = await prisma.couponUsage.findMany({
+        where: {
+          usedAt: {
+            gte: start,
+            lte: end,
+          },
+        },
+        include: {
+          coupon: {
+            select: {
+              code: true,
+              discountType: true,
+              discountValue: true,
+            },
+          },
+        },
+        orderBy: {
+          usedAt: 'asc',
+        },
+      });
+
+      // Agrupar por período
+      const usageByPeriod: Record<string, number> = {};
+      const usageByCoupon: Record<string, { count: number; type: string; value: number }> = {};
+      const usageByType: Record<string, number> = { PERCENTAGE: 0, FIXED: 0 };
+
+      for (const usage of usages) {
+        const date = new Date(usage.usedAt);
+        let periodKey: string;
+
+        if (groupBy === 'week') {
+          // Agrupar por semana (início da semana)
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          periodKey = weekStart.toISOString().split('T')[0];
+        } else if (groupBy === 'month') {
+          // Agrupar por mês
+          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        } else {
+          // Agrupar por dia (padrão)
+          periodKey = date.toISOString().split('T')[0];
+        }
+
+        usageByPeriod[periodKey] = (usageByPeriod[periodKey] || 0) + 1;
+
+        // Contagem por cupom
+        const couponCode = usage.coupon.code;
+        if (!usageByCoupon[couponCode]) {
+          usageByCoupon[couponCode] = {
+            count: 0,
+            type: usage.coupon.discountType,
+            value: usage.coupon.discountValue,
+          };
+        }
+        usageByCoupon[couponCode].count += 1;
+
+        // Contagem por tipo
+        usageByType[usage.coupon.discountType] += 1;
+      }
+
+      // Converter para arrays para gráficos
+      const timeSeriesData = Object.entries(usageByPeriod)
+        .map(([period, count]) => ({ period, count }))
+        .sort((a, b) => a.period.localeCompare(b.period));
+
+      const topCoupons = Object.entries(usageByCoupon)
+        .map(([code, data]) => ({
+          code,
+          count: data.count,
+          type: data.type,
+          value: data.value,
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10); // Top 10
+
+      const typeDistribution = Object.entries(usageByType).map(([type, count]) => ({
+        type,
+        count,
+      }));
+
+      // Estatísticas gerais
+      const totalCoupons = await prisma.coupon.count();
+      const usedCoupons = await prisma.coupon.count({
+        where: {
+          usageLogs: {
+            some: {},
+          },
+        },
+      });
+
+      const totalUsages = usages.length;
+
+      return res.json({
+        period: {
+          start: start.toISOString(),
+          end: end.toISOString(),
+          groupBy,
+        },
+        stats: {
+          totalCoupons,
+          usedCoupons,
+          unusedCoupons: totalCoupons - usedCoupons,
+          totalUsages,
+          conversionRate: totalCoupons > 0 ? ((usedCoupons / totalCoupons) * 100).toFixed(2) : '0',
+        },
+        timeSeries: timeSeriesData,
+        topCoupons,
+        typeDistribution,
+      });
+    } catch (error) {
+      console.error('Erro ao buscar analytics de cupons:', error);
+      return res.status(500).json({ error: 'Erro ao buscar analytics de cupons' });
+    }
+  }
 }

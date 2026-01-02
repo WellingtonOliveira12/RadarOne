@@ -94,6 +94,16 @@ export const AdminCouponsPage: React.FC = () => {
   // Modals
   const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
+  const { isOpen: isImportOpen, onOpen: onImportOpen, onClose: onImportClose } = useDisclosure();
+
+  // Import CSV State
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState<{
+    success: string[];
+    errors: Array<{ line: number; code: string; error: string }>;
+    total: number;
+  } | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -546,6 +556,68 @@ export const AdminCouponsPage: React.FC = () => {
     }
   };
 
+  const handleImportCsv = async () => {
+    if (!importFile) {
+      toast({
+        title: 'Selecione um arquivo CSV',
+        status: 'warning',
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      setImporting(true);
+      const token = getToken();
+
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com'}/api/admin/coupons/import`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao importar CSV');
+      }
+
+      const data = await response.json();
+      setImportResults(data.results);
+
+      toast({
+        title: data.message,
+        description: `${data.results.success.length} cupons importados com sucesso`,
+        status: 'success',
+        duration: 5000,
+      });
+
+      loadCoupons();
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao importar CSV',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportClose = () => {
+    setImportFile(null);
+    setImportResults(null);
+    onImportClose();
+  };
+
   return (
     <AdminLayout>
       <VStack spacing={6} align="stretch">
@@ -632,6 +704,14 @@ export const AdminCouponsPage: React.FC = () => {
                   size="sm"
                 >
                   📥 Exportar CSV
+                </Button>
+                <Button
+                  colorScheme="purple"
+                  variant="outline"
+                  onClick={onImportOpen}
+                  size="sm"
+                >
+                  📤 Importar CSV
                 </Button>
                 <Button colorScheme="blue" onClick={onCreateOpen} size="sm">
                   + Novo Cupom
@@ -1019,6 +1099,132 @@ export const AdminCouponsPage: React.FC = () => {
             <Button colorScheme="blue" onClick={handleEditCoupon} isLoading={submitting}>
               Salvar Alterações
             </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Import CSV Modal */}
+      <Modal isOpen={isImportOpen} onClose={handleImportClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Importar Cupons via CSV</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              {!importResults ? (
+                <>
+                  <Alert status="info" fontSize="sm">
+                    <AlertIcon />
+                    <VStack align="start" spacing={1}>
+                      <Text fontWeight="bold">Formato esperado do CSV:</Text>
+                      <Text fontSize="xs">
+                        code,description,discountType,discountValue,maxUses,expiresAt,planSlug
+                      </Text>
+                      <Text fontSize="xs">
+                        PROMO10,Desconto 10%,PERCENTAGE,10,100,2025-12-31,
+                      </Text>
+                      <Text fontSize="xs">
+                        SAVE50,Economize 50 reais,FIXED,5000,50,2025-12-31,premium
+                      </Text>
+                    </VStack>
+                  </Alert>
+
+                  <FormControl>
+                    <FormLabel>Selecionar Arquivo CSV</FormLabel>
+                    <Input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                      pt={1}
+                    />
+                    {importFile && (
+                      <Text fontSize="sm" mt={2} color="gray.600">
+                        Arquivo selecionado: {importFile.name}
+                      </Text>
+                    )}
+                  </FormControl>
+                </>
+              ) : (
+                <VStack spacing={4} align="stretch">
+                  <Alert
+                    status={importResults.errors.length === 0 ? 'success' : 'warning'}
+                  >
+                    <AlertIcon />
+                    <VStack align="start" spacing={1}>
+                      <Text fontWeight="bold">Importação Concluída!</Text>
+                      <Text fontSize="sm">
+                        Total de linhas: {importResults.total}
+                      </Text>
+                      <Text fontSize="sm" color="green.600">
+                        Sucesso: {importResults.success.length} cupons
+                      </Text>
+                      {importResults.errors.length > 0 && (
+                        <Text fontSize="sm" color="red.600">
+                          Erros: {importResults.errors.length} linhas
+                        </Text>
+                      )}
+                    </VStack>
+                  </Alert>
+
+                  {importResults.success.length > 0 && (
+                    <Box>
+                      <Text fontWeight="bold" mb={2} fontSize="sm">
+                        Cupons Importados:
+                      </Text>
+                      <Box
+                        maxH="150px"
+                        overflowY="auto"
+                        p={2}
+                        bg="green.50"
+                        borderRadius="md"
+                        fontSize="xs"
+                      >
+                        {importResults.success.map((code) => (
+                          <Text key={code}>✅ {code}</Text>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {importResults.errors.length > 0 && (
+                    <Box>
+                      <Text fontWeight="bold" mb={2} fontSize="sm" color="red.600">
+                        Erros Encontrados:
+                      </Text>
+                      <Box
+                        maxH="200px"
+                        overflowY="auto"
+                        p={2}
+                        bg="red.50"
+                        borderRadius="md"
+                        fontSize="xs"
+                      >
+                        {importResults.errors.map((err, idx) => (
+                          <Text key={idx} mb={1}>
+                            ❌ Linha {err.line} ({err.code}): {err.error}
+                          </Text>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                </VStack>
+              )}
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={handleImportClose}>
+              {importResults ? 'Fechar' : 'Cancelar'}
+            </Button>
+            {!importResults && (
+              <Button
+                colorScheme="purple"
+                onClick={handleImportCsv}
+                isLoading={importing}
+                isDisabled={!importFile}
+              >
+                Importar CSV
+              </Button>
+            )}
           </ModalFooter>
         </ModalContent>
       </Modal>
