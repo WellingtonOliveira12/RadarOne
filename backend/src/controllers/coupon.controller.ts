@@ -81,6 +81,22 @@ export class CouponController {
         }
       }
 
+      // Rastrear validação (para analytics e notificações de abandono)
+      // Buscar userId do request (pode ser undefined se não autenticado)
+      const userId = (req as any).userId;
+      const userEmail = (req as any).userEmail; // Se disponível no middleware
+
+      await prisma.couponValidation.create({
+        data: {
+          couponId: coupon.id,
+          userId: userId || null,
+          userEmail: userEmail || null,
+          purpose: coupon.purpose || 'DISCOUNT',
+          location: 'plans_page', // ou extrair do body se necessário
+          converted: false, // Inicialmente não convertido
+        },
+      });
+
       // Cupom válido! Retornar informações
       res.json({
         valid: true,

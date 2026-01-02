@@ -200,6 +200,75 @@ export async function sendTrialExpiredEmail(to: string, name: string, planName: 
   return { success: true };
 }
 
+export async function sendAbandonedCouponEmail(
+  to: string,
+  name: string,
+  couponCode: string,
+  discountText: string,
+  description: string
+): Promise<{ success: boolean; error?: string }> {
+  console.log('[EmailService] Enviando email de cupom abandonado', { to, couponCode });
+
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Não esqueça seu cupom de desconto!</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">💰 Seu Cupom Está Esperando!</h1>
+  </div>
+
+  <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    <p style="font-size: 16px; margin-bottom: 20px;">Olá <strong>${name}</strong>,</p>
+
+    <p style="font-size: 16px; margin-bottom: 20px;">
+      Notamos que você validou o cupom <strong style="color: #667eea; font-size: 18px;">${couponCode}</strong> mas ainda não finalizou sua assinatura!
+    </p>
+
+    <div style="background: #f9fafb; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 5px;">
+      <p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>${description}</strong></p>
+      <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #10b981;">${discountText} de desconto</p>
+    </div>
+
+    <p style="font-size: 16px; margin-bottom: 25px;">
+      Não perca essa oportunidade! Escolha seu plano e economize com seu cupom exclusivo.
+    </p>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${frontendUrl}/plans?coupon=${couponCode}"
+         style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        Escolher Meu Plano com Desconto
+      </a>
+    </div>
+
+    <p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
+      <strong>Dica:</strong> Cupons promocionais têm validade limitada. Aproveite agora!
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+      RadarOne - Monitoramento Inteligente de Sites e Produtos<br>
+      <a href="${frontendUrl}" style="color: #667eea; text-decoration: none;">Visitar RadarOne</a>
+    </p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  return sendEmail({
+    to,
+    subject: `💰 Não esqueça seu cupom ${couponCode} - ${discountText} de desconto!`,
+    html,
+  });
+}
+
 export async function sendSubscriptionExpiredEmail(to: string, name: string, planName: string): Promise<{ success: boolean; error?: string }> {
   console.log('[EmailService] sendSubscriptionExpiredEmail stub chamado', { to, name, planName });
   return { success: true };

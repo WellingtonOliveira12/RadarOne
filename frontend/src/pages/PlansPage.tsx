@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { trackViewPlans, trackSelectPlan, trackTrialExpiredToastShown } from '../lib/analytics';
+import {
+  trackViewPlans,
+  trackSelectPlan,
+  trackTrialExpiredToastShown,
+  trackCouponValidated,
+  trackCouponValidationFailed,
+  trackCouponAppliedToCheckout,
+  trackTrialUpgradeApplied,
+} from '../lib/analytics';
 import { showInfo } from '../lib/toast';
 import { getABMessage, trackABVariantShown } from '../lib/abtest';
 import { getToken } from '../lib/auth';
@@ -72,6 +80,13 @@ export const PlansPage: React.FC = () => {
 
   useEffect(() => {
     loadPlans();
+
+    // Track A/B variant shown para cupons (uma vez por sessão)
+    if (!sessionStorage.getItem('coupon_ab_tracked')) {
+      trackABVariantShown('couponUpgradeTitle', 'plans_page');
+      trackABVariantShown('couponDiscountTitle', 'plans_page');
+      sessionStorage.setItem('coupon_ab_tracked', 'true');
+    }
   }, []);
 
   // Mostrar toast ao redirecionar por TRIAL_EXPIRED
@@ -153,10 +168,25 @@ export const PlansPage: React.FC = () => {
         daysGranted: data.subscription.daysGranted
       });
 
+      // Analytics: rastrear trial upgrade aplicado
+      trackTrialUpgradeApplied({
+        couponCode: couponCode.toUpperCase(),
+        planName: data.subscription.planName,
+        durationDays: data.subscription.daysGranted
+      });
+
       showInfo(`Cupom aplicado! ${data.message}`);
 
     } catch (err: any) {
-      setCouponError(err.message || 'Erro ao aplicar cupom');
+      const errorMessage = err.message || 'Erro ao aplicar cupom';
+      setCouponError(errorMessage);
+
+      // Analytics: rastrear falha na validação
+      trackCouponValidationFailed({
+        couponCode: couponCode.toUpperCase(),
+        errorReason: errorMessage,
+        location: 'plans_page'
+      });
     } finally {
       setCouponLoading(false);
     }
@@ -200,10 +230,27 @@ export const PlansPage: React.FC = () => {
         appliesToPlan: data.coupon.appliesToPlan
       });
 
+      // Analytics: rastrear validação de cupom de desconto
+      trackCouponValidated({
+        couponCode: data.coupon.code,
+        couponType: 'DISCOUNT',
+        discountValue: data.coupon.discountValue,
+        discountType: data.coupon.discountType,
+        location: 'plans_page'
+      });
+
       showInfo('Cupom de desconto validado! Escolha um plano abaixo para prosseguir.');
 
     } catch (err: any) {
-      setDiscountCouponError(err.message || 'Erro ao validar cupom');
+      const errorMessage = err.message || 'Erro ao validar cupom';
+      setDiscountCouponError(errorMessage);
+
+      // Analytics: rastrear falha na validação
+      trackCouponValidationFailed({
+        couponCode: discountCouponCode.toUpperCase(),
+        errorReason: errorMessage,
+        location: 'plans_page'
+      });
     } finally {
       setDiscountCouponLoading(false);
     }
@@ -214,6 +261,16 @@ export const PlansPage: React.FC = () => {
     const selectedPlan = plans.find(p => p.slug === planSlug);
     if (selectedPlan) {
       trackSelectPlan(selectedPlan.name, selectedPlan.priceCents / 100);
+    }
+
+    // Analytics: rastrear se cupom foi aplicado ao checkout
+    if (couponCode && discountCouponData && selectedPlan) {
+      trackCouponAppliedToCheckout({
+        couponCode: couponCode,
+        planName: selectedPlan.name,
+        discountValue: discountCouponData.discountValue,
+        discountType: discountCouponData.discountType
+      });
     }
 
     // Se o plano tem checkoutUrl, redireciona para checkout externo (Kiwify)
@@ -299,9 +356,9 @@ export const PlansPage: React.FC = () => {
         {/* Seção de Cupom de Trial Upgrade (só aparece se usuário logado) */}
         {user && !couponSuccess && (
           <div style={styles.couponSection}>
-            <h3 style={styles.couponTitle}>🎁 Tem um cupom de upgrade?</h3>
+            <h3 style={styles.couponTitle}>{getABMessage('couponUpgradeTitle')}</h3>
             <p style={styles.couponSubtitle}>
-              Cupons de upgrade liberam acesso premium temporário
+              {getABMessage('couponUpgradeSubtitle')}
             </p>
             <div style={styles.couponInputGroup}>
               <input
@@ -334,9 +391,9 @@ export const PlansPage: React.FC = () => {
         {/* Seção de Cupom de Desconto (DISCOUNT) - sempre visível */}
         {!discountCouponData && (
           <div style={styles.discountCouponSection}>
-            <h3 style={styles.discountCouponTitle}>💰 Cupom de Desconto</h3>
+            <h3 style={styles.discountCouponTitle}>{getABMessage('couponDiscountTitle')}</h3>
             <p style={styles.discountCouponSubtitle}>
-              Aplique um cupom de desconto no checkout e economize na assinatura
+              {getABMessage('couponDiscountSubtitle')}
             </p>
             <div style={styles.couponInputGroup}>
               <input

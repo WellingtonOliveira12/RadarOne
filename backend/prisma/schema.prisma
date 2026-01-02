@@ -253,6 +253,25 @@ model CouponUsage {
   @@map("coupon_usage")
 }
 
+// Rastreamento de cupons validados (para analytics e notificações de abandono)
+model CouponValidation {
+  id        String   @id @default(cuid())
+  couponId  String   @map("coupon_id")
+  userId    String?  @map("user_id") // Nullable para usuários não logados
+  userEmail String?  @map("user_email") // Email para envio de notificação
+  purpose   String   // DISCOUNT ou TRIAL_UPGRADE
+  location  String   // plans_page, checkout, etc
+  converted Boolean  @default(false) // True se o cupom foi usado (checkout completado)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([couponId])
+  @@index([userId])
+  @@index([converted])
+  @@index([createdAt])
+  @@map("coupon_validations")
+}
+
 // ============================================
 // MONITORES
 // ============================================

@@ -26,6 +26,23 @@ export const AB_TEST_VARIANTS = {
     A: (days: number) => `Seu trial expira em ${days} ${days === 1 ? 'dia' : 'dias'}!`,
     B: (days: number) => `Faltam apenas ${days} ${days === 1 ? 'dia' : 'dias'} do seu teste gratuito!`,
   },
+  // A/B Tests para Cupons
+  couponUpgradeTitle: {
+    A: '🎁 Tem um cupom de upgrade?',
+    B: '🎁 Tem um código promocional de teste?',
+  },
+  couponUpgradeSubtitle: {
+    A: 'Cupons de upgrade liberam acesso premium temporário',
+    B: 'Ganhe acesso temporário a planos superiores com cupom promocional',
+  },
+  couponDiscountTitle: {
+    A: '💰 Cupom de Desconto',
+    B: '💰 Tem um código de desconto?',
+  },
+  couponDiscountSubtitle: {
+    A: 'Aplique um cupom de desconto no checkout e economize na assinatura',
+    B: 'Valide seu cupom de desconto aqui e pague menos na assinatura',
+  },
 } as const;
 
 export type ABTestKey = keyof typeof AB_TEST_VARIANTS;
@@ -72,6 +89,10 @@ export function getABVariant(testKey: ABTestKey): ABVariant {
 export function getABMessage(testKey: 'trialExpiredToast'): string;
 export function getABMessage(testKey: 'trialExpiredBanner'): string;
 export function getABMessage(testKey: 'trialExpiringBanner', days: number): string;
+export function getABMessage(testKey: 'couponUpgradeTitle'): string;
+export function getABMessage(testKey: 'couponUpgradeSubtitle'): string;
+export function getABMessage(testKey: 'couponDiscountTitle'): string;
+export function getABMessage(testKey: 'couponDiscountSubtitle'): string;
 export function getABMessage(testKey: ABTestKey, ...args: any[]): string {
   const variant = getABVariant(testKey);
   const message = AB_TEST_VARIANTS[testKey][variant];

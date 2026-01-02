@@ -4,6 +4,7 @@ import { checkSubscriptionExpired } from './checkSubscriptionExpired';
 import { resetMonthlyQueries } from './resetMonthlyQueries';
 import { checkCouponAlerts } from './checkCouponAlerts';
 import { checkTrialUpgradeExpiring } from './checkTrialUpgradeExpiring'; // FASE: Cupons de Upgrade
+import { checkAbandonedCoupons } from './checkAbandonedCoupons'; // FASE: Notificações de Cupons Abandonados
 
 /**
  * Scheduler de Jobs Automáticos
@@ -117,12 +118,32 @@ export function startScheduler() {
     timezone: 'America/Sao_Paulo'
   });
 
+  // ============================================
+  // JOB 6: FASE - Verificar cupons abandonados
+  // ============================================
+  // Executa diariamente às 13h
+  // - Verifica cupons DISCOUNT validados há 24h que não foram usados
+  // - Envia email de lembrete com link para checkout
+  // - Ajuda a recuperar vendas abandonadas
+  cron.schedule('0 13 * * *', async () => {
+    console.log('[SCHEDULER] ⏰ Executando checkAbandonedCoupons...');
+    try {
+      await checkAbandonedCoupons();
+      console.log('[SCHEDULER] ✅ checkAbandonedCoupons executado com sucesso');
+    } catch (error) {
+      console.error('[SCHEDULER] ❌ Erro ao executar checkAbandonedCoupons:', error);
+    }
+  }, {
+    timezone: 'America/Sao_Paulo'
+  });
+
   console.log('[SCHEDULER] ✅ Jobs agendados:');
   console.log('[SCHEDULER]    📧 checkTrialExpiring - Diariamente às 9h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    💳 checkSubscriptionExpired - Diariamente às 10h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    🔄 resetMonthlyQueries - Mensalmente no dia 1 às 3h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    🎟️  checkCouponAlerts - Diariamente às 11h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    ⏰ checkTrialUpgradeExpiring - Diariamente às 12h (America/Sao_Paulo)');
+  console.log('[SCHEDULER]    🎫 checkAbandonedCoupons - Diariamente às 13h (America/Sao_Paulo)');
 }
 
 /**
@@ -175,11 +196,19 @@ export async function runJobsNow() {
   }
 
   try {
-    console.log('[SCHEDULER] 5/5 Executando checkTrialUpgradeExpiring...');
+    console.log('[SCHEDULER] 5/6 Executando checkTrialUpgradeExpiring...');
     await checkTrialUpgradeExpiring();
     console.log('[SCHEDULER] ✅ checkTrialUpgradeExpiring OK');
   } catch (error) {
     console.error('[SCHEDULER] ❌ Erro checkTrialUpgradeExpiring:', error);
+  }
+
+  try {
+    console.log('[SCHEDULER] 6/6 Executando checkAbandonedCoupons...');
+    await checkAbandonedCoupons();
+    console.log('[SCHEDULER] ✅ checkAbandonedCoupons OK');
+  } catch (error) {
+    console.error('[SCHEDULER] ❌ Erro checkAbandonedCoupons:', error);
   }
 
   console.log('[SCHEDULER] 🎉 Todos os jobs executados');

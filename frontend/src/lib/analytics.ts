@@ -281,3 +281,73 @@ export function maskEmail(email: string): string {
   const masked = localPart.charAt(0) + '***';
   return `${masked}@${domain}`;
 }
+
+// ============================================
+// CUPONS - Analytics de cupons
+// ============================================
+
+/**
+ * Rastreia validação bem-sucedida de cupom
+ */
+export function trackCouponValidated(params: {
+  couponCode: string;
+  couponType: 'TRIAL_UPGRADE' | 'DISCOUNT';
+  discountValue?: number;
+  discountType?: string;
+  location: 'plans_page' | 'checkout';
+}): void {
+  trackEvent('coupon_validated', {
+    coupon_code: params.couponCode,
+    coupon_type: params.couponType,
+    discount_value: params.discountValue,
+    discount_type: params.discountType,
+    location: params.location,
+  });
+}
+
+/**
+ * Rastreia falha na validação de cupom
+ */
+export function trackCouponValidationFailed(params: {
+  couponCode: string;
+  errorReason: string;
+  location: 'plans_page' | 'checkout';
+}): void {
+  trackEvent('coupon_validation_failed', {
+    coupon_code: params.couponCode,
+    error_reason: params.errorReason,
+    location: params.location,
+  });
+}
+
+/**
+ * Rastreia quando usuário escolhe plano com cupom aplicado
+ */
+export function trackCouponAppliedToCheckout(params: {
+  couponCode: string;
+  planName: string;
+  discountValue?: number;
+  discountType?: string;
+}): void {
+  trackEvent('coupon_applied_to_checkout', {
+    coupon_code: params.couponCode,
+    plan_name: params.planName,
+    discount_value: params.discountValue,
+    discount_type: params.discountType,
+  });
+}
+
+/**
+ * Rastreia quando cupom de trial upgrade é aplicado com sucesso
+ */
+export function trackTrialUpgradeApplied(params: {
+  couponCode: string;
+  planName: string;
+  durationDays: number;
+}): void {
+  trackEvent('trial_upgrade_applied', {
+    coupon_code: params.couponCode,
+    plan_name: params.planName,
+    duration_days: params.durationDays,
+  });
+}
