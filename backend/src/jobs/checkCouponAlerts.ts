@@ -171,19 +171,121 @@ export async function checkCouponAlerts() {
     }
 
     // ============================================
+    // 3. CUPONS POPULARES/VIRAIS (>10 usos em 24h)
+    // ============================================
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    // Buscar usos de cupons nas últimas 24h agrupados por cupom
+    const recentUsages = await prisma.couponUsage.findMany({
+      where: {
+        usedAt: {
+          gte: twentyFourHoursAgo,
+        },
+      },
+      include: {
+        coupon: {
+          select: {
+            id: true,
+            code: true,
+            isActive: true,
+            maxUses: true,
+            usedCount: true,
+            plan: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Agrupar por cupom
+    const usagesByCoupon: Record<string, { coupon: any; count: number }> = {};
+    for (const usage of recentUsages) {
+      const couponId = usage.couponId;
+      if (!usagesByCoupon[couponId]) {
+        usagesByCoupon[couponId] = {
+          coupon: usage.coupon,
+          count: 0,
+        };
+      }
+      usagesByCoupon[couponId].count += 1;
+    }
+
+    // Filtrar cupons com >10 usos em 24h (limite configurável)
+    const POPULAR_THRESHOLD = 10;
+    const popularCoupons = Object.values(usagesByCoupon).filter(
+      (item) => item.count >= POPULAR_THRESHOLD && item.coupon.isActive
+    );
+
+    logInfo(`[JOB] Encontrados ${popularCoupons.length} cupons populares (>${POPULAR_THRESHOLD} usos em 24h)`, {});
+
+    for (const { coupon, count } of popularCoupons) {
+      // Verificar se já existe alerta recente (últimas 24h)
+      const existingAlert = await prisma.adminAlert.findFirst({
+        where: {
+          type: 'COUPON_HIGH_USAGE',
+          source: `coupon:${coupon.id}`,
+          createdAt: {
+            gte: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+          },
+        },
+      });
+
+      if (existingAlert) {
+        logInfo(`[JOB] Alerta de cupom popular já existe para ${coupon.code}, pulando...`, {});
+        continue;
+      }
+
+      // Calcular taxa de uso (usos em 24h / maxUses total)
+      const usageRate = coupon.maxUses
+        ? ((count / coupon.maxUses) * 100).toFixed(2)
+        : 'ilimitado';
+
+      await prisma.adminAlert.create({
+        data: {
+          type: 'COUPON_HIGH_USAGE',
+          severity: count >= 50 ? 'CRITICAL' : count >= 20 ? 'WARNING' : 'INFO',
+          title: `Cupom "${coupon.code}" com alto volume de usos`,
+          message: `O cupom "${coupon.code}" teve ${count} usos nas últimas 24 horas, indicando alta popularidade. ${
+            coupon.plan ? `Plano: ${coupon.plan.name}` : 'Aplicável a todos os planos'
+          }. ${
+            coupon.maxUses
+              ? `Total usado: ${coupon.usedCount} / ${coupon.maxUses} (${usageRate}%)`
+              : 'Sem limite de usos'
+          }. Considere: aumentar maxUses, monitorar fraude, ou analisar ROI.`,
+          source: `coupon:${coupon.id}`,
+          metadata: {
+            couponId: coupon.id,
+            couponCode: coupon.code,
+            usesLast24h: count,
+            totalUsedCount: coupon.usedCount,
+            maxUses: coupon.maxUses,
+            planName: coupon.plan?.name || null,
+          },
+        },
+      });
+
+      logInfo(`[JOB] ✅ Alerta criado para cupom popular: ${coupon.code} (${count} usos em 24h)`, {});
+    }
+
+    // ============================================
     // RESUMO DO JOB
     // ============================================
-    const totalAlerts = expiringCoupons.length + nearLimitCoupons.length;
+    const totalAlerts = expiringCoupons.length + nearLimitCoupons.length + popularCoupons.length;
 
     logInfo(`[JOB] ✅ Verificação de cupons concluída`, {});
     logInfo(`[JOB]    📅 Cupons expirando: ${expiringCoupons.length}`, {});
     logInfo(`[JOB]    📊 Cupons próximos do limite: ${nearLimitCoupons.length}`, {});
+    logInfo(`[JOB]    🔥 Cupons populares: ${popularCoupons.length}`, {});
     logInfo(`[JOB]    🔔 Total de alertas verificados: ${totalAlerts}`, {});
 
     return {
       success: true,
       expiringCount: expiringCoupons.length,
       nearLimitCount: nearLimitCoupons.length,
+      popularCount: popularCoupons.length,
       totalAlerts,
     };
   } catch (error) {

@@ -63,6 +63,7 @@ router.patch('/alerts/:id/read', requireAdmin, AdminController.markAlertAsRead);
 // Coupons (FASE ADMIN CUPONS)
 router.get('/coupons/export', requireAdmin, AdminController.exportCoupons); // IMPORTANTE: Vem ANTES de /coupons
 router.get('/coupons/analytics', requireAdmin, AdminController.getCouponAnalytics); // Analytics para gráficos
+router.get('/coupons/:code/detailed-stats', requireAdmin, AdminController.getCouponDetailedStats); // Detailed stats por cupom
 router.post('/coupons/import', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), upload.single('file'), AdminController.importCoupons); // CSV Import
 router.patch('/coupons/bulk/toggle', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), AdminController.bulkToggleCoupons); // Bulk toggle
 router.delete('/coupons/bulk', requireAdminRole([UserRole.ADMIN_SUPER]), AdminController.bulkDeleteCoupons); // Bulk delete

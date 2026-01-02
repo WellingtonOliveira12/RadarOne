@@ -3299,4 +3299,174 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao buscar analytics de cupons' });
     }
   }
+
+  /**
+   * GET /api/admin/coupons/:code/detailed-stats
+   * Retorna estatísticas detalhadas de um cupom específico
+   *
+   * FEATURE: Relatório de Conversão por Cupom
+   * - Total de usos ao longo do tempo
+   * - Distribuição por plano
+   * - Top usuários
+   * - Taxa de crescimento
+   */
+  static async getCouponDetailedStats(req: Request, res: Response) {
+    try {
+      const { code } = req.params;
+
+      // Buscar cupom
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: code.toUpperCase() },
+        include: {
+          plan: {
+            select: {
+              name: true,
+              slug: true,
+            },
+          },
+        },
+      });
+
+      if (!coupon) {
+        return res.status(404).json({ error: 'Cupom não encontrado' });
+      }
+
+      // Buscar todos os usos deste cupom
+      const usages = await prisma.couponUsage.findMany({
+        where: { couponId: coupon.id },
+        orderBy: {
+          usedAt: 'asc',
+        },
+      });
+
+      // Buscar dados dos usuários
+      const userIds = [...new Set(usages.map(u => u.userId))];
+      const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      });
+      const userMap = new Map(users.map(u => [u.id, u]));
+
+      // Estatísticas básicas
+      const totalUses = usages.length;
+      const uniqueUsers = new Set(usages.map(u => u.userId)).size;
+
+      // Agrupamento por dia (últimos 30 dias)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const usagesByDay: Record<string, number> = {};
+      const recentUsages = usages.filter(u => new Date(u.usedAt) >= thirtyDaysAgo);
+
+      for (const usage of recentUsages) {
+        const day = new Date(usage.usedAt).toISOString().split('T')[0];
+        usagesByDay[day] = (usagesByDay[day] || 0) + 1;
+      }
+
+      const timelineData = Object.entries(usagesByDay)
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Top usuários que mais usaram
+      const userUsageMap: Record<string, { email: string; name: string; count: number }> = {};
+      for (const usage of usages) {
+        const userId = usage.userId;
+        const user = userMap.get(userId);
+        if (!user) continue; // Pular se usuário não encontrado
+
+        if (!userUsageMap[userId]) {
+          userUsageMap[userId] = {
+            email: user.email,
+            name: user.name,
+            count: 0,
+          };
+        }
+        userUsageMap[userId].count += 1;
+      }
+
+      const topUsers = Object.entries(userUsageMap)
+        .map(([userId, data]) => ({ userId, ...data }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10); // Top 10
+
+      // Distribuição por plano (se o cupom for específico de um plano, mostrar isso)
+      const planDistribution = coupon.plan
+        ? [{ planName: coupon.plan.name, count: totalUses }]
+        : [{ planName: 'Todos os planos', count: totalUses }];
+
+      // Taxa de crescimento (comparação últimos 7 dias vs 7 dias anteriores)
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+      const last7Days = usages.filter(u => new Date(u.usedAt) >= sevenDaysAgo).length;
+      const previous7Days = usages.filter(
+        u => new Date(u.usedAt) >= fourteenDaysAgo && new Date(u.usedAt) < sevenDaysAgo
+      ).length;
+
+      const growthRate =
+        previous7Days > 0
+          ? (((last7Days - previous7Days) / previous7Days) * 100).toFixed(2)
+          : last7Days > 0
+          ? '100.00'
+          : '0.00';
+
+      // Taxa de conversão aproximada (assumindo que maxUses é o objetivo)
+      const conversionRate = coupon.maxUses
+        ? ((totalUses / coupon.maxUses) * 100).toFixed(2)
+        : '100.00';
+
+      // Status de saúde do cupom
+      let healthStatus: 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'POOR' | 'INACTIVE' = 'INACTIVE';
+      if (last7Days >= 10) healthStatus = 'EXCELLENT';
+      else if (last7Days >= 5) healthStatus = 'GOOD';
+      else if (last7Days >= 1) healthStatus = 'AVERAGE';
+      else if (totalUses > 0) healthStatus = 'POOR';
+
+      const healthStatusLabel = {
+        EXCELLENT: 'Excelente',
+        GOOD: 'Bom',
+        AVERAGE: 'Médio',
+        POOR: 'Baixo',
+        INACTIVE: 'Inativo',
+      }[healthStatus];
+
+      return res.json({
+        coupon: {
+          code: coupon.code,
+          description: coupon.description,
+          discountType: coupon.discountType,
+          discountValue: coupon.discountValue,
+          purpose: coupon.purpose || 'DISCOUNT',
+          durationDays: coupon.durationDays,
+          maxUses: coupon.maxUses,
+          usedCount: coupon.usedCount,
+          expiresAt: coupon.expiresAt,
+          isActive: coupon.isActive,
+          plan: coupon.plan,
+        },
+        stats: {
+          totalUses,
+          uniqueUsers,
+          last7Days,
+          previous7Days,
+          growthRate: parseFloat(growthRate),
+          conversionRate: parseFloat(conversionRate),
+          healthStatus,
+          healthStatusLabel,
+          averageUsesPerDay: (totalUses / Math.max(1, Math.ceil((now.getTime() - new Date(coupon.createdAt).getTime()) / (1000 * 60 * 60 * 24)))).toFixed(2),
+        },
+        timeline: timelineData,
+        topUsers,
+        planDistribution,
+      });
+    } catch (error) {
+      console.error('Erro ao buscar detailed stats do cupom:', error);
+      return res.status(500).json({ error: 'Erro ao buscar estatísticas detalhadas do cupom' });
+    }
+  }
 }

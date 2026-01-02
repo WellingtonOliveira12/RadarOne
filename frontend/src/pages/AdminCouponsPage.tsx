@@ -81,11 +81,27 @@ interface CouponAnalytics {
     groupBy: string;
   };
   stats: {
+    // Estatísticas básicas
     totalCoupons: number;
     usedCoupons: number;
     unusedCoupons: number;
     totalUsages: number;
     conversionRate: string;
+
+    // Estatísticas adicionais
+    activeCoupons: number;
+    inactiveCoupons: number;
+    expiringSoon: number;
+    nearLimit: number;
+
+    // Métricas por finalidade (purpose)
+    discountCoupons: number;
+    trialUpgradeCoupons: number;
+    totalTrialDaysGranted: number;
+
+    // Métricas por tipo de desconto
+    percentageCoupons: number;
+    fixedCoupons: number;
   };
   timeSeries: Array<{ period: string; count: number }>;
   topCoupons: Array<{
@@ -95,6 +111,36 @@ interface CouponAnalytics {
     value: number;
   }>;
   typeDistribution: Array<{ type: string; count: number }>;
+}
+
+interface CouponDetailedStats {
+  coupon: {
+    code: string;
+    description: string | null;
+    discountType: string;
+    discountValue: number;
+    purpose: string;
+    durationDays: number | null;
+    maxUses: number | null;
+    usedCount: number;
+    expiresAt: string | null;
+    isActive: boolean;
+    plan: { name: string; slug: string } | null;
+  };
+  stats: {
+    totalUses: number;
+    uniqueUsers: number;
+    last7Days: number;
+    previous7Days: number;
+    growthRate: number;
+    conversionRate: number;
+    healthStatus: string;
+    healthStatusLabel: string;
+    averageUsesPerDay: string;
+  };
+  timeline: Array<{ date: string; count: number }>;
+  topUsers: Array<{ userId: string; email: string; name: string; count: number }>;
+  planDistribution: Array<{ planName: string; count: number }>;
 }
 
 export const AdminCouponsPage: React.FC = () => {
@@ -126,6 +172,11 @@ export const AdminCouponsPage: React.FC = () => {
   const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
   const { isOpen: isImportOpen, onOpen: onImportOpen, onClose: onImportClose } = useDisclosure();
+  const { isOpen: isDetailsOpen, onOpen: onDetailsOpen, onClose: onDetailsClose } = useDisclosure();
+
+  // Detailed Stats State
+  const [detailedStats, setDetailedStats] = useState<CouponDetailedStats | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Import CSV State
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -231,6 +282,31 @@ export const AdminCouponsPage: React.FC = () => {
       });
     } finally {
       setLoadingAnalytics(false);
+    }
+  };
+
+  const loadDetailedStats = async (couponCode: string) => {
+    try {
+      setLoadingDetails(true);
+      const token = getToken();
+
+      const response = await api.get<CouponDetailedStats>(
+        `/api/admin/coupons/${couponCode}/detailed-stats`,
+        token
+      );
+
+      setDetailedStats(response);
+      onDetailsOpen();
+    } catch (err: any) {
+      console.error('Erro ao carregar detalhes do cupom:', err);
+      toast({
+        title: 'Erro ao carregar detalhes',
+        description: err.message || 'Não foi possível carregar os detalhes do cupom',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -796,6 +872,104 @@ export const AdminCouponsPage: React.FC = () => {
                 </Card>
               </HStack>
 
+              {/* Status Cards - Linha 2 */}
+              <HStack spacing={4} mb={6} flexWrap="wrap">
+                <Card flex="1" minW="200px" bg="white" borderLeft="4px solid" borderLeftColor="green.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Cupons Ativos
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="green.600">
+                      {analytics.stats.activeCoupons}
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="200px" bg="white" borderLeft="4px solid" borderLeftColor="gray.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Cupons Inativos
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="gray.600">
+                      {analytics.stats.inactiveCoupons}
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="200px" bg="white" borderLeft="4px solid" borderLeftColor="orange.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Expirando em Breve
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="orange.600">
+                      {analytics.stats.expiringSoon}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Próximos 7 dias
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="200px" bg="white" borderLeft="4px solid" borderLeftColor="red.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Próximos do Limite
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="red.600">
+                      {analytics.stats.nearLimit}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      {'>'} 80% do maxUses
+                    </Text>
+                  </CardBody>
+                </Card>
+              </HStack>
+
+              {/* Purpose Cards - Linha 3 */}
+              <HStack spacing={4} mb={6} flexWrap="wrap">
+                <Card flex="1" minW="250px" bg="white" borderLeft="4px solid" borderLeftColor="blue.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Cupons de Desconto
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="blue.600">
+                      {analytics.stats.discountCoupons}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Aplicados no checkout
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="250px" bg="white" borderLeft="4px solid" borderLeftColor="purple.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Cupons de Trial Upgrade
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="purple.600">
+                      {analytics.stats.trialUpgradeCoupons}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Upgrades temporários
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="250px" bg="white" borderLeft="4px solid" borderLeftColor="cyan.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Total de Dias Concedidos
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="cyan.600">
+                      {analytics.stats.totalTrialDaysGranted}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Em trial upgrades
+                    </Text>
+                  </CardBody>
+                </Card>
+              </HStack>
+
               {/* Top Coupons */}
               {analytics.topCoupons.length > 0 && (
                 <Box>
@@ -1097,6 +1271,17 @@ export const AdminCouponsPage: React.FC = () => {
                                   variant="ghost"
                                   colorScheme="red"
                                   onClick={() => handleDeleteCoupon(coupon)}
+                                />
+                              </Tooltip>
+                              <Tooltip label="Ver Detalhes">
+                                <IconButton
+                                  aria-label="Ver Detalhes"
+                                  icon={<Text>📊</Text>}
+                                  size="xs"
+                                  variant="ghost"
+                                  colorScheme="blue"
+                                  onClick={() => loadDetailedStats(coupon.code)}
+                                  isLoading={loadingDetails}
                                 />
                               </Tooltip>
                             </HStack>
@@ -1545,6 +1730,205 @@ export const AdminCouponsPage: React.FC = () => {
                 Importar CSV
               </Button>
             )}
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Modal: Detalhes do Cupom */}
+      <Modal isOpen={isDetailsOpen} onClose={onDetailsClose} size="4xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            📊 Detalhes do Cupom: {detailedStats?.coupon.code}
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {loadingDetails ? (
+              <Center py={10}>
+                <Spinner size="xl" color="blue.500" />
+              </Center>
+            ) : detailedStats ? (
+              <VStack spacing={6} align="stretch">
+                {/* Health Status Badge */}
+                <Box>
+                  <Badge
+                    colorScheme={
+                      detailedStats.stats.healthStatus === 'EXCELLENT'
+                        ? 'green'
+                        : detailedStats.stats.healthStatus === 'GOOD'
+                        ? 'blue'
+                        : detailedStats.stats.healthStatus === 'AVERAGE'
+                        ? 'yellow'
+                        : detailedStats.stats.healthStatus === 'POOR'
+                        ? 'orange'
+                        : 'gray'
+                    }
+                    fontSize="lg"
+                    px={4}
+                    py={2}
+                    borderRadius="md"
+                  >
+                    Status: {detailedStats.stats.healthStatusLabel}
+                  </Badge>
+                </Box>
+
+                {/* Stats Cards */}
+                <Box>
+                  <Text fontSize="md" fontWeight="semibold" mb={3}>
+                    📈 Estatísticas Gerais
+                  </Text>
+                  <HStack spacing={4} flexWrap="wrap">
+                    <Card flex="1" minW="150px" bg="blue.50">
+                      <CardBody>
+                        <Text fontSize="sm" color="gray.600">
+                          Total de Usos
+                        </Text>
+                        <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+                          {detailedStats.stats.totalUses}
+                        </Text>
+                      </CardBody>
+                    </Card>
+
+                    <Card flex="1" minW="150px" bg="purple.50">
+                      <CardBody>
+                        <Text fontSize="sm" color="gray.600">
+                          Usuários Únicos
+                        </Text>
+                        <Text fontSize="2xl" fontWeight="bold" color="purple.600">
+                          {detailedStats.stats.uniqueUsers}
+                        </Text>
+                      </CardBody>
+                    </Card>
+
+                    <Card flex="1" minW="150px" bg="green.50">
+                      <CardBody>
+                        <Text fontSize="sm" color="gray.600">
+                          Últimos 7 dias
+                        </Text>
+                        <Text fontSize="2xl" fontWeight="bold" color="green.600">
+                          {detailedStats.stats.last7Days}
+                        </Text>
+                      </CardBody>
+                    </Card>
+
+                    <Card flex="1" minW="150px" bg="orange.50">
+                      <CardBody>
+                        <Text fontSize="sm" color="gray.600">
+                          Taxa de Crescimento
+                        </Text>
+                        <Text
+                          fontSize="2xl"
+                          fontWeight="bold"
+                          color={detailedStats.stats.growthRate >= 0 ? 'green.600' : 'red.600'}
+                        >
+                          {detailedStats.stats.growthRate >= 0 ? '+' : ''}
+                          {detailedStats.stats.growthRate.toFixed(1)}%
+                        </Text>
+                      </CardBody>
+                    </Card>
+
+                    <Card flex="1" minW="150px" bg="cyan.50">
+                      <CardBody>
+                        <Text fontSize="sm" color="gray.600">
+                          Média/dia
+                        </Text>
+                        <Text fontSize="2xl" fontWeight="bold" color="cyan.600">
+                          {detailedStats.stats.averageUsesPerDay}
+                        </Text>
+                      </CardBody>
+                    </Card>
+
+                    <Card flex="1" minW="150px" bg="pink.50">
+                      <CardBody>
+                        <Text fontSize="sm" color="gray.600">
+                          Taxa de Conversão
+                        </Text>
+                        <Text fontSize="2xl" fontWeight="bold" color="pink.600">
+                          {detailedStats.stats.conversionRate.toFixed(1)}%
+                        </Text>
+                      </CardBody>
+                    </Card>
+                  </HStack>
+                </Box>
+
+                {/* Timeline */}
+                {detailedStats.timeline.length > 0 && (
+                  <Box>
+                    <Text fontSize="md" fontWeight="semibold" mb={3}>
+                      📅 Linha do Tempo (Últimos 30 dias)
+                    </Text>
+                    <Card bg="gray.50">
+                      <CardBody>
+                        <VStack spacing={2} align="stretch">
+                          {detailedStats.timeline.map((item) => (
+                            <HStack key={item.date} justify="space-between">
+                              <Text fontSize="sm" color="gray.600">
+                                {new Date(item.date).toLocaleDateString('pt-BR')}
+                              </Text>
+                              <HStack>
+                                <Box
+                                  bg="blue.500"
+                                  h="20px"
+                                  w={`${Math.min(item.count * 20, 200)}px`}
+                                  borderRadius="md"
+                                />
+                                <Text fontSize="sm" fontWeight="bold" color="blue.600">
+                                  {item.count}
+                                </Text>
+                              </HStack>
+                            </HStack>
+                          ))}
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  </Box>
+                )}
+
+                {/* Top Users */}
+                {detailedStats.topUsers.length > 0 && (
+                  <Box>
+                    <Text fontSize="md" fontWeight="semibold" mb={3}>
+                      👥 Top Usuários
+                    </Text>
+                    <Card>
+                      <CardBody p={0}>
+                        <Table size="sm">
+                          <Thead>
+                            <Tr>
+                              <Th>Posição</Th>
+                              <Th>Nome</Th>
+                              <Th>Email</Th>
+                              <Th isNumeric>Usos</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {detailedStats.topUsers.map((user, idx) => (
+                              <Tr key={user.userId}>
+                                <Td fontWeight="bold">#{idx + 1}</Td>
+                                <Td>{user.name}</Td>
+                                <Td fontSize="sm" color="gray.600">
+                                  {user.email}
+                                </Td>
+                                <Td isNumeric fontWeight="bold" color="green.600">
+                                  {user.count}
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      </CardBody>
+                    </Card>
+                  </Box>
+                )}
+              </VStack>
+            ) : (
+              <Text>Nenhum dado disponível</Text>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" onClick={onDetailsClose}>
+              Fechar
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

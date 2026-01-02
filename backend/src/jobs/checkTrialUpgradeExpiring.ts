@@ -72,15 +72,11 @@ export async function checkTrialUpgradeExpiring(): Promise<void> {
           // (para evitar spam se o job rodar múltiplas vezes no mesmo dia)
           const recentNotification = await prisma.auditLog.findFirst({
             where: {
-              action: 'NOTIFICATION_SENT',
+              action: 'NOTIFICATION_TRIAL_UPGRADE_EXPIRING',
               targetType: 'SUBSCRIPTION',
               targetId: subscription.id,
               createdAt: {
                 gte: new Date(now.getTime() - 12 * 60 * 60 * 1000), // Últimas 12h
-              },
-              metadata: {
-                path: ['notificationType'],
-                equals: 'TRIAL_UPGRADE_EXPIRING',
               },
             },
           });
@@ -108,13 +104,13 @@ export async function checkTrialUpgradeExpiring(): Promise<void> {
             // Registrar no audit log
             await prisma.auditLog.create({
               data: {
-                action: 'NOTIFICATION_SENT',
+                action: 'NOTIFICATION_TRIAL_UPGRADE_EXPIRING',
                 targetType: 'SUBSCRIPTION',
                 targetId: subscription.id,
+                adminId: 'SYSTEM',
+                adminEmail: 'system@radarone.com',
                 beforeData: null,
-                afterData: null,
-                metadata: {
-                  notificationType: 'TRIAL_UPGRADE_EXPIRING',
+                afterData: {
                   userEmail: subscription.user.email,
                   planName: subscription.plan.name,
                   daysRemaining: window.days,
