@@ -52,6 +52,18 @@ export const PlansPage: React.FC = () => {
     daysGranted: number;
   } | null>(null);
 
+  // Estado do cupom de desconto (DISCOUNT)
+  const [discountCouponCode, setDiscountCouponCode] = useState('');
+  const [discountCouponLoading, setDiscountCouponLoading] = useState(false);
+  const [discountCouponError, setDiscountCouponError] = useState('');
+  const [discountCouponData, setDiscountCouponData] = useState<{
+    code: string;
+    description: string | null;
+    discountType: string;
+    discountValue: number;
+    appliesToPlan: string;
+  } | null>(null);
+
   // SEO meta
   usePageMeta({
     title: 'Planos | RadarOne',
@@ -127,6 +139,10 @@ export const PlansPage: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok) {
+        // Melhorar mensagem se cupom for DISCOUNT
+        if (data.error && data.error.includes('não é um cupom de upgrade de teste')) {
+          throw new Error('Este cupom é de desconto financeiro. Use-o na seção "Cupom de Desconto" abaixo para aplicá-lo no checkout.');
+        }
         throw new Error(data.error || 'Erro ao aplicar cupom');
       }
 
@@ -146,7 +162,54 @@ export const PlansPage: React.FC = () => {
     }
   };
 
-  const handleChoosePlan = async (planSlug: string) => {
+  const handleValidateDiscountCoupon = async () => {
+    if (!discountCouponCode.trim()) {
+      setDiscountCouponError('Digite o código do cupom');
+      return;
+    }
+
+    setDiscountCouponLoading(true);
+    setDiscountCouponError('');
+    setDiscountCouponData(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/coupons/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: discountCouponCode })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.valid) {
+        throw new Error(data.error || 'Cupom inválido');
+      }
+
+      // Verificar se não é cupom de TRIAL_UPGRADE
+      if (data.coupon.purpose === 'TRIAL_UPGRADE') {
+        throw new Error('Este cupom é de upgrade temporário. Use-o na seção "Tem um cupom de upgrade?" acima.');
+      }
+
+      setDiscountCouponData({
+        code: data.coupon.code,
+        description: data.coupon.description,
+        discountType: data.coupon.discountType,
+        discountValue: data.coupon.discountValue,
+        appliesToPlan: data.coupon.appliesToPlan
+      });
+
+      showInfo('Cupom de desconto validado! Escolha um plano abaixo para prosseguir.');
+
+    } catch (err: any) {
+      setDiscountCouponError(err.message || 'Erro ao validar cupom');
+    } finally {
+      setDiscountCouponLoading(false);
+    }
+  };
+
+  const handleChoosePlan = async (planSlug: string, couponCode?: string) => {
     // Encontra o plano selecionado para tracking
     const selectedPlan = plans.find(p => p.slug === planSlug);
     if (selectedPlan) {
@@ -155,8 +218,14 @@ export const PlansPage: React.FC = () => {
 
     // Se o plano tem checkoutUrl, redireciona para checkout externo (Kiwify)
     if (selectedPlan?.checkoutUrl) {
+      // Adicionar cupom à URL se fornecido
+      let checkoutUrl = selectedPlan.checkoutUrl;
+      if (couponCode) {
+        const separator = checkoutUrl.includes('?') ? '&' : '?';
+        checkoutUrl = `${checkoutUrl}${separator}coupon=${encodeURIComponent(couponCode)}&discount_code=${encodeURIComponent(couponCode)}`;
+      }
       // Redirecionar para checkout Kiwify
-      window.location.href = selectedPlan.checkoutUrl;
+      window.location.href = checkoutUrl;
       return;
     }
 
@@ -230,7 +299,7 @@ export const PlansPage: React.FC = () => {
         {/* Seção de Cupom de Trial Upgrade (só aparece se usuário logado) */}
         {user && !couponSuccess && (
           <div style={styles.couponSection}>
-            <h3 style={styles.couponTitle}>Tem um cupom de upgrade?</h3>
+            <h3 style={styles.couponTitle}>🎁 Tem um cupom de upgrade?</h3>
             <p style={styles.couponSubtitle}>
               Cupons de upgrade liberam acesso premium temporário
             </p>
@@ -259,6 +328,76 @@ export const PlansPage: React.FC = () => {
                 ❌ {couponError}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Seção de Cupom de Desconto (DISCOUNT) - sempre visível */}
+        {!discountCouponData && (
+          <div style={styles.discountCouponSection}>
+            <h3 style={styles.discountCouponTitle}>💰 Cupom de Desconto</h3>
+            <p style={styles.discountCouponSubtitle}>
+              Aplique um cupom de desconto no checkout e economize na assinatura
+            </p>
+            <div style={styles.couponInputGroup}>
+              <input
+                type="text"
+                placeholder="Digite o código do cupom"
+                value={discountCouponCode}
+                onChange={(e) => setDiscountCouponCode(e.target.value.toUpperCase())}
+                style={styles.couponInput}
+                disabled={discountCouponLoading}
+              />
+              <button
+                onClick={handleValidateDiscountCoupon}
+                disabled={discountCouponLoading || !discountCouponCode.trim()}
+                style={{
+                  ...styles.discountCouponButton,
+                  ...(discountCouponLoading || !discountCouponCode.trim() ? styles.couponButtonDisabled : {})
+                }}
+              >
+                {discountCouponLoading ? 'Validando...' : 'Validar cupom'}
+              </button>
+            </div>
+            {discountCouponError && (
+              <div style={styles.couponError}>
+                ❌ {discountCouponError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Cupom de Desconto Validado */}
+        {discountCouponData && (
+          <div style={styles.discountCouponSuccessBox}>
+            <h3 style={styles.discountCouponSuccessTitle}>
+              ✅ Cupom de desconto validado!
+            </h3>
+            <p style={styles.discountCouponSuccessText}>
+              <strong>{discountCouponData.code}</strong>
+              {discountCouponData.description && `: ${discountCouponData.description}`}
+            </p>
+            <p style={styles.discountCouponSuccessText}>
+              Desconto: <strong>
+                {discountCouponData.discountType === 'PERCENTAGE'
+                  ? `${discountCouponData.discountValue}%`
+                  : `R$ ${(discountCouponData.discountValue / 100).toFixed(2)}`}
+              </strong>
+            </p>
+            <p style={styles.discountCouponSuccessText}>
+              Válido para: <strong>{discountCouponData.appliesToPlan}</strong>
+            </p>
+            <p style={styles.discountCouponInfo}>
+              👇 Escolha um plano abaixo para prosseguir com o desconto aplicado
+            </p>
+            <button
+              onClick={() => {
+                setDiscountCouponData(null);
+                setDiscountCouponCode('');
+              }}
+              style={styles.discountCouponClearButton}
+            >
+              Limpar cupom
+            </button>
           </div>
         )}
 
@@ -339,7 +478,7 @@ export const PlansPage: React.FC = () => {
               )}
 
               <button
-                onClick={() => handleChoosePlan(plan.slug)}
+                onClick={() => handleChoosePlan(plan.slug, discountCouponData?.code)}
                 style={{
                   ...styles.planButton,
                   ...(plan.isRecommended ? styles.planButtonRecommended : {}),
@@ -347,6 +486,8 @@ export const PlansPage: React.FC = () => {
               >
                 {plan.priceCents === 0
                   ? 'Usar grátis por 7 dias'
+                  : discountCouponData
+                  ? `Assinar com ${discountCouponData.discountType === 'PERCENTAGE' ? discountCouponData.discountValue + '% OFF' : 'desconto'}`
                   : 'Assinar agora'}
               </button>
             </div>
@@ -598,5 +739,66 @@ const styles = {
     fontWeight: '600' as const,
     marginTop: responsive.spacing.md,
     minWidth: '200px',
+  },
+  // Estilos do cupom de desconto (DISCOUNT)
+  discountCouponSection: {
+    backgroundColor: '#fef3c7',
+    border: '2px solid #f59e0b',
+    borderRadius: '12px',
+    padding: responsive.spacing.lg,
+    marginBottom: responsive.spacing.xl,
+    textAlign: 'center' as const,
+  },
+  discountCouponTitle: {
+    fontSize: 'clamp(18px, 4vw, 22px)',
+    fontWeight: '700' as const,
+    color: '#92400e',
+    marginBottom: responsive.spacing.xs,
+  },
+  discountCouponSubtitle: {
+    fontSize: responsive.typography.small.fontSize,
+    color: '#6b7280',
+    marginBottom: responsive.spacing.md,
+  },
+  discountCouponButton: {
+    ...responsive.button,
+    backgroundColor: '#f59e0b',
+    color: 'white',
+    fontWeight: '600' as const,
+    minWidth: '140px',
+  },
+  discountCouponSuccessBox: {
+    backgroundColor: '#fef3c7',
+    border: '2px solid #f59e0b',
+    borderRadius: '12px',
+    padding: responsive.spacing.xl,
+    marginBottom: responsive.spacing.xl,
+    textAlign: 'center' as const,
+  },
+  discountCouponSuccessTitle: {
+    fontSize: 'clamp(20px, 4vw, 26px)',
+    fontWeight: '700' as const,
+    color: '#92400e',
+    marginBottom: responsive.spacing.md,
+  },
+  discountCouponSuccessText: {
+    fontSize: responsive.typography.body.fontSize,
+    color: '#78350f',
+    marginBottom: responsive.spacing.sm,
+  },
+  discountCouponInfo: {
+    fontSize: responsive.typography.body.fontSize,
+    color: '#92400e',
+    marginTop: responsive.spacing.md,
+    marginBottom: responsive.spacing.sm,
+    fontWeight: '600' as const,
+  },
+  discountCouponClearButton: {
+    ...responsive.button,
+    backgroundColor: '#6b7280',
+    color: 'white',
+    fontWeight: '600' as const,
+    marginTop: responsive.spacing.sm,
+    minWidth: '140px',
   },
 };

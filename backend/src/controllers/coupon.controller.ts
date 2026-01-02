@@ -89,6 +89,7 @@ export class CouponController {
           description: coupon.description,
           discountType: coupon.discountType,
           discountValue: coupon.discountValue,
+          purpose: coupon.purpose || 'DISCOUNT', // Retornar purpose (null tratado como DISCOUNT)
           appliesToPlan: coupon.plan?.name || 'Qualquer plano'
         },
         message: 'Cupom válido! O desconto será aplicado no checkout.'
