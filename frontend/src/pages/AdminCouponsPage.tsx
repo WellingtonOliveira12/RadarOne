@@ -71,6 +71,29 @@ interface Plan {
   slug: string;
 }
 
+interface CouponAnalytics {
+  period: {
+    start: string;
+    end: string;
+    groupBy: string;
+  };
+  stats: {
+    totalCoupons: number;
+    usedCoupons: number;
+    unusedCoupons: number;
+    totalUsages: number;
+    conversionRate: string;
+  };
+  timeSeries: Array<{ period: string; count: number }>;
+  topCoupons: Array<{
+    code: string;
+    count: number;
+    type: string;
+    value: number;
+  }>;
+  typeDistribution: Array<{ type: string; count: number }>;
+}
+
 export const AdminCouponsPage: React.FC = () => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -90,6 +113,11 @@ export const AdminCouponsPage: React.FC = () => {
 
   // Bulk Operations
   const [selectedCouponIds, setSelectedCouponIds] = useState<Set<string>>(new Set());
+
+  // Analytics State
+  const [analytics, setAnalytics] = useState<CouponAnalytics | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Modals
   const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
@@ -163,6 +191,41 @@ export const AdminCouponsPage: React.FC = () => {
       console.error('Erro ao carregar cupons:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAnalytics = async () => {
+    try {
+      setLoadingAnalytics(true);
+      const token = getToken();
+
+      // Buscar analytics dos últimos 30 dias
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+
+      const queryParams = new URLSearchParams({
+        startDate: thirtyDaysAgo.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0],
+        groupBy: 'day',
+      });
+
+      const response = await api.get<CouponAnalytics>(
+        `/api/admin/coupons/analytics?${queryParams.toString()}`,
+        token
+      );
+
+      setAnalytics(response);
+    } catch (err: any) {
+      console.error('Erro ao carregar analytics:', err);
+      toast({
+        title: 'Erro ao carregar analytics',
+        description: err.message,
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLoadingAnalytics(false);
     }
   };
 
@@ -622,18 +685,167 @@ export const AdminCouponsPage: React.FC = () => {
     <AdminLayout>
       <VStack spacing={6} align="stretch">
         {/* Header */}
-        <Box>
-          <Heading size="lg" mb={2}>
-            Cupons de Desconto
-          </Heading>
-          <Text color="gray.600">Gerenciar cupons promocionais e descontos</Text>
-        </Box>
+        <HStack justify="space-between" align="flex-start" flexWrap="wrap">
+          <Box>
+            <Heading size="lg" mb={2}>
+              Cupons de Desconto
+            </Heading>
+            <Text color="gray.600">Gerenciar cupons promocionais e descontos</Text>
+          </Box>
+          <Button
+            colorScheme="teal"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (!showAnalytics && !analytics) {
+                loadAnalytics();
+              }
+              setShowAnalytics(!showAnalytics);
+            }}
+            isLoading={loadingAnalytics}
+          >
+            {showAnalytics ? '📊 Ocultar Analytics' : '📊 Ver Analytics'}
+          </Button>
+        </HStack>
 
         {error && (
           <Alert status="error">
             <AlertIcon />
             {error}
           </Alert>
+        )}
+
+        {/* Analytics Section */}
+        {showAnalytics && analytics && (
+          <Card bg="blue.50" borderColor="blue.200" borderWidth="2px">
+            <CardBody>
+              <Heading size="md" mb={4} color="blue.800">
+                📊 Analytics de Cupons (Últimos 30 Dias)
+              </Heading>
+
+              {/* Stats Cards */}
+              <HStack spacing={4} mb={6} flexWrap="wrap">
+                <Card flex="1" minW="200px" bg="white">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Total de Cupons
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="blue.600">
+                      {analytics.stats.totalCoupons}
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="200px" bg="white">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Cupons Usados
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="green.600">
+                      {analytics.stats.usedCoupons}
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="200px" bg="white">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Total de Usos
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="purple.600">
+                      {analytics.stats.totalUsages}
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="200px" bg="white">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Taxa de Conversão
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="orange.600">
+                      {analytics.stats.conversionRate}%
+                    </Text>
+                  </CardBody>
+                </Card>
+              </HStack>
+
+              {/* Top Coupons */}
+              {analytics.topCoupons.length > 0 && (
+                <Box>
+                  <Heading size="sm" mb={3} color="blue.700">
+                    🏆 Top 10 Cupons Mais Usados
+                  </Heading>
+                  <Card bg="white">
+                    <CardBody p={0}>
+                      <Table size="sm">
+                        <Thead>
+                          <Tr>
+                            <Th>Posição</Th>
+                            <Th>Código</Th>
+                            <Th>Tipo</Th>
+                            <Th>Valor</Th>
+                            <Th isNumeric>Usos</Th>
+                          </Tr>
+                        </Thead>
+                        <Tbody>
+                          {analytics.topCoupons.map((coupon, idx) => (
+                            <Tr key={coupon.code}>
+                              <Td fontWeight="bold">#{idx + 1}</Td>
+                              <Td>
+                                <Badge colorScheme="blue" fontSize="sm">
+                                  {coupon.code}
+                                </Badge>
+                              </Td>
+                              <Td>
+                                <Badge
+                                  colorScheme={coupon.type === 'PERCENTAGE' ? 'purple' : 'green'}
+                                  variant="outline"
+                                >
+                                  {coupon.type === 'PERCENTAGE' ? 'Percentual' : 'Fixo'}
+                                </Badge>
+                              </Td>
+                              <Td>
+                                {coupon.type === 'PERCENTAGE'
+                                  ? `${coupon.value}%`
+                                  : `R$ ${(coupon.value / 100).toFixed(2)}`}
+                              </Td>
+                              <Td isNumeric fontWeight="bold" color="green.600">
+                                {coupon.count}
+                              </Td>
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                    </CardBody>
+                  </Card>
+                </Box>
+              )}
+
+              {/* Type Distribution */}
+              {analytics.typeDistribution.length > 0 && (
+                <Box mt={4}>
+                  <Heading size="sm" mb={3} color="blue.700">
+                    📈 Distribuição por Tipo
+                  </Heading>
+                  <HStack spacing={4}>
+                    {analytics.typeDistribution.map((dist) => (
+                      <Card key={dist.type} bg="white" flex="1">
+                        <CardBody>
+                          <Text fontSize="sm" color="gray.600" mb={1}>
+                            {dist.type === 'PERCENTAGE' ? 'Percentual' : 'Fixo'}
+                          </Text>
+                          <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+                            {dist.count} usos
+                          </Text>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </HStack>
+                </Box>
+              )}
+            </CardBody>
+          </Card>
         )}
 
         {/* Filters */}

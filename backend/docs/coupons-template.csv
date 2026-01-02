@@ -1,0 +1,6 @@
+code,description,discountType,discountValue,maxUses,expiresAt,planSlug
+NATAL2026,Promoção de Natal - 20% de desconto,PERCENTAGE,20,500,2026-12-31,
+ANO_NOVO,Ano Novo Imperdível - R$ 50 OFF,FIXED,50.00,200,2027-01-15,
+BLACK_FRIDAY,Black Friday - 50% OFF,PERCENTAGE,50,1000,2026-11-30,premium
+PRIMEIRA_COMPRA,Desconto primeira compra,PERCENTAGE,15,,,
+SAVE10,Economize 10%,PERCENTAGE,10,100,2027-12-31,

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
+import { Center, Spinner, Text, VStack } from '@chakra-ui/react';
 import { AuthProvider } from './context/AuthContext';
 import { RequireSubscriptionRoute } from './components/RequireSubscriptionRoute';
 import { RedirectIfAuthenticated } from './components/RedirectIfAuthenticated';
@@ -27,21 +28,33 @@ import { ManualPage } from './pages/ManualPage';
 import { FAQPage } from './pages/FAQPage';
 import { ContactPage } from './pages/ContactPage';
 
-// Páginas admin
-import { AdminJobsPage } from './pages/AdminJobsPage';
-import { AdminStatsPage } from './pages/AdminStatsPage';
-import { AdminUsersPage } from './pages/AdminUsersPage';
-import { AdminSubscriptionsPage } from './pages/AdminSubscriptionsPage';
-import { AdminAuditLogsPage } from './pages/AdminAuditLogsPage';
-import { AdminSettingsPage } from './pages/AdminSettingsPage';
-import { AdminMonitorsPage } from './pages/AdminMonitorsPage';
-import { AdminWebhooksPage } from './pages/AdminWebhooksPage';
-import { AdminCouponsPage } from './pages/AdminCouponsPage';
-import { AdminAlertsPage } from './pages/AdminAlertsPage';
-import { Security2FAPage } from './pages/Security2FAPage';
+// Páginas admin - LAZY LOADED (Code Splitting)
+const AdminJobsPage = lazy(() => import('./pages/AdminJobsPage').then(m => ({ default: m.AdminJobsPage })));
+const AdminStatsPage = lazy(() => import('./pages/AdminStatsPage').then(m => ({ default: m.AdminStatsPage })));
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
+const AdminSubscriptionsPage = lazy(() => import('./pages/AdminSubscriptionsPage').then(m => ({ default: m.AdminSubscriptionsPage })));
+const AdminAuditLogsPage = lazy(() => import('./pages/AdminAuditLogsPage').then(m => ({ default: m.AdminAuditLogsPage })));
+const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage').then(m => ({ default: m.AdminSettingsPage })));
+const AdminMonitorsPage = lazy(() => import('./pages/AdminMonitorsPage').then(m => ({ default: m.AdminMonitorsPage })));
+const AdminWebhooksPage = lazy(() => import('./pages/AdminWebhooksPage').then(m => ({ default: m.AdminWebhooksPage })));
+const AdminCouponsPage = lazy(() => import('./pages/AdminCouponsPage').then(m => ({ default: m.AdminCouponsPage })));
+const AdminAlertsPage = lazy(() => import('./pages/AdminAlertsPage').then(m => ({ default: m.AdminAlertsPage })));
+const Security2FAPage = lazy(() => import('./pages/Security2FAPage').then(m => ({ default: m.Security2FAPage })));
 
 // Páginas de teste/debug
 import { HealthCheckPage } from './pages/HealthCheckPage';
+
+// Componente de loading para lazy loaded pages
+function PageLoader() {
+  return (
+    <Center h="100vh" bg="gray.50">
+      <VStack spacing={4}>
+        <Spinner size="xl" color="blue.500" thickness="4px" />
+        <Text color="gray.600">Carregando...</Text>
+      </VStack>
+    </Center>
+  );
+}
 
 // Componente para rastrear pageviews automaticamente
 function PageViewTracker() {
@@ -143,12 +156,14 @@ export function AppRouter() {
             }
           />
 
-          {/* Rotas admin */}
+          {/* Rotas admin - Com Code Splitting (Lazy Loading) */}
           <Route
             path="/admin/stats"
             element={
               <AdminProtectedRoute>
-                <AdminStatsPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminStatsPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -156,7 +171,9 @@ export function AppRouter() {
             path="/admin/users"
             element={
               <AdminProtectedRoute>
-                <AdminUsersPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminUsersPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -164,7 +181,9 @@ export function AppRouter() {
             path="/admin/subscriptions"
             element={
               <AdminProtectedRoute>
-                <AdminSubscriptionsPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminSubscriptionsPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -172,7 +191,9 @@ export function AppRouter() {
             path="/admin/jobs"
             element={
               <AdminProtectedRoute>
-                <AdminJobsPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminJobsPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -180,7 +201,9 @@ export function AppRouter() {
             path="/admin/audit-logs"
             element={
               <AdminProtectedRoute>
-                <AdminAuditLogsPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminAuditLogsPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -188,7 +211,9 @@ export function AppRouter() {
             path="/admin/settings"
             element={
               <AdminProtectedRoute>
-                <AdminSettingsPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminSettingsPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -196,7 +221,9 @@ export function AppRouter() {
             path="/admin/monitors"
             element={
               <AdminProtectedRoute>
-                <AdminMonitorsPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminMonitorsPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -204,7 +231,9 @@ export function AppRouter() {
             path="/admin/webhooks"
             element={
               <AdminProtectedRoute>
-                <AdminWebhooksPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminWebhooksPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -212,7 +241,9 @@ export function AppRouter() {
             path="/admin/coupons"
             element={
               <AdminProtectedRoute>
-                <AdminCouponsPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminCouponsPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -220,7 +251,9 @@ export function AppRouter() {
             path="/admin/alerts"
             element={
               <AdminProtectedRoute>
-                <AdminAlertsPage />
+                <Suspense fallback={<PageLoader />}>
+                  <AdminAlertsPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -228,7 +261,9 @@ export function AppRouter() {
             path="/admin/security"
             element={
               <AdminProtectedRoute>
-                <Security2FAPage />
+                <Suspense fallback={<PageLoader />}>
+                  <Security2FAPage />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />

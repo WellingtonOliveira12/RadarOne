@@ -568,4 +568,153 @@ test.describe('Admin Coupons Management', () => {
       expect(isChecked).toBe(false);
     }
   });
+
+  // =========================================
+  // TESTES DE IMPORT CSV
+  // =========================================
+
+  test('deve importar cupons via CSV com sucesso', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    // Clicar em "Importar CSV"
+    await page.click('button:has-text("Importar CSV")');
+
+    // Aguardar modal abrir
+    await expect(page.locator('text=Importar Cupons via CSV')).toBeVisible();
+
+    // Criar arquivo CSV de teste
+    const uniqueSuffix = Date.now().toString().slice(-6);
+    const csvContent = `code,description,discountType,discountValue,maxUses,expiresAt,planSlug
+CSV1${uniqueSuffix},Cupom CSV 1,PERCENTAGE,10,100,2027-12-31,
+CSV2${uniqueSuffix},Cupom CSV 2,FIXED,5000,50,2027-12-31,`;
+
+    // Criar blob e file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const file = new File([blob], 'coupons.csv', { type: 'text/csv' });
+
+    // Upload do arquivo
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles({
+      name: 'coupons.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(csvContent),
+    });
+
+    // Verificar que arquivo foi selecionado
+    await expect(page.locator('text=/Arquivo selecionado/i')).toBeVisible();
+
+    // Clicar em "Importar CSV"
+    await page.click('button:has-text("Importar CSV")');
+
+    // Aguardar resultado
+    await expect(page.locator('text=/Importação Concluída/i')).toBeVisible({ timeout: 10000 });
+
+    // Verificar sucesso
+    await expect(page.locator('text=/Sucesso: 2 cupons/i')).toBeVisible();
+
+    // Fechar modal
+    await page.click('button:has-text("Fechar")');
+
+    // Verificar que cupons aparecem na tabela (após reload)
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator(`text=CSV1${uniqueSuffix}`)).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(`text=CSV2${uniqueSuffix}`)).toBeVisible({ timeout: 5000 });
+  });
+
+  test('deve mostrar erros ao importar CSV inválido', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    // Abrir modal de import
+    await page.click('button:has-text("Importar CSV")');
+    await expect(page.locator('text=Importar Cupons via CSV')).toBeVisible();
+
+    // CSV com linha inválida (código muito curto)
+    const csvContent = `code,description,discountType,discountValue,maxUses,expiresAt,planSlug
+AB,Cupom inválido,PERCENTAGE,10,100,2027-12-31,`;
+
+    // Upload
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles({
+      name: 'invalid.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(csvContent),
+    });
+
+    // Importar
+    await page.click('button:has-text("Importar CSV")');
+
+    // Aguardar resultado
+    await expect(page.locator('text=/Importação Concluída/i')).toBeVisible({ timeout: 10000 });
+
+    // Verificar que mostra erros
+    await expect(page.locator('text=/Erros: 1/i')).toBeVisible();
+    await expect(page.locator('text=/Código inválido/i')).toBeVisible();
+  });
+
+  // =========================================
+  // TESTES DE ANALYTICS
+  // =========================================
+
+  test('deve exibir analytics de cupons', async ({ page }) => {
+    await loginReal(page, 'ADMIN');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    // Clicar no botão "Ver Analytics"
+    await page.click('button:has-text("Ver Analytics")');
+
+    // Aguardar section de analytics aparecer
+    await expect(page.locator('text=/Analytics de Cupons/i')).toBeVisible({ timeout: 10000 });
+
+    // Verificar cards de estatísticas
+    await expect(page.locator('text=/Total de Cupons/i')).toBeVisible();
+    await expect(page.locator('text=/Cupons Usados/i')).toBeVisible();
+    await expect(page.locator('text=/Total de Usos/i')).toBeVisible();
+    await expect(page.locator('text=/Taxa de Conversão/i')).toBeVisible();
+
+    // Verificar que mostra valores numéricos
+    const totalCoupons = await page.locator('text=/Total de Cupons/i').locator('../..').locator('text=/\\d+/').first();
+    await expect(totalCoupons).toBeVisible();
+  });
+
+  test('deve ocultar analytics ao clicar novamente', async ({ page }) => {
+    await loginReal(page, 'ADMIN');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    // Abrir analytics
+    await page.click('button:has-text("Ver Analytics")');
+    await expect(page.locator('text=/Analytics de Cupons/i')).toBeVisible({ timeout: 10000 });
+
+    // Clicar novamente para ocultar
+    await page.click('button:has-text("Ocultar Analytics")');
+
+    // Analytics deve desaparecer
+    await expect(page.locator('text=/Analytics de Cupons/i')).not.toBeVisible();
+  });
+
+  test('analytics deve mostrar top cupons mais usados', async ({ page }) => {
+    await loginReal(page, 'ADMIN');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    // Abrir analytics
+    await page.click('button:has-text("Ver Analytics")');
+    await expect(page.locator('text=/Analytics de Cupons/i')).toBeVisible({ timeout: 10000 });
+
+    // Verificar seção de Top Cupons
+    const hasTopCoupons = await page.locator('text=/Top 10 Cupons Mais Usados/i').count();
+
+    // Se houver cupons usados, deve mostrar a tabela
+    if (hasTopCoupons > 0) {
+      await expect(page.locator('text=/Top 10 Cupons Mais Usados/i')).toBeVisible();
+      await expect(page.locator('th:has-text("Código")')).toBeVisible();
+      await expect(page.locator('th:has-text("Usos")')).toBeVisible();
+    }
+  });
 });

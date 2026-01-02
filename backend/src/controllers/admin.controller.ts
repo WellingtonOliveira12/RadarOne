@@ -2886,6 +2886,13 @@ export class AdminController {
         return res.status(400).json({ error: 'Arquivo CSV vazio' });
       }
 
+      // VALIDAÇÃO EXTRA: Limite de linhas (máximo 1000 cupons por importação)
+      if (records.length > 1000) {
+        return res.status(400).json({
+          error: `Arquivo muito grande. Máximo de 1000 cupons por importação. Você enviou ${records.length} linhas.`
+        });
+      }
+
       const results = {
         success: [] as string[],
         errors: [] as { line: number; code: string; error: string }[],
@@ -2898,10 +2905,20 @@ export class AdminController {
         const lineNumber = i + 2; // +2 porque linha 1 é header
 
         try {
-          // Validações
+          // VALIDAÇÃO EXTRA: Código
           const code = row.code?.trim().toUpperCase();
           if (!code || code.length < 3) {
             throw new Error('Código inválido (mínimo 3 caracteres)');
+          }
+
+          // VALIDAÇÃO EXTRA: Tamanho máximo do código
+          if (code.length > 50) {
+            throw new Error('Código muito longo (máximo 50 caracteres)');
+          }
+
+          // VALIDAÇÃO EXTRA: Apenas caracteres alfanuméricos, hífens e underscores
+          if (!/^[A-Z0-9_-]+$/.test(code)) {
+            throw new Error('Código deve conter apenas letras, números, hífens e underscores');
           }
 
           const discountType = row.discountType?.toUpperCase();
@@ -2927,13 +2944,43 @@ export class AdminController {
             throw new Error('Cupom já existe');
           }
 
-          // Parse optional fields
-          const maxUses = row.maxUses ? parseInt(row.maxUses) : null;
-          const expiresAt = row.expiresAt ? new Date(row.expiresAt) : null;
+          // VALIDAÇÃO EXTRA: Parse optional fields com validação
+          let maxUses: number | null = null;
+          if (row.maxUses?.trim()) {
+            maxUses = parseInt(row.maxUses.trim());
+            if (isNaN(maxUses) || maxUses < 1) {
+              throw new Error('maxUses deve ser um número inteiro maior ou igual a 1');
+            }
+            if (maxUses > 1000000) {
+              throw new Error('maxUses muito alto (máximo 1.000.000)');
+            }
+          }
 
-          // Validate expiration date
-          if (expiresAt && expiresAt <= new Date()) {
-            throw new Error('Data de expiração deve ser futura');
+          // VALIDAÇÃO EXTRA: Data de expiração com validação de formato
+          let expiresAt: Date | null = null;
+          if (row.expiresAt?.trim()) {
+            expiresAt = new Date(row.expiresAt.trim());
+            if (isNaN(expiresAt.getTime())) {
+              throw new Error('Data de expiração inválida (use formato YYYY-MM-DD)');
+            }
+            if (expiresAt <= new Date()) {
+              throw new Error('Data de expiração deve ser futura');
+            }
+            // VALIDAÇÃO EXTRA: Não permitir datas muito distantes (max 10 anos)
+            const tenYearsFromNow = new Date();
+            tenYearsFromNow.setFullYear(tenYearsFromNow.getFullYear() + 10);
+            if (expiresAt > tenYearsFromNow) {
+              throw new Error('Data de expiração muito distante (máximo 10 anos)');
+            }
+          }
+
+          // VALIDAÇÃO EXTRA: Descrição (se fornecida)
+          let description: string | null = null;
+          if (row.description?.trim()) {
+            description = row.description.trim();
+            if (description.length > 500) {
+              throw new Error('Descrição muito longa (máximo 500 caracteres)');
+            }
           }
 
           // Find plan by slug if provided
@@ -2952,7 +2999,7 @@ export class AdminController {
           await prisma.coupon.create({
             data: {
               code,
-              description: row.description?.trim() || null,
+              description,
               discountType,
               discountValue,
               maxUses,
@@ -2998,6 +3045,7 @@ export class AdminController {
    * Retorna analytics de cupons para gráficos
    * GET /api/admin/coupons/analytics?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&groupBy=day|week|month
    * Permissão: Qualquer ADMIN
+   * MELHORIA: Com cache de 5 minutos para melhorar performance
    */
   static async getCouponAnalytics(req: Request, res: Response) {
     try {
@@ -3008,6 +3056,16 @@ export class AdminController {
         ? new Date(startDate as string)
         : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
+
+      // MELHORIA: Cache key baseado nos parâmetros
+      const { cache } = await import('../utils/cache');
+      const cacheKey = `coupon-analytics:${start.toISOString()}:${end.toISOString()}:${groupBy}`;
+
+      // Tentar buscar do cache primeiro
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
 
       // Buscar usos de cupons no período
       const usages = await prisma.couponUsage.findMany({
@@ -3102,23 +3160,81 @@ export class AdminController {
 
       const totalUsages = usages.length;
 
-      return res.json({
+      // MELHORIA: Métricas adicionais
+
+      // Cupons ativos vs inativos
+      const activeCoupons = await prisma.coupon.count({
+        where: { isActive: true },
+      });
+      const inactiveCoupons = totalCoupons - activeCoupons;
+
+      // Cupons expirando nos próximos 7 dias
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+      const expiringSoon = await prisma.coupon.count({
+        where: {
+          expiresAt: {
+            gte: new Date(),
+            lte: sevenDaysFromNow,
+          },
+        },
+      });
+
+      // Cupons próximos do limite (80% ou mais do maxUses)
+      const couponsWithLimit = await prisma.coupon.findMany({
+        where: {
+          maxUses: { not: null },
+          isActive: true,
+        },
+        select: {
+          id: true,
+          usedCount: true,
+          maxUses: true,
+        },
+      });
+      const nearLimit = couponsWithLimit.filter(c =>
+        c.maxUses && c.usedCount >= (c.maxUses * 0.8)
+      ).length;
+
+      // Cupons por tipo de desconto
+      const percentageCoupons = await prisma.coupon.count({
+        where: { discountType: 'PERCENTAGE' },
+      });
+      const fixedCoupons = await prisma.coupon.count({
+        where: { discountType: 'FIXED' },
+      });
+
+      const responseData = {
         period: {
           start: start.toISOString(),
           end: end.toISOString(),
           groupBy,
         },
         stats: {
+          // Estatísticas básicas
           totalCoupons,
           usedCoupons,
           unusedCoupons: totalCoupons - usedCoupons,
           totalUsages,
           conversionRate: totalCoupons > 0 ? ((usedCoupons / totalCoupons) * 100).toFixed(2) : '0',
+
+          // MELHORIA: Estatísticas adicionais
+          activeCoupons,
+          inactiveCoupons,
+          expiringSoon,
+          nearLimit,
+          percentageCoupons,
+          fixedCoupons,
         },
         timeSeries: timeSeriesData,
         topCoupons,
         typeDistribution,
-      });
+      };
+
+      // MELHORIA: Salvar no cache por 5 minutos (300 segundos)
+      cache.set(cacheKey, responseData, 300);
+
+      return res.json(responseData);
     } catch (error) {
       console.error('Erro ao buscar analytics de cupons:', error);
       return res.status(500).json({ error: 'Erro ao buscar analytics de cupons' });
