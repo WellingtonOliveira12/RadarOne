@@ -34,6 +34,7 @@ import {
   FormControl,
   FormLabel,
   FormErrorMessage,
+  FormHelperText,
   NumberInput,
   NumberInputField,
   Tooltip,
@@ -49,6 +50,8 @@ interface Coupon {
   description: string | null;
   discountType: string;
   discountValue: number;
+  purpose?: 'DISCOUNT' | 'TRIAL_UPGRADE'; // FASE: Cupons de Upgrade
+  durationDays?: number | null; // FASE: Cupons de Upgrade
   maxUses: number | null;
   usedCount: number;
   expiresAt: string | null;
