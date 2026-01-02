@@ -211,9 +211,15 @@ model Coupon {
   code        String  @unique
   description String?
 
-  // Tipo e Valor do Desconto
+  // Tipo e Valor do Desconto (usado quando purpose=DISCOUNT ou null)
   discountType  String @map("discount_type") // PERCENT, FIXED
   discountValue Int    @map("discount_value") // Porcentagem (0-100) ou valor em centavos
+
+  // Finalidade do Cupom (FASE: CUPONS DE UPGRADE)
+  // null ou DISCOUNT = desconto financeiro (comportamento padrão/legado)
+  // TRIAL_UPGRADE = libera acesso premium temporário
+  purpose      String? @map("purpose") // DISCOUNT, TRIAL_UPGRADE
+  durationDays Int?    @map("duration_days") // Duração em dias (usado apenas se purpose=TRIAL_UPGRADE, 1-60 dias)
 
   // Restrições
   appliesToPlanId String?   @map("applies_to_plan_id") // Se null, vale para qualquer plano

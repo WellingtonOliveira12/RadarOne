@@ -42,6 +42,16 @@ export const PlansPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Estado do cupom de trial upgrade
+  const [couponCode, setCouponCode] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
+  const [couponSuccess, setCouponSuccess] = useState<{
+    planName: string;
+    endsAt: Date;
+    daysGranted: number;
+  } | null>(null);
+
   // SEO meta
   usePageMeta({
     title: 'Planos | RadarOne',
@@ -85,6 +95,54 @@ export const PlansPage: React.FC = () => {
       setError('Erro ao carregar planos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!user) {
+      setCouponError('Você precisa estar logado para usar um cupom.');
+      return;
+    }
+
+    if (!couponCode.trim()) {
+      setCouponError('Digite o código do cupom');
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponError('');
+    setCouponSuccess(null);
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/coupons/redeem-trial-upgrade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: couponCode })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao aplicar cupom');
+      }
+
+      // Sucesso!
+      setCouponSuccess({
+        planName: data.subscription.planName,
+        endsAt: new Date(data.subscription.endsAt),
+        daysGranted: data.subscription.daysGranted
+      });
+
+      showInfo(`Cupom aplicado! ${data.message}`);
+
+    } catch (err: any) {
+      setCouponError(err.message || 'Erro ao aplicar cupom');
+    } finally {
+      setCouponLoading(false);
     }
   };
 
@@ -166,6 +224,63 @@ export const PlansPage: React.FC = () => {
             <p style={styles.reasonBannerText}>
               ⚠️ {getSubscriptionMessage(reason)}
             </p>
+          </div>
+        )}
+
+        {/* Seção de Cupom de Trial Upgrade (só aparece se usuário logado) */}
+        {user && !couponSuccess && (
+          <div style={styles.couponSection}>
+            <h3 style={styles.couponTitle}>Tem um cupom de upgrade?</h3>
+            <p style={styles.couponSubtitle}>
+              Cupons de upgrade liberam acesso premium temporário
+            </p>
+            <div style={styles.couponInputGroup}>
+              <input
+                type="text"
+                placeholder="Digite o código do cupom"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                style={styles.couponInput}
+                disabled={couponLoading}
+              />
+              <button
+                onClick={handleApplyCoupon}
+                disabled={couponLoading || !couponCode.trim()}
+                style={{
+                  ...styles.couponButton,
+                  ...(couponLoading || !couponCode.trim() ? styles.couponButtonDisabled : {})
+                }}
+              >
+                {couponLoading ? 'Aplicando...' : 'Aplicar cupom'}
+              </button>
+            </div>
+            {couponError && (
+              <div style={styles.couponError}>
+                ❌ {couponError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Sucesso do cupom */}
+        {couponSuccess && (
+          <div style={styles.couponSuccessBox}>
+            <h3 style={styles.couponSuccessTitle}>
+              ✅ Cupom aplicado com sucesso!
+            </h3>
+            <p style={styles.couponSuccessText}>
+              Você ganhou acesso ao plano <strong>{couponSuccess.planName}</strong> por{' '}
+              <strong>{couponSuccess.daysGranted} dias</strong>!
+            </p>
+            <p style={styles.couponSuccessText}>
+              Válido até: <strong>{couponSuccess.endsAt.toLocaleDateString('pt-BR')}</strong>
+            </p>
+            <button
+              onClick={() => navigate('/dashboard')}
+              style={styles.couponSuccessButton}
+            >
+              Ir para o Dashboard
+            </button>
           </div>
         )}
 
@@ -400,5 +515,88 @@ const styles = {
     fontWeight: '600' as const,
     color: '#92400e',
     margin: 0,
+  },
+  // Estilos do cupom de trial upgrade
+  couponSection: {
+    backgroundColor: '#f0f9ff',
+    border: '2px solid #3b82f6',
+    borderRadius: '12px',
+    padding: responsive.spacing.lg,
+    marginBottom: responsive.spacing.xl,
+    textAlign: 'center' as const,
+  },
+  couponTitle: {
+    fontSize: 'clamp(18px, 4vw, 22px)',
+    fontWeight: '700' as const,
+    color: '#1e40af',
+    marginBottom: responsive.spacing.xs,
+  },
+  couponSubtitle: {
+    fontSize: responsive.typography.small.fontSize,
+    color: '#6b7280',
+    marginBottom: responsive.spacing.md,
+  },
+  couponInputGroup: {
+    display: 'flex',
+    gap: responsive.spacing.sm,
+    maxWidth: '500px',
+    margin: '0 auto',
+    flexWrap: 'wrap' as const,
+  },
+  couponInput: {
+    flex: '1 1 200px',
+    padding: responsive.spacing.sm,
+    fontSize: responsive.typography.body.fontSize,
+    border: '2px solid #cbd5e1',
+    borderRadius: '8px',
+    textTransform: 'uppercase' as const,
+    fontWeight: '600' as const,
+  },
+  couponButton: {
+    ...responsive.button,
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    fontWeight: '600' as const,
+    minWidth: '140px',
+  },
+  couponButtonDisabled: {
+    backgroundColor: '#cbd5e1',
+    cursor: 'not-allowed',
+    opacity: 0.6,
+  },
+  couponError: {
+    marginTop: responsive.spacing.sm,
+    padding: responsive.spacing.sm,
+    backgroundColor: '#fee2e2',
+    borderRadius: '8px',
+    color: '#991b1b',
+    fontSize: responsive.typography.small.fontSize,
+  },
+  couponSuccessBox: {
+    backgroundColor: '#d1fae5',
+    border: '2px solid #10b981',
+    borderRadius: '12px',
+    padding: responsive.spacing.xl,
+    marginBottom: responsive.spacing.xl,
+    textAlign: 'center' as const,
+  },
+  couponSuccessTitle: {
+    fontSize: 'clamp(20px, 4vw, 26px)',
+    fontWeight: '700' as const,
+    color: '#065f46',
+    marginBottom: responsive.spacing.md,
+  },
+  couponSuccessText: {
+    fontSize: responsive.typography.body.fontSize,
+    color: '#047857',
+    marginBottom: responsive.spacing.sm,
+  },
+  couponSuccessButton: {
+    ...responsive.button,
+    backgroundColor: '#10b981',
+    color: 'white',
+    fontWeight: '600' as const,
+    marginTop: responsive.spacing.md,
+    minWidth: '200px',
   },
 };

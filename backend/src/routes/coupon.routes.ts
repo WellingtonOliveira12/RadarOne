@@ -10,4 +10,8 @@ router.post('/validate', CouponController.validateCoupon);
 // Aplicar cupom (requer autenticação)
 router.post('/apply', authenticateToken, CouponController.applyCoupon);
 
+// Resgatar cupom de trial upgrade (requer autenticação)
+// FASE: CUPONS DE UPGRADE - libera plano premium temporário
+router.post('/redeem-trial-upgrade', authenticateToken, CouponController.redeemTrialUpgrade);
+
 export default router;

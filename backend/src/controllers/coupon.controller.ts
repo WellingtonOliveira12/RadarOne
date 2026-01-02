@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import { prisma } from '../server';
+import { AppError } from '../errors/AppError';
 
 /**
  * Controller de Cupons
  * MVP: Validação de cupons (sem aplicação real pois checkout é externo)
+ * FASE UPGRADE: Resgate de cupons de trial upgrade
  */
 
 export class CouponController {
@@ -154,6 +156,205 @@ export class CouponController {
     } catch (error) {
       console.error('Erro ao aplicar cupom:', error);
       res.status(500).json({ error: 'Erro ao aplicar cupom' });
+    }
+  }
+
+  /**
+   * POST /api/coupons/redeem-trial-upgrade
+   * Resgata cupom de TRIAL_UPGRADE (libera plano premium por X dias)
+   *
+   * Regras:
+   * - Usuário deve estar autenticado
+   * - Cupom deve ser ativo, não expirado, dentro de maxUses
+   * - Cupom deve ter purpose=TRIAL_UPGRADE
+   * - Não permite downgrade (se já é premium ativo)
+   * - Não permite stacking: se já tem trial/upgrade ativo, aceita apenas se novo prazo for maior
+   */
+  static async redeemTrialUpgrade(req: Request, res: Response): Promise<void> {
+    try {
+      const { code, planId } = req.body;
+      const userId = req.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Usuário não autenticado' });
+        return;
+      }
+
+      if (!code) {
+        res.status(400).json({ error: 'Código do cupom é obrigatório' });
+        return;
+      }
+
+      // 1. Buscar e validar cupom
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: code.trim().toUpperCase() },
+        include: { plan: true }
+      });
+
+      if (!coupon) {
+        res.status(404).json({
+          valid: false,
+          error: 'Cupom inválido ou não encontrado'
+        });
+        return;
+      }
+
+      // Validar se é cupom de trial upgrade
+      if (coupon.purpose !== 'TRIAL_UPGRADE') {
+        res.status(400).json({
+          valid: false,
+          error: 'Este cupom não é um cupom de upgrade de teste. Use-o no checkout para obter desconto.'
+        });
+        return;
+      }
+
+      // Cupom inativo
+      if (!coupon.isActive) {
+        res.status(400).json({
+          valid: false,
+          error: 'Este cupom não está mais ativo'
+        });
+        return;
+      }
+
+      // Cupom expirado
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+        res.status(400).json({
+          valid: false,
+          error: 'Este cupom expirou'
+        });
+        return;
+      }
+
+      // Cupom atingiu limite de usos
+      if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) {
+        res.status(400).json({
+          valid: false,
+          error: 'Este cupom já atingiu o limite de usos'
+        });
+        return;
+      }
+
+      // Validar durationDays
+      if (!coupon.durationDays || coupon.durationDays < 1 || coupon.durationDays > 60) {
+        res.status(500).json({
+          error: 'Cupom mal configurado: duração inválida'
+        });
+        return;
+      }
+
+      // 2. Determinar plano alvo
+      let targetPlan = null;
+      if (coupon.appliesToPlanId) {
+        // Cupom amarra plano específico
+        targetPlan = coupon.plan;
+      } else if (planId) {
+        // Plano fornecido pelo usuário
+        targetPlan = await prisma.plan.findUnique({
+          where: { id: planId }
+        });
+      } else {
+        res.status(400).json({
+          error: 'Plano alvo não especificado e cupom não amarra plano específico'
+        });
+        return;
+      }
+
+      if (!targetPlan) {
+        res.status(404).json({ error: 'Plano não encontrado' });
+        return;
+      }
+
+      // 3. Verificar subscription atual do usuário
+      const currentSubscription = await prisma.subscription.findFirst({
+        where: {
+          userId,
+          status: { in: ['ACTIVE', 'TRIAL'] }
+        },
+        include: { plan: true },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      // Regra: não permitir downgrade (se já tem plano ativo igual ou superior)
+      // Simplificação: checar apenas se já é o mesmo plano e está ACTIVE
+      if (currentSubscription && currentSubscription.status === 'ACTIVE' && currentSubscription.planId === targetPlan.id) {
+        res.status(400).json({
+          error: `Você já possui assinatura ativa do plano ${targetPlan.name}. Este cupom não pode ser usado.`
+        });
+        return;
+      }
+
+      // Regra de stacking: se já tem trial/upgrade ativo, verificar data
+      const now = new Date();
+      const newEndDate = new Date(now.getTime() + coupon.durationDays * 24 * 60 * 60 * 1000);
+
+      if (currentSubscription && currentSubscription.status === 'TRIAL') {
+        // Já tem trial ativo
+        const currentEndDate = currentSubscription.trialEndsAt || currentSubscription.validUntil;
+
+        if (currentEndDate && newEndDate <= currentEndDate) {
+          res.status(400).json({
+            error: 'Você já possui um trial/upgrade ativo com prazo igual ou maior. Não é possível acumular cupons.'
+          });
+          return;
+        }
+
+        // Se chegou aqui, o novo prazo é maior - permitir e cancelar o atual
+        await prisma.subscription.update({
+          where: { id: currentSubscription.id },
+          data: { status: 'CANCELLED' }
+        });
+      }
+
+      // 4. Criar nova subscription de trial upgrade
+      const newSubscription = await prisma.subscription.create({
+        data: {
+          userId,
+          planId: targetPlan.id,
+          status: 'TRIAL',
+          isTrial: true,
+          trialEndsAt: newEndDate,
+          validUntil: newEndDate,
+          queriesLimit: targetPlan.maxMonitors * 100, // Limite generoso
+          externalProvider: 'COUPON_TRIAL_UPGRADE'
+        },
+        include: {
+          plan: true
+        }
+      });
+
+      // 5. Registrar uso do cupom
+      await prisma.couponUsage.create({
+        data: {
+          couponId: coupon.id,
+          userId
+        }
+      });
+
+      // Incrementar contador
+      await prisma.coupon.update({
+        where: { id: coupon.id },
+        data: {
+          usedCount: { increment: 1 }
+        }
+      });
+
+      // 6. Retornar sucesso
+      res.status(200).json({
+        success: true,
+        message: `Cupom aplicado! Você ganhou acesso ao plano ${targetPlan.name} até ${newEndDate.toLocaleDateString('pt-BR')}.`,
+        subscription: {
+          id: newSubscription.id,
+          planName: targetPlan.name,
+          planSlug: targetPlan.slug,
+          endsAt: newEndDate,
+          daysGranted: coupon.durationDays
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao resgatar cupom de trial upgrade:', error);
+      res.status(500).json({ error: 'Erro ao resgatar cupom' });
     }
   }
 }

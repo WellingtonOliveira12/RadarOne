@@ -137,8 +137,10 @@ export const AdminCouponsPage: React.FC = () => {
   const [formData, setFormData] = useState({
     code: '',
     description: '',
+    purpose: 'DISCOUNT' as 'DISCOUNT' | 'TRIAL_UPGRADE', // FASE: Cupons de Upgrade
     discountType: 'PERCENTAGE',
     discountValue: 0,
+    durationDays: null as number | null, // Apenas para TRIAL_UPGRADE
     maxUses: null as number | null,
     expiresAt: '',
     appliesToPlanId: null as string | null,
@@ -238,12 +240,25 @@ export const AdminCouponsPage: React.FC = () => {
       errors.code = 'Código deve ter pelo menos 3 caracteres';
     }
 
-    if (formData.discountValue <= 0) {
-      errors.discountValue = 'Valor deve ser maior que 0';
-    }
+    // Validações específicas por tipo de cupom
+    if (formData.purpose === 'DISCOUNT') {
+      // Cupom de desconto: validar discountValue e discountType
+      if (formData.discountValue <= 0) {
+        errors.discountValue = 'Valor deve ser maior que 0';
+      }
 
-    if (formData.discountType === 'PERCENTAGE' && formData.discountValue > 100) {
-      errors.discountValue = 'Desconto percentual não pode ser maior que 100%';
+      if (formData.discountType === 'PERCENTAGE' && formData.discountValue > 100) {
+        errors.discountValue = 'Desconto percentual não pode ser maior que 100%';
+      }
+    } else if (formData.purpose === 'TRIAL_UPGRADE') {
+      // Cupom de trial upgrade: validar durationDays
+      if (!formData.durationDays || formData.durationDays < 1) {
+        errors.durationDays = 'Duração deve ser pelo menos 1 dia';
+      }
+
+      if (formData.durationDays && formData.durationDays > 60) {
+        errors.durationDays = 'Duração não pode ser maior que 60 dias';
+      }
     }
 
     if (formData.expiresAt && new Date(formData.expiresAt) <= new Date()) {
@@ -266,8 +281,10 @@ export const AdminCouponsPage: React.FC = () => {
         {
           code: formData.code.trim().toUpperCase(),
           description: formData.description.trim() || null,
+          purpose: formData.purpose, // FASE: Cupons de Upgrade
           discountType: formData.discountType,
           discountValue: formData.discountValue,
+          durationDays: formData.purpose === 'TRIAL_UPGRADE' ? formData.durationDays : null, // Apenas para TRIAL_UPGRADE
           maxUses: formData.maxUses || null,
           expiresAt: formData.expiresAt || null,
           appliesToPlanId: formData.appliesToPlanId || null,
@@ -307,8 +324,10 @@ export const AdminCouponsPage: React.FC = () => {
         `/api/admin/coupons/${editingCoupon.id}`,
         {
           description: formData.description.trim() || null,
+          purpose: formData.purpose, // FASE: Cupons de Upgrade
           discountType: formData.discountType,
           discountValue: formData.discountValue,
+          durationDays: formData.purpose === 'TRIAL_UPGRADE' ? formData.durationDays : null, // Apenas para TRIAL_UPGRADE
           maxUses: formData.maxUses || null,
           expiresAt: formData.expiresAt || null,
           appliesToPlanId: formData.appliesToPlanId || null,
@@ -436,8 +455,10 @@ export const AdminCouponsPage: React.FC = () => {
     setFormData({
       code: coupon.code,
       description: coupon.description || '',
+      purpose: (coupon.purpose as 'DISCOUNT' | 'TRIAL_UPGRADE') || 'DISCOUNT', // FASE: Cupons de Upgrade
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
+      durationDays: coupon.durationDays || null, // FASE: Cupons de Upgrade
       maxUses: coupon.maxUses,
       expiresAt: coupon.expiresAt ? coupon.expiresAt.substring(0, 16) : '',
       appliesToPlanId: coupon.plan?.id || null,
@@ -449,8 +470,10 @@ export const AdminCouponsPage: React.FC = () => {
     setFormData({
       code: '',
       description: '',
+      purpose: 'DISCOUNT', // FASE: Cupons de Upgrade
       discountType: 'PERCENTAGE',
       discountValue: 0,
+      durationDays: null, // FASE: Cupons de Upgrade
       maxUses: null,
       expiresAt: '',
       appliesToPlanId: null,
@@ -1143,32 +1166,73 @@ export const AdminCouponsPage: React.FC = () => {
                 />
               </FormControl>
 
-              <FormControl isInvalid={!!formErrors.discountType}>
-                <FormLabel>Tipo de Desconto *</FormLabel>
+              {/* FASE: Cupons de Upgrade - Campo de finalidade */}
+              <FormControl>
+                <FormLabel>Finalidade do Cupom *</FormLabel>
                 <Select
-                  value={formData.discountType}
-                  onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
+                  value={formData.purpose}
+                  onChange={(e) => setFormData({ ...formData, purpose: e.target.value as 'DISCOUNT' | 'TRIAL_UPGRADE' })}
                 >
-                  <option value="PERCENTAGE">Percentual (%)</option>
-                  <option value="FIXED">Fixo (R$)</option>
+                  <option value="DISCOUNT">Desconto Financeiro</option>
+                  <option value="TRIAL_UPGRADE">Trial Upgrade (Acesso Temporário)</option>
                 </Select>
+                <FormHelperText>
+                  {formData.purpose === 'DISCOUNT'
+                    ? 'Cupom que oferece desconto no checkout'
+                    : 'Cupom que libera plano premium temporário'}
+                </FormHelperText>
               </FormControl>
 
-              <FormControl isInvalid={!!formErrors.discountValue}>
-                <FormLabel>
-                  Valor do Desconto * {formData.discountType === 'PERCENTAGE' ? '(%)' : '(R$)'}
-                </FormLabel>
-                <NumberInput
-                  value={formData.discountValue}
-                  onChange={(_, val) => setFormData({ ...formData, discountValue: val })}
-                  min={0}
-                  max={formData.discountType === 'PERCENTAGE' ? 100 : undefined}
-                  precision={formData.discountType === 'FIXED' ? 2 : 0}
-                >
-                  <NumberInputField />
-                </NumberInput>
-                <FormErrorMessage>{formErrors.discountValue}</FormErrorMessage>
-              </FormControl>
+              {/* Campos para cupons de DISCOUNT */}
+              {formData.purpose === 'DISCOUNT' && (
+                <>
+                  <FormControl isInvalid={!!formErrors.discountType}>
+                    <FormLabel>Tipo de Desconto *</FormLabel>
+                    <Select
+                      value={formData.discountType}
+                      onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
+                    >
+                      <option value="PERCENTAGE">Percentual (%)</option>
+                      <option value="FIXED">Fixo (R$)</option>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl isInvalid={!!formErrors.discountValue}>
+                    <FormLabel>
+                      Valor do Desconto * {formData.discountType === 'PERCENTAGE' ? '(%)' : '(R$)'}
+                    </FormLabel>
+                    <NumberInput
+                      value={formData.discountValue}
+                      onChange={(_, val) => setFormData({ ...formData, discountValue: val })}
+                      min={0}
+                      max={formData.discountType === 'PERCENTAGE' ? 100 : undefined}
+                      precision={formData.discountType === 'FIXED' ? 2 : 0}
+                    >
+                      <NumberInputField />
+                    </NumberInput>
+                    <FormErrorMessage>{formErrors.discountValue}</FormErrorMessage>
+                  </FormControl>
+                </>
+              )}
+
+              {/* Campos para cupons de TRIAL_UPGRADE */}
+              {formData.purpose === 'TRIAL_UPGRADE' && (
+                <FormControl isInvalid={!!formErrors.durationDays}>
+                  <FormLabel>Duração (dias) *</FormLabel>
+                  <NumberInput
+                    value={formData.durationDays || ''}
+                    onChange={(_, val) => setFormData({ ...formData, durationDays: val || null })}
+                    min={1}
+                    max={60}
+                  >
+                    <NumberInputField placeholder="Ex: 7" />
+                  </NumberInput>
+                  <FormHelperText>
+                    Quantos dias o usuário terá acesso premium (1-60 dias)
+                  </FormHelperText>
+                  <FormErrorMessage>{formErrors.durationDays}</FormErrorMessage>
+                </FormControl>
+              )}
 
               <FormControl>
                 <FormLabel>Plano Aplicável</FormLabel>
@@ -1240,32 +1304,73 @@ export const AdminCouponsPage: React.FC = () => {
                 />
               </FormControl>
 
-              <FormControl isInvalid={!!formErrors.discountType}>
-                <FormLabel>Tipo de Desconto *</FormLabel>
+              {/* FASE: Cupons de Upgrade - Campo de finalidade */}
+              <FormControl>
+                <FormLabel>Finalidade do Cupom *</FormLabel>
                 <Select
-                  value={formData.discountType}
-                  onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
+                  value={formData.purpose}
+                  onChange={(e) => setFormData({ ...formData, purpose: e.target.value as 'DISCOUNT' | 'TRIAL_UPGRADE' })}
                 >
-                  <option value="PERCENTAGE">Percentual (%)</option>
-                  <option value="FIXED">Fixo (R$)</option>
+                  <option value="DISCOUNT">Desconto Financeiro</option>
+                  <option value="TRIAL_UPGRADE">Trial Upgrade (Acesso Temporário)</option>
                 </Select>
+                <FormHelperText>
+                  {formData.purpose === 'DISCOUNT'
+                    ? 'Cupom que oferece desconto no checkout'
+                    : 'Cupom que libera plano premium temporário'}
+                </FormHelperText>
               </FormControl>
 
-              <FormControl isInvalid={!!formErrors.discountValue}>
-                <FormLabel>
-                  Valor do Desconto * {formData.discountType === 'PERCENTAGE' ? '(%)' : '(R$)'}
-                </FormLabel>
-                <NumberInput
-                  value={formData.discountValue}
-                  onChange={(_, val) => setFormData({ ...formData, discountValue: val })}
-                  min={0}
-                  max={formData.discountType === 'PERCENTAGE' ? 100 : undefined}
-                  precision={formData.discountType === 'FIXED' ? 2 : 0}
-                >
-                  <NumberInputField />
-                </NumberInput>
-                <FormErrorMessage>{formErrors.discountValue}</FormErrorMessage>
-              </FormControl>
+              {/* Campos para cupons de DISCOUNT */}
+              {formData.purpose === 'DISCOUNT' && (
+                <>
+                  <FormControl isInvalid={!!formErrors.discountType}>
+                    <FormLabel>Tipo de Desconto *</FormLabel>
+                    <Select
+                      value={formData.discountType}
+                      onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
+                    >
+                      <option value="PERCENTAGE">Percentual (%)</option>
+                      <option value="FIXED">Fixo (R$)</option>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl isInvalid={!!formErrors.discountValue}>
+                    <FormLabel>
+                      Valor do Desconto * {formData.discountType === 'PERCENTAGE' ? '(%)' : '(R$)'}
+                    </FormLabel>
+                    <NumberInput
+                      value={formData.discountValue}
+                      onChange={(_, val) => setFormData({ ...formData, discountValue: val })}
+                      min={0}
+                      max={formData.discountType === 'PERCENTAGE' ? 100 : undefined}
+                      precision={formData.discountType === 'FIXED' ? 2 : 0}
+                    >
+                      <NumberInputField />
+                    </NumberInput>
+                    <FormErrorMessage>{formErrors.discountValue}</FormErrorMessage>
+                  </FormControl>
+                </>
+              )}
+
+              {/* Campos para cupons de TRIAL_UPGRADE */}
+              {formData.purpose === 'TRIAL_UPGRADE' && (
+                <FormControl isInvalid={!!formErrors.durationDays}>
+                  <FormLabel>Duração (dias) *</FormLabel>
+                  <NumberInput
+                    value={formData.durationDays || ''}
+                    onChange={(_, val) => setFormData({ ...formData, durationDays: val || null })}
+                    min={1}
+                    max={60}
+                  >
+                    <NumberInputField placeholder="Ex: 7" />
+                  </NumberInput>
+                  <FormHelperText>
+                    Quantos dias o usuário terá acesso premium (1-60 dias)
+                  </FormHelperText>
+                  <FormErrorMessage>{formErrors.durationDays}</FormErrorMessage>
+                </FormControl>
+              )}
 
               <FormControl>
                 <FormLabel>Plano Aplicável</FormLabel>

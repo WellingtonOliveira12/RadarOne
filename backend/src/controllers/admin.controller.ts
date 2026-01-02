@@ -2331,8 +2331,10 @@ export class AdminController {
       const {
         code,
         description,
+        purpose, // FASE: Cupons de Upgrade
         discountType,
         discountValue,
+        durationDays, // FASE: Cupons de Upgrade
         maxUses,
         expiresAt,
         appliesToPlanId
@@ -2341,11 +2343,29 @@ export class AdminController {
       const adminId = req.userId;
       const admin = await prisma.user.findUnique({ where: { id: adminId! } });
 
+      // Determinar purpose (default = DISCOUNT para backwards compatibility)
+      const couponPurpose = purpose || 'DISCOUNT';
+
       // Validações
-      if (!code || !discountType || discountValue === undefined) {
+      if (!code) {
         return res.status(400).json({
-          error: 'Campos obrigatórios: code, discountType, discountValue'
+          error: 'Campo obrigatório: code'
         });
+      }
+
+      // Validações específicas por tipo de cupom
+      if (couponPurpose === 'DISCOUNT') {
+        if (!discountType || discountValue === undefined) {
+          return res.status(400).json({
+            error: 'Cupom de desconto requer: discountType, discountValue'
+          });
+        }
+      } else if (couponPurpose === 'TRIAL_UPGRADE') {
+        if (!durationDays || durationDays < 1 || durationDays > 60) {
+          return res.status(400).json({
+            error: 'Cupom de trial upgrade requer durationDays entre 1 e 60'
+          });
+        }
       }
 
       // Code deve ser uppercase e sem espaços
@@ -2357,17 +2377,19 @@ export class AdminController {
         });
       }
 
-      // Validar discountValue
-      if (discountValue <= 0) {
-        return res.status(400).json({
-          error: 'Valor de desconto deve ser maior que 0'
-        });
-      }
+      // Validar discountValue (apenas para cupons de desconto)
+      if (couponPurpose === 'DISCOUNT') {
+        if (discountValue <= 0) {
+          return res.status(400).json({
+            error: 'Valor de desconto deve ser maior que 0'
+          });
+        }
 
-      if (discountType === 'PERCENTAGE' && discountValue > 100) {
-        return res.status(400).json({
-          error: 'Desconto percentual não pode ser maior que 100%'
-        });
+        if (discountType === 'PERCENTAGE' && discountValue > 100) {
+          return res.status(400).json({
+            error: 'Desconto percentual não pode ser maior que 100%'
+          });
+        }
       }
 
       // Verificar se código já existe
@@ -2406,8 +2428,10 @@ export class AdminController {
         data: {
           code: normalizedCode,
           description: description || null,
-          discountType,
-          discountValue,
+          purpose: couponPurpose, // FASE: Cupons de Upgrade
+          discountType: couponPurpose === 'DISCOUNT' ? discountType : 'FIXED', // Default se não aplicável
+          discountValue: couponPurpose === 'DISCOUNT' ? discountValue : 0, // Default se não aplicável
+          durationDays: couponPurpose === 'TRIAL_UPGRADE' ? durationDays : null, // FASE: Cupons de Upgrade
           maxUses: maxUses || null,
           expiresAt: expiresAt ? new Date(expiresAt) : null,
           appliesToPlanId: appliesToPlanId || null,
@@ -2455,8 +2479,10 @@ export class AdminController {
       const { id } = req.params;
       const {
         description,
+        purpose, // FASE: Cupons de Upgrade
         discountType,
         discountValue,
+        durationDays, // FASE: Cupons de Upgrade
         maxUses,
         expiresAt,
         appliesToPlanId
@@ -2474,17 +2500,28 @@ export class AdminController {
         return res.status(404).json({ error: 'Cupom não encontrado' });
       }
 
-      // Validações
-      if (discountValue !== undefined && discountValue <= 0) {
-        return res.status(400).json({
-          error: 'Valor de desconto deve ser maior que 0'
-        });
-      }
+      // Determinar purpose a ser usado (do req ou do existente)
+      const couponPurpose = purpose !== undefined ? purpose : existing.purpose || 'DISCOUNT';
 
-      if (discountType === 'PERCENTAGE' && discountValue > 100) {
-        return res.status(400).json({
-          error: 'Desconto percentual não pode ser maior que 100%'
-        });
+      // Validações específicas por tipo de cupom
+      if (couponPurpose === 'DISCOUNT') {
+        if (discountValue !== undefined && discountValue <= 0) {
+          return res.status(400).json({
+            error: 'Valor de desconto deve ser maior que 0'
+          });
+        }
+
+        if (discountType === 'PERCENTAGE' && discountValue > 100) {
+          return res.status(400).json({
+            error: 'Desconto percentual não pode ser maior que 100%'
+          });
+        }
+      } else if (couponPurpose === 'TRIAL_UPGRADE') {
+        if (durationDays !== undefined && (durationDays < 1 || durationDays > 60)) {
+          return res.status(400).json({
+            error: 'Duração deve estar entre 1 e 60 dias'
+          });
+        }
       }
 
       // Validar plano se especificado
@@ -2512,8 +2549,10 @@ export class AdminController {
         where: { id },
         data: {
           description: description !== undefined ? description : existing.description,
+          purpose: purpose !== undefined ? purpose : existing.purpose, // FASE: Cupons de Upgrade
           discountType: discountType || existing.discountType,
           discountValue: discountValue !== undefined ? discountValue : existing.discountValue,
+          durationDays: durationDays !== undefined ? durationDays : existing.durationDays, // FASE: Cupons de Upgrade
           maxUses: maxUses !== undefined ? maxUses : existing.maxUses,
           expiresAt: expiresAt !== undefined ? (expiresAt ? new Date(expiresAt) : null) : existing.expiresAt,
           appliesToPlanId: appliesToPlanId !== undefined ? appliesToPlanId : existing.appliesToPlanId
