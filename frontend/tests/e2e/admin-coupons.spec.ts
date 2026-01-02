@@ -372,4 +372,200 @@ test.describe('Admin Coupons Management', () => {
     // Verificar que chegou na página correta
     expect(page.url()).toContain('/admin/stats');
   });
+
+  // ============================================
+  // TESTES DE BULK OPERATIONS
+  // ============================================
+
+  test('deve selecionar todos os cupons com checkbox "Selecionar Todos"', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    // Aguardar tabela carregar
+    await page.waitForSelector('table', { timeout: 10000 });
+
+    // Verificar se há cupons na página
+    const rowCount = await page.locator('table tbody tr').count();
+
+    if (rowCount > 0) {
+      // Clicar no checkbox "Selecionar Todos" no header da tabela
+      const selectAllCheckbox = page.locator('table thead th').first().locator('input[type="checkbox"]');
+      await selectAllCheckbox.click();
+
+      // Verificar se a barra de ações em lote apareceu
+      await expect(page.locator('text=/cupom.*selecionado/i')).toBeVisible({ timeout: 5000 });
+
+      // Verificar se todos os checkboxes individuais foram marcados
+      const checkedCount = await page.locator('table tbody td input[type="checkbox"]:checked').count();
+      expect(checkedCount).toBe(rowCount);
+    }
+  });
+
+  test('deve ativar múltiplos cupons em lote', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+
+    // Primeiro criar 2 cupons de teste para ativar
+    await page.goto('/admin/coupons');
+    const uniqueSuffix = Date.now().toString().slice(-6);
+
+    // Criar cupom 1
+    await page.click('button:has-text("Novo Cupom")');
+    await page.fill('input[placeholder*="PROMO"]', `BULK1${uniqueSuffix}`);
+    await page.fill('input[placeholder*="Descrição"]', 'Bulk Test 1');
+    await page.fill('input[type="number"]', '15');
+    await page.click('button:has-text("Criar Cupom")');
+    await expect(page.locator('text=/criado com sucesso/i')).toBeVisible({ timeout: 5000 });
+
+    // Criar cupom 2
+    await page.click('button:has-text("Novo Cupom")');
+    await page.fill('input[placeholder*="PROMO"]', `BULK2${uniqueSuffix}`);
+    await page.fill('input[placeholder*="Descrição"]', 'Bulk Test 2');
+    await page.fill('input[type="number"]', '20');
+    await page.click('button:has-text("Criar Cupom")');
+    await expect(page.locator('text=/criado com sucesso/i')).toBeVisible({ timeout: 5000 });
+
+    await page.waitForTimeout(1000);
+
+    // Recarregar para ver os cupons
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Selecionar os 2 cupons criados
+    const bulk1Row = page.locator(`tr:has-text("BULK1${uniqueSuffix}")`);
+    const bulk2Row = page.locator(`tr:has-text("BULK2${uniqueSuffix}")`);
+
+    await bulk1Row.locator('input[type="checkbox"]').click();
+    await bulk2Row.locator('input[type="checkbox"]').click();
+
+    // Verificar barra de ações
+    await expect(page.locator('text=/2 cupom.*selecionado/i')).toBeVisible();
+
+    // Clicar em "Ativar Selecionados"
+    await page.click('button:has-text("Ativar Selecionados")');
+
+    // Aguardar toast de sucesso
+    await expect(page.locator('text=/ativado.*com sucesso/i')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('deve desativar múltiplos cupons em lote', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    // Aguardar tabela carregar
+    await page.waitForSelector('table', { timeout: 10000 });
+
+    // Verificar se há cupons ativos
+    const activeCouponRows = page.locator('tr:has(span:text("Ativo"))');
+    const activeCount = await activeCouponRows.count();
+
+    if (activeCount >= 2) {
+      // Selecionar os 2 primeiros cupons ativos
+      await activeCouponRows.nth(0).locator('input[type="checkbox"]').click();
+      await activeCouponRows.nth(1).locator('input[type="checkbox"]').click();
+
+      // Verificar barra de ações
+      await expect(page.locator('text=/2 cupom.*selecionado/i')).toBeVisible();
+
+      // Clicar em "Desativar Selecionados"
+      await page.click('button:has-text("Desativar Selecionados")');
+
+      // Aguardar toast de sucesso
+      await expect(page.locator('text=/desativado.*com sucesso/i')).toBeVisible({ timeout: 5000 });
+    }
+  });
+
+  test('deve deletar múltiplos cupons em lote (com confirmação)', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+
+    // Criar 2 cupons para deletar
+    await page.goto('/admin/coupons');
+    const uniqueSuffix = Date.now().toString().slice(-6);
+
+    // Criar cupom 1
+    await page.click('button:has-text("Novo Cupom")');
+    await page.fill('input[placeholder*="PROMO"]', `DEL1${uniqueSuffix}`);
+    await page.fill('input[placeholder*="Descrição"]', 'Delete Test 1');
+    await page.fill('input[type="number"]', '5');
+    await page.click('button:has-text("Criar Cupom")');
+    await expect(page.locator('text=/criado com sucesso/i')).toBeVisible({ timeout: 5000 });
+
+    // Criar cupom 2
+    await page.click('button:has-text("Novo Cupom")');
+    await page.fill('input[placeholder*="PROMO"]', `DEL2${uniqueSuffix}`);
+    await page.fill('input[placeholder*="Descrição"]', 'Delete Test 2');
+    await page.fill('input[type="number"]', '10');
+    await page.click('button:has-text("Criar Cupom")');
+    await expect(page.locator('text=/criado com sucesso/i')).toBeVisible({ timeout: 5000 });
+
+    await page.waitForTimeout(1000);
+
+    // Recarregar para ver os cupons
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Selecionar os 2 cupons criados
+    const del1Row = page.locator(`tr:has-text("DEL1${uniqueSuffix}")`);
+    const del2Row = page.locator(`tr:has-text("DEL2${uniqueSuffix}")`);
+
+    await del1Row.locator('input[type="checkbox"]').click();
+    await del2Row.locator('input[type="checkbox"]').click();
+
+    // Verificar barra de ações
+    await expect(page.locator('text=/2 cupom.*selecionado/i')).toBeVisible();
+
+    // Configurar handler para o dialog de confirmação
+    page.once('dialog', async dialog => {
+      expect(dialog.type()).toBe('confirm');
+      expect(dialog.message()).toContain('2 cupom');
+      await dialog.accept(); // Confirmar deleção
+    });
+
+    // Clicar em "Deletar Selecionados"
+    await page.click('button:has-text("Deletar Selecionados")');
+
+    // Aguardar toast de sucesso
+    await expect(page.locator('text=/concluída/i, text=/deletad/i')).toBeVisible({ timeout: 5000 });
+
+    // Recarregar e verificar que cupons foram removidos/desativados
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Cupons devem ter sido deletados (hard delete) pois não tinham usos
+    const stillExists1 = await page.locator(`text=DEL1${uniqueSuffix}`).count();
+    const stillExists2 = await page.locator(`text=DEL2${uniqueSuffix}`).count();
+
+    // Ambos devem ter sido deletados (count = 0)
+    expect(stillExists1 + stillExists2).toBe(0);
+  });
+
+  test('deve limpar seleção ao clicar em "Limpar Seleção"', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    // Aguardar tabela carregar
+    await page.waitForSelector('table', { timeout: 10000 });
+
+    const rowCount = await page.locator('table tbody tr').count();
+
+    if (rowCount > 0) {
+      // Selecionar primeiro cupom
+      await page.locator('table tbody tr').first().locator('input[type="checkbox"]').click();
+
+      // Verificar que barra de ações apareceu
+      await expect(page.locator('text=/cupom.*selecionado/i')).toBeVisible();
+
+      // Clicar em "Limpar Seleção"
+      await page.click('button:has-text("Limpar Seleção")');
+
+      // Barra de ações deve desaparecer
+      await expect(page.locator('text=/cupom.*selecionado/i')).not.toBeVisible();
+
+      // Checkbox deve estar desmarcado
+      const isChecked = await page.locator('table tbody tr').first().locator('input[type="checkbox"]').isChecked();
+      expect(isChecked).toBe(false);
+    }
+  });
 });
