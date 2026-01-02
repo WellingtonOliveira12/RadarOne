@@ -101,6 +101,66 @@ export async function sendAlertEmail(to: string, adTitle: string, adUrl: string,
 }
 
 /**
+ * FASE: Cupons de Upgrade
+ * Envia email de notificação quando trial upgrade está expirando
+ */
+export async function sendTrialUpgradeExpiringEmail(
+  to: string,
+  planName: string,
+  daysRemaining: number,
+  expiresAt: Date
+): Promise<{ success: boolean; error?: string }> {
+  const subject = `⏰ Seu acesso premium ao ${planName} expira em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}`;
+
+  const formattedDate = expiresAt.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #1f2937;">⏰ Seu acesso premium está expirando!</h2>
+
+      <p>Olá,</p>
+
+      <p>Seu acesso premium ao plano <strong>${planName}</strong> (concedido via cupom de upgrade) irá expirar em breve:</p>
+
+      <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        <p style="margin: 0; color: #92400e; font-size: 16px; font-weight: 600;">
+          ⚠️ Expira em: ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}
+        </p>
+        <p style="margin: 8px 0 0 0; color: #78350f; font-size: 14px;">
+          Data: ${formattedDate}
+        </p>
+      </div>
+
+      <p>Para continuar aproveitando todos os recursos premium, considere assinar um plano:</p>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${process.env.FRONTEND_URL || 'https://radarone.com'}/plans"
+           style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">
+          Ver Planos e Preços
+        </a>
+      </div>
+
+      <p style="color: #6b7280; font-size: 14px;">
+        Após a expiração, você será movido para o plano gratuito, mas pode voltar a assinar a qualquer momento!
+      </p>
+
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+
+      <p style="color: #9ca3af; font-size: 12px;">
+        Este email foi enviado automaticamente pelo RadarOne.<br />
+        Não deseja receber essas notificações? <a href="${process.env.FRONTEND_URL || 'https://radarone.com'}/settings/notifications">Gerencie suas preferências</a>.
+      </p>
+    </div>
+  `;
+
+  return sendEmail({ to, subject, html });
+}
+
+/**
  * Envia email de boas-vindas
  */
 export async function sendWelcomeEmail(to: string, name: string): Promise<{ success: boolean; error?: string }> {

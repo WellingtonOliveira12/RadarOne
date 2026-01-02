@@ -3,6 +3,7 @@ import { checkTrialExpiring } from './checkTrialExpiring';
 import { checkSubscriptionExpired } from './checkSubscriptionExpired';
 import { resetMonthlyQueries } from './resetMonthlyQueries';
 import { checkCouponAlerts } from './checkCouponAlerts';
+import { checkTrialUpgradeExpiring } from './checkTrialUpgradeExpiring'; // FASE: Cupons de Upgrade
 
 /**
  * Scheduler de Jobs Automáticos
@@ -97,11 +98,31 @@ export function startScheduler() {
     timezone: 'America/Sao_Paulo'
   });
 
+  // ============================================
+  // JOB 5: FASE - Verificar trial upgrades expirando
+  // ============================================
+  // Executa diariamente às 12h
+  // - Verifica subscriptions TRIAL criadas por cupons
+  // - Notifica usuários que têm trial upgrade expirando em 1, 3 ou 7 dias
+  // - Envia emails de lembrete para incentivar assinatura
+  cron.schedule('0 12 * * *', async () => {
+    console.log('[SCHEDULER] ⏰ Executando checkTrialUpgradeExpiring...');
+    try {
+      await checkTrialUpgradeExpiring();
+      console.log('[SCHEDULER] ✅ checkTrialUpgradeExpiring executado com sucesso');
+    } catch (error) {
+      console.error('[SCHEDULER] ❌ Erro ao executar checkTrialUpgradeExpiring:', error);
+    }
+  }, {
+    timezone: 'America/Sao_Paulo'
+  });
+
   console.log('[SCHEDULER] ✅ Jobs agendados:');
   console.log('[SCHEDULER]    📧 checkTrialExpiring - Diariamente às 9h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    💳 checkSubscriptionExpired - Diariamente às 10h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    🔄 resetMonthlyQueries - Mensalmente no dia 1 às 3h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    🎟️  checkCouponAlerts - Diariamente às 11h (America/Sao_Paulo)');
+  console.log('[SCHEDULER]    ⏰ checkTrialUpgradeExpiring - Diariamente às 12h (America/Sao_Paulo)');
 }
 
 /**
@@ -146,11 +167,19 @@ export async function runJobsNow() {
   }
 
   try {
-    console.log('[SCHEDULER] 4/4 Executando checkCouponAlerts...');
+    console.log('[SCHEDULER] 4/5 Executando checkCouponAlerts...');
     await checkCouponAlerts();
     console.log('[SCHEDULER] ✅ checkCouponAlerts OK');
   } catch (error) {
     console.error('[SCHEDULER] ❌ Erro checkCouponAlerts:', error);
+  }
+
+  try {
+    console.log('[SCHEDULER] 5/5 Executando checkTrialUpgradeExpiring...');
+    await checkTrialUpgradeExpiring();
+    console.log('[SCHEDULER] ✅ checkTrialUpgradeExpiring OK');
+  } catch (error) {
+    console.error('[SCHEDULER] ❌ Erro checkTrialUpgradeExpiring:', error);
   }
 
   console.log('[SCHEDULER] 🎉 Todos os jobs executados');
