@@ -820,6 +820,174 @@ export const AdminCouponsPage: React.FC = () => {
 
         {/* Analytics em Tempo Real - Novo Dashboard */}
         {showAnalytics && <CouponAnalytics />}
+                      {analytics.stats.activeCoupons}
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="200px" bg="white" borderLeft="4px solid" borderLeftColor="gray.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Cupons Inativos
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="gray.600">
+                      {analytics.stats.inactiveCoupons}
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="200px" bg="white" borderLeft="4px solid" borderLeftColor="orange.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Expirando em Breve
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="orange.600">
+                      {analytics.stats.expiringSoon}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Próximos 7 dias
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="200px" bg="white" borderLeft="4px solid" borderLeftColor="red.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Próximos do Limite
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="red.600">
+                      {analytics.stats.nearLimit}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      {'>'} 80% do maxUses
+                    </Text>
+                  </CardBody>
+                </Card>
+              </HStack>
+
+              {/* Purpose Cards - Linha 3 */}
+              <HStack spacing={4} mb={6} flexWrap="wrap">
+                <Card flex="1" minW="250px" bg="white" borderLeft="4px solid" borderLeftColor="blue.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Cupons de Desconto
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="blue.600">
+                      {analytics.stats.discountCoupons}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Aplicados no checkout
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="250px" bg="white" borderLeft="4px solid" borderLeftColor="purple.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Cupons de Trial Upgrade
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="purple.600">
+                      {analytics.stats.trialUpgradeCoupons}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Upgrades temporários
+                    </Text>
+                  </CardBody>
+                </Card>
+
+                <Card flex="1" minW="250px" bg="white" borderLeft="4px solid" borderLeftColor="cyan.400">
+                  <CardBody>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      Total de Dias Concedidos
+                    </Text>
+                    <Text fontSize="3xl" fontWeight="bold" color="cyan.600">
+                      {analytics.stats.totalTrialDaysGranted}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Em trial upgrades
+                    </Text>
+                  </CardBody>
+                </Card>
+              </HStack>
+
+              {/* Top Coupons */}
+              {analytics.topCoupons.length > 0 && (
+                <Box>
+                  <Heading size="sm" mb={3} color="blue.700">
+                    🏆 Top 10 Cupons Mais Usados
+                  </Heading>
+                  <Card bg="white">
+                    <CardBody p={0}>
+                      <Table size="sm">
+                        <Thead>
+                          <Tr>
+                            <Th>Posição</Th>
+                            <Th>Código</Th>
+                            <Th>Tipo</Th>
+                            <Th>Valor</Th>
+                            <Th isNumeric>Usos</Th>
+                          </Tr>
+                        </Thead>
+                        <Tbody>
+                          {analytics.topCoupons.map((coupon, idx) => (
+                            <Tr key={coupon.code}>
+                              <Td fontWeight="bold">#{idx + 1}</Td>
+                              <Td>
+                                <Badge colorScheme="blue" fontSize="sm">
+                                  {coupon.code}
+                                </Badge>
+                              </Td>
+                              <Td>
+                                <Badge
+                                  colorScheme={coupon.type === 'PERCENTAGE' ? 'purple' : 'green'}
+                                  variant="outline"
+                                >
+                                  {coupon.type === 'PERCENTAGE' ? 'Percentual' : 'Fixo'}
+                                </Badge>
+                              </Td>
+                              <Td>
+                                {coupon.type === 'PERCENTAGE'
+                                  ? `${coupon.value}%`
+                                  : `R$ ${(coupon.value / 100).toFixed(2)}`}
+                              </Td>
+                              <Td isNumeric fontWeight="bold" color="green.600">
+                                {coupon.count}
+                              </Td>
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                    </CardBody>
+                  </Card>
+                </Box>
+              )}
+
+              {/* Type Distribution */}
+              {analytics.typeDistribution.length > 0 && (
+                <Box mt={4}>
+                  <Heading size="sm" mb={3} color="blue.700">
+                    📈 Distribuição por Tipo
+                  </Heading>
+                  <HStack spacing={4}>
+                    {analytics.typeDistribution.map((dist) => (
+                      <Card key={dist.type} bg="white" flex="1">
+                        <CardBody>
+                          <Text fontSize="sm" color="gray.600" mb={1}>
+                            {dist.type === 'PERCENTAGE' ? 'Percentual' : 'Fixo'}
+                          </Text>
+                          <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+                            {dist.count} usos
+                          </Text>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </HStack>
+                </Box>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
         {/* Filters */}
         <Card>
           <CardBody>

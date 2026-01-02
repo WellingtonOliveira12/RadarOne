@@ -255,21 +255,38 @@ model CouponUsage {
 
 // Rastreamento de cupons validados (para analytics e notificações de abandono)
 model CouponValidation {
-  id        String   @id @default(cuid())
-  couponId  String   @map("coupon_id")
-  userId    String?  @map("user_id") // Nullable para usuários não logados
-  userEmail String?  @map("user_email") // Email para envio de notificação
-  purpose   String   // DISCOUNT ou TRIAL_UPGRADE
-  location  String   // plans_page, checkout, etc
-  converted Boolean  @default(false) // True se o cupom foi usado (checkout completado)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                   String    @id @default(cuid())
+  couponId             String    @map("coupon_id")
+  userId               String?   @map("user_id") // Nullable para usuários não logados
+  userEmail            String?   @map("user_email") // Email para envio de notificação
+  purpose              String    // DISCOUNT ou TRIAL_UPGRADE
+  location             String    // plans_page, checkout, etc
+  converted            Boolean   @default(false) // True se o cupom foi usado (checkout completado)
+  reminderSentAt       DateTime? @map("reminder_sent_at") // Quando 1º email foi enviado (24h)
+  secondReminderSentAt DateTime? @map("second_reminder_sent_at") // Quando 2º email foi enviado (48h)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   @@index([couponId])
   @@index([userId])
   @@index([converted])
   @@index([createdAt])
+  @@index([reminderSentAt])
   @@map("coupon_validations")
+}
+
+// Subscrições de Push Notification (Web Push API)
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  endpoint   String   @unique // URL do push service
+  p256dh     String   // Chave pública para criptografia
+  auth       String   // Chave de autenticação
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 // ============================================

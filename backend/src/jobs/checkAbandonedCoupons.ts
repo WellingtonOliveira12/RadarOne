@@ -1,10 +1,11 @@
 import { prisma } from '../server';
 import { sendAbandonedCouponEmail } from '../services/emailService';
+import { sendAbandonedCouponPush } from '../services/pushService';
 import { captureJobException } from '../monitoring/sentry';
 import { retryAsync } from '../utils/retry';
 
 /**
- * Job: Verificar cupons validados mas não utilizados (abandono)
+ * Job: Verificar cupons validados mas não utilizados (abandono) - RETARGETING AVANÇADO
  *
  * COMO EXECUTAR:
  * - Manualmente: npx ts-node src/jobs/checkAbandonedCoupons.ts
@@ -12,46 +13,46 @@ import { retryAsync } from '../utils/retry';
  * - Possui retry automático em caso de falhas transientes
  *
  * FUNCIONALIDADE:
- * - Busca cupons DISCOUNT validados há 24h que não foram convertidos
- * - Envia email de lembrete com link direto para checkout
- * - Evita enviar múltiplos emails (controle por data)
+ * - 1º EMAIL: Busca cupons DISCOUNT validados há 24h+ que não foram convertidos e não receberam email
+ * - 2º EMAIL: Busca cupons validados há 48h+ que receberam 1º email mas ainda não converteram
+ * - Controle de envio via campos reminderSentAt e secondReminderSentAt
+ * - Link direto para checkout com cupom pré-aplicado
  */
 
-const HOURS_BEFORE_REMINDER = 24; // Aguardar 24h antes de enviar lembrete
+const HOURS_BEFORE_FIRST_REMINDER = 24; // 1º lembrete após 24h
+const HOURS_BEFORE_SECOND_REMINDER = 48; // 2º lembrete após 48h
 
 async function checkAbandonedCoupons() {
-  console.log('[JOB] 🎫 Verificando cupons abandonados...');
+  console.log('[JOB] 🎫 Verificando cupons abandonados (retargeting avançado)...');
 
   try {
     await retryAsync(async () => {
       const now = new Date();
-      const reminderThreshold = new Date();
-      reminderThreshold.setHours(now.getHours() - HOURS_BEFORE_REMINDER);
+      const firstReminderThreshold = new Date(now.getTime() - HOURS_BEFORE_FIRST_REMINDER * 60 * 60 * 1000);
+      const secondReminderThreshold = new Date(now.getTime() - HOURS_BEFORE_SECOND_REMINDER * 60 * 60 * 1000);
 
-      // Buscar validações de cupons DISCOUNT não convertidas
-      const abandonedValidations = await prisma.couponValidation.findMany({
+      // ========== ETAPA 1: PRIMEIRO EMAIL (24h) ==========
+      const firstReminderCandidates = await prisma.couponValidation.findMany({
         where: {
           purpose: 'DISCOUNT',
           converted: false,
+          reminderSentAt: null, // Ainda não recebeu 1º email
           createdAt: {
-            gte: new Date(now.getTime() - 48 * 60 * 60 * 1000), // Últimas 48h
-            lte: reminderThreshold, // Mas criadas há mais de 24h
+            lte: firstReminderThreshold, // Criado há mais de 24h
           },
         },
       });
 
-      console.log(`[JOB] 📧 ${abandonedValidations.length} cupons abandonados encontrados`);
+      console.log(`[JOB] 📧 ${firstReminderCandidates.length} candidatos para 1º email (24h)`);
 
-      // Buscar dados do cupom para cada validação
-      for (const validation of abandonedValidations) {
+      for (const validation of firstReminderCandidates) {
         try {
-          // Buscar cupom
           const coupon = await prisma.coupon.findUnique({
             where: { id: validation.couponId },
           });
 
           if (!coupon || !coupon.isActive) {
-            console.log(`[JOB] ⏭️  Cupom ${validation.couponId} inativo ou deletado - pulando`);
+            console.log(`[JOB] ⏭️  Cupom ${validation.couponId} inativo - pulando`);
             continue;
           }
 
@@ -59,7 +60,6 @@ async function checkAbandonedCoupons() {
           let recipientEmail = validation.userEmail;
           let recipientName = 'Usuário';
 
-          // Se tem userId, buscar dados do usuário
           if (validation.userId) {
             const user = await prisma.user.findUnique({
               where: { id: validation.userId },
@@ -77,33 +77,126 @@ async function checkAbandonedCoupons() {
             continue;
           }
 
-          // Verificar se já enviamos email para essa validação
-          // (para evitar spam caso o job rode múltiplas vezes)
-          if (validation.updatedAt.getTime() !== validation.createdAt.getTime()) {
-            console.log(`[JOB] ⏭️  Email já enviado para ${recipientEmail} - pulando`);
-            continue;
-          }
+          // Calcular valor do desconto formatado
+          const discountText = coupon.discountType === 'PERCENTAGE'
+            ? `${coupon.discountValue}%`
+            : `R$ ${(coupon.discountValue / 100).toFixed(2)}`;
 
-          // Enviar email de lembrete
+          // Enviar 1º email
           await sendAbandonedCouponEmail(
             recipientEmail,
             recipientName,
             coupon.code,
-            coupon.discountType === 'PERCENTAGE'
-              ? `${coupon.discountValue}%`
-              : `R$ ${(coupon.discountValue / 100).toFixed(2)}`,
-            coupon.description || 'Desconto especial'
+            discountText,
+            coupon.description || 'Desconto especial',
+            false // primeiro email
           );
 
-          // Atualizar updatedAt para marcar que email foi enviado
+          // Enviar push notification se usuário tem userId
+          if (validation.userId) {
+            await sendAbandonedCouponPush(
+              validation.userId,
+              coupon.code,
+              discountText,
+              false // primeiro lembrete
+            );
+            console.log(`[JOB] 📱 Push enviado para userId ${validation.userId}`);
+          }
+
+          // Marcar reminderSentAt
           await prisma.couponValidation.update({
             where: { id: validation.id },
-            data: { updatedAt: new Date() },
+            data: { reminderSentAt: new Date() },
           });
 
-          console.log(`[JOB] ✅ Email de cupom abandonado enviado para ${recipientEmail}`);
+          console.log(`[JOB] ✅ 1º email enviado para ${recipientEmail} (cupom: ${coupon.code})`);
         } catch (err) {
-          console.error(`[JOB] ❌ Erro ao processar validação ${validation.id}:`, err);
+          console.error(`[JOB] ❌ Erro ao processar 1º email validação ${validation.id}:`, err);
+        }
+      }
+
+      // ========== ETAPA 2: SEGUNDO EMAIL (48h) ==========
+      const secondReminderCandidates = await prisma.couponValidation.findMany({
+        where: {
+          purpose: 'DISCOUNT',
+          converted: false,
+          reminderSentAt: { not: null }, // Já recebeu 1º email
+          secondReminderSentAt: null, // Ainda não recebeu 2º email
+          createdAt: {
+            lte: secondReminderThreshold, // Criado há mais de 48h
+          },
+        },
+      });
+
+      console.log(`[JOB] 📧 ${secondReminderCandidates.length} candidatos para 2º email (48h)`);
+
+      for (const validation of secondReminderCandidates) {
+        try {
+          const coupon = await prisma.coupon.findUnique({
+            where: { id: validation.couponId },
+          });
+
+          if (!coupon || !coupon.isActive) {
+            console.log(`[JOB] ⏭️  Cupom ${validation.couponId} inativo - pulando`);
+            continue;
+          }
+
+          // Determinar email e nome
+          let recipientEmail = validation.userEmail;
+          let recipientName = 'Usuário';
+
+          if (validation.userId) {
+            const user = await prisma.user.findUnique({
+              where: { id: validation.userId },
+              select: { email: true, name: true },
+            });
+
+            if (user) {
+              recipientEmail = user.email;
+              recipientName = user.name || 'Usuário';
+            }
+          }
+
+          if (!recipientEmail) {
+            console.log(`[JOB] ⚠️  Validação ${validation.id} sem email - pulando`);
+            continue;
+          }
+
+          // Calcular valor do desconto formatado
+          const discountText = coupon.discountType === 'PERCENTAGE'
+            ? `${coupon.discountValue}%`
+            : `R$ ${(coupon.discountValue / 100).toFixed(2)}`;
+
+          // Enviar 2º email (mais urgente)
+          await sendAbandonedCouponEmail(
+            recipientEmail,
+            recipientName,
+            coupon.code,
+            discountText,
+            coupon.description || 'Desconto especial',
+            true // segundo email (urgente)
+          );
+
+          // Enviar push notification se usuário tem userId
+          if (validation.userId) {
+            await sendAbandonedCouponPush(
+              validation.userId,
+              coupon.code,
+              discountText,
+              true // segundo lembrete (urgente)
+            );
+            console.log(`[JOB] 📱 Push de 2º lembrete enviado para userId ${validation.userId}`);
+          }
+
+          // Marcar secondReminderSentAt
+          await prisma.couponValidation.update({
+            where: { id: validation.id },
+            data: { secondReminderSentAt: new Date() },
+          });
+
+          console.log(`[JOB] ✅ 2º email enviado para ${recipientEmail} (cupom: ${coupon.code})`);
+        } catch (err) {
+          console.error(`[JOB] ❌ Erro ao processar 2º email validação ${validation.id}:`, err);
         }
       }
 

@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { renderTestEmailTemplate, renderNewAdEmailTemplate } from '../templates/email/baseTemplate';
+import { getEmailSubject, getSubjectTestKey } from '../utils/abtest';
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -200,16 +201,92 @@ export async function sendTrialExpiredEmail(to: string, name: string, planName: 
   return { success: true };
 }
 
+/**
+ * Determinar categoria do desconto para segmentação de email
+ */
+function getDiscountCategory(discountText: string): 'high' | 'medium' | 'standard' {
+  // Extrair valor numérico do desconto
+  const percentMatch = discountText.match(/(\d+)%/);
+  if (percentMatch) {
+    const percent = parseInt(percentMatch[1], 10);
+    if (percent >= 50) return 'high';
+    if (percent >= 20) return 'medium';
+  }
+  return 'standard';
+}
+
 export async function sendAbandonedCouponEmail(
   to: string,
   name: string,
   couponCode: string,
   discountText: string,
-  description: string
+  description: string,
+  isSecondReminder: boolean = false
 ): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] Enviando email de cupom abandonado', { to, couponCode });
+  console.log('[EmailService] Enviando email de cupom abandonado', {
+    to,
+    couponCode,
+    reminder: isSecondReminder ? '2º' : '1º',
+  });
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const category = getDiscountCategory(discountText);
+
+  // A/B Testing: Escolher subject line baseado em categoria e reminder
+  const subjectTestKey = getSubjectTestKey(category, isSecondReminder);
+  const { subject, variant } = getEmailSubject(subjectTestKey, couponCode, discountText);
+
+  console.log(`[EmailService] A/B Test Subject: ${subjectTestKey} = Variant ${variant}`);
+
+  // Mensagens personalizadas por categoria de desconto
+  const categoryMessages = {
+    high: {
+      highlight: '🔥 Desconto EXCLUSIVO!',
+      urgency: 'Este é um dos nossos maiores descontos. Não deixe passar!',
+    },
+    medium: {
+      highlight: '💎 Ótima Oportunidade!',
+      urgency: 'Aproveite este desconto especial enquanto é tempo!',
+    },
+    standard: {
+      highlight: '💰 Desconto Especial',
+      urgency: 'Economize na sua assinatura com este cupom exclusivo!',
+    },
+  };
+
+  const messages = categoryMessages[category];
+
+  // Templates diferentes para 1º e 2º email
+  const header = isSecondReminder
+    ? '⏰ Última Chance - Seu Cupom Expira em Breve!'
+    : `${messages.highlight} - Seu Cupom Está Esperando!`;
+
+  const greeting = isSecondReminder
+    ? `<p style="font-size: 16px; margin-bottom: 20px;">Olá <strong>${name}</strong>,</p>
+       <p style="font-size: 16px; margin-bottom: 20px;">
+         Esta é a sua <strong style="color: #dc2626;">última chance</strong>! Você validou o cupom
+         <strong style="color: #667eea; font-size: 18px;">${couponCode}</strong> mas ainda não finalizou sua assinatura.
+       </p>
+       <p style="font-size: 16px; margin-bottom: 20px; color: #dc2626;">
+         ⚠️ Cupons promocionais têm validade limitada e este pode expirar a qualquer momento!
+       </p>`
+    : `<p style="font-size: 16px; margin-bottom: 20px;">Olá <strong>${name}</strong>,</p>
+       <p style="font-size: 16px; margin-bottom: 20px;">
+         Notamos que você validou o cupom <strong style="color: #667eea; font-size: 18px;">${couponCode}</strong>
+         mas ainda não finalizou sua assinatura!
+       </p>`;
+
+  const cta = isSecondReminder
+    ? '🚀 Garantir Meu Desconto Agora'
+    : '✨ Escolher Meu Plano com Desconto';
+
+  const footer = isSecondReminder
+    ? `<p style="font-size: 14px; color: #dc2626; margin-top: 30px; font-weight: bold;">
+         ⏰ Este é o seu último lembrete. Não perca essa oportunidade!
+       </p>`
+    : `<p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
+         <strong>Dica:</strong> ${messages.urgency}
+       </p>`;
 
   const html = `
 <!DOCTYPE html>
@@ -217,39 +294,34 @@ export async function sendAbandonedCouponEmail(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Não esqueça seu cupom de desconto!</title>
+  <title>${header}</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 28px;">💰 Seu Cupom Está Esperando!</h1>
+  <div style="background: ${isSecondReminder ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">${header}</h1>
   </div>
 
   <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-    <p style="font-size: 16px; margin-bottom: 20px;">Olá <strong>${name}</strong>,</p>
+    ${greeting}
 
-    <p style="font-size: 16px; margin-bottom: 20px;">
-      Notamos que você validou o cupom <strong style="color: #667eea; font-size: 18px;">${couponCode}</strong> mas ainda não finalizou sua assinatura!
-    </p>
-
-    <div style="background: #f9fafb; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <div style="background: ${category === 'high' ? '#fef3c7' : '#f9fafb'}; border-left: 4px solid ${category === 'high' ? '#f59e0b' : '#10b981'}; padding: 20px; margin: 20px 0; border-radius: 5px;">
       <p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>${description}</strong></p>
-      <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #10b981;">${discountText} de desconto</p>
+      <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: ${category === 'high' ? '#f59e0b' : '#10b981'};">${discountText} de desconto</p>
+      ${category === 'high' ? '<p style="margin: 10px 0 0 0; font-size: 12px; color: #92400e; font-weight: bold;">⭐ DESCONTO MÁXIMO</p>' : ''}
     </div>
 
     <p style="font-size: 16px; margin-bottom: 25px;">
-      Não perca essa oportunidade! Escolha seu plano e economize com seu cupom exclusivo.
+      ${isSecondReminder ? 'Não deixe essa oportunidade passar! Finalize agora e aproveite seu desconto exclusivo.' : 'Não perca essa oportunidade! Escolha seu plano e economize com seu cupom exclusivo.'}
     </p>
 
     <div style="text-align: center; margin: 30px 0;">
       <a href="${frontendUrl}/plans?coupon=${couponCode}"
-         style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        Escolher Meu Plano com Desconto
+         style="display: inline-block; background: ${isSecondReminder ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        ${cta}
       </a>
     </div>
 
-    <p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
-      <strong>Dica:</strong> Cupons promocionais têm validade limitada. Aproveite agora!
-    </p>
+    ${footer}
 
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 
@@ -262,9 +334,10 @@ export async function sendAbandonedCouponEmail(
 </html>
   `.trim();
 
+  // Subject já foi definido via A/B test acima
   return sendEmail({
     to,
-    subject: `💰 Não esqueça seu cupom ${couponCode} - ${discountText} de desconto!`,
+    subject,
     html,
   });
 }

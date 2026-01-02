@@ -177,6 +177,111 @@ export class CouponController {
   }
 
   /**
+   * GET /api/coupons/analytics
+   * Retorna analytics de cupons em tempo real (admin only)
+   */
+  static async getCouponAnalytics(req: Request, res: Response): Promise<void> {
+    try {
+      const now = new Date();
+      const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      // 1. Total de cupons ativos
+      const totalActiveCoupons = await prisma.coupon.count({
+        where: { isActive: true }
+      });
+
+      // 2. Cupons por tipo (DISCOUNT vs TRIAL_UPGRADE)
+      const couponsByPurpose = await prisma.coupon.groupBy({
+        by: ['purpose'],
+        where: { isActive: true },
+        _count: true
+      });
+
+      // 3. Validações últimos 7 dias
+      const validationsLast7Days = await prisma.couponValidation.count({
+        where: {
+          createdAt: { gte: last7Days }
+        }
+      });
+
+      // 4. Taxa de conversão (validações → convertidas)
+      const totalValidations = await prisma.couponValidation.count();
+      const convertedValidations = await prisma.couponValidation.count({
+        where: { converted: true }
+      });
+      const conversionRate = totalValidations > 0
+        ? ((convertedValidations / totalValidations) * 100).toFixed(2)
+        : '0.00';
+
+      // 5. Cupons abandonados (últimas 24h)
+      const abandonedCoupons = await prisma.couponValidation.count({
+        where: {
+          converted: false,
+          createdAt: { gte: last24Hours }
+        }
+      });
+
+      // 6. Top 5 cupons mais validados
+      const topCoupons = await prisma.couponValidation.groupBy({
+        by: ['couponId'],
+        _count: true,
+        orderBy: {
+          _count: {
+            couponId: 'desc'
+          }
+        },
+        take: 5
+      });
+
+      // Buscar dados dos cupons top
+      const topCouponsWithData = await Promise.all(
+        topCoupons.map(async (item) => {
+          const coupon = await prisma.coupon.findUnique({
+            where: { id: item.couponId }
+          });
+          return {
+            code: coupon?.code || 'Deletado',
+            validations: item._count,
+            purpose: coupon?.purpose || 'UNKNOWN'
+          };
+        })
+      );
+
+      // 7. Validações por dia (últimos 7 dias)
+      const validationsByDay = await prisma.$queryRaw`
+        SELECT
+          DATE(created_at) as date,
+          COUNT(*)::int as count,
+          SUM(CASE WHEN converted = true THEN 1 ELSE 0 END)::int as converted
+        FROM coupon_validations
+        WHERE created_at >= ${last7Days}
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `;
+
+      res.json({
+        summary: {
+          totalActiveCoupons,
+          validationsLast7Days,
+          conversionRate: parseFloat(conversionRate),
+          abandonedCoupons,
+          couponsByPurpose: couponsByPurpose.map(g => ({
+            purpose: g.purpose || 'DISCOUNT',
+            count: g._count
+          }))
+        },
+        topCoupons: topCouponsWithData,
+        validationsByDay
+      });
+
+    } catch (error) {
+      console.error('Erro ao buscar analytics de cupons:', error);
+      res.status(500).json({ error: 'Erro ao buscar analytics' });
+    }
+  }
+
+  /**
    * POST /api/coupons/redeem-trial-upgrade
    * Resgata cupom de TRIAL_UPGRADE (libera plano premium por X dias)
    *
