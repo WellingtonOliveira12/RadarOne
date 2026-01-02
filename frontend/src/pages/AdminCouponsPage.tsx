@@ -37,6 +37,7 @@ import {
   NumberInput,
   NumberInputField,
   Tooltip,
+  Checkbox,
 } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
 import { api } from '../services/api';
@@ -86,6 +87,9 @@ export const AdminCouponsPage: React.FC = () => {
   const [filterCode, setFilterCode] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType] = useState('');
+
+  // Bulk Operations
+  const [selectedCouponIds, setSelectedCouponIds] = useState<Set<string>>(new Set());
 
   // Modals
   const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
@@ -405,6 +409,143 @@ export const AdminCouponsPage: React.FC = () => {
     }
   };
 
+  // Bulk Operations Handlers
+  const handleSelectAll = () => {
+    if (selectedCouponIds.size === coupons.length) {
+      // Deselect all
+      setSelectedCouponIds(new Set());
+    } else {
+      // Select all on current page
+      setSelectedCouponIds(new Set(coupons.map((c) => c.id)));
+    }
+  };
+
+  const handleSelectCoupon = (couponId: string) => {
+    const newSelected = new Set(selectedCouponIds);
+    if (newSelected.has(couponId)) {
+      newSelected.delete(couponId);
+    } else {
+      newSelected.add(couponId);
+    }
+    setSelectedCouponIds(newSelected);
+  };
+
+  const handleBulkActivate = async () => {
+    if (selectedCouponIds.size === 0) return;
+
+    try {
+      const token = getToken();
+      const couponIds = Array.from(selectedCouponIds);
+
+      await api.patch(
+        '/api/admin/coupons/bulk/toggle',
+        { couponIds, isActive: true },
+        token
+      );
+
+      toast({
+        title: `${selectedCouponIds.size} cupom(ns) ativado(s) com sucesso!`,
+        status: 'success',
+        duration: 3000,
+      });
+
+      setSelectedCouponIds(new Set());
+      loadCoupons();
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao ativar cupons',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (selectedCouponIds.size === 0) return;
+
+    try {
+      const token = getToken();
+      const couponIds = Array.from(selectedCouponIds);
+
+      await api.patch(
+        '/api/admin/coupons/bulk/toggle',
+        { couponIds, isActive: false },
+        token
+      );
+
+      toast({
+        title: `${selectedCouponIds.size} cupom(ns) desativado(s) com sucesso!`,
+        status: 'success',
+        duration: 3000,
+      });
+
+      setSelectedCouponIds(new Set());
+      loadCoupons();
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao desativar cupons',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCouponIds.size === 0) return;
+
+    if (
+      !confirm(
+        `Tem certeza que deseja deletar ${selectedCouponIds.size} cupom(ns)?\n\nCupons com histórico de uso serão apenas desativados.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const token = getToken();
+      const couponIds = Array.from(selectedCouponIds);
+
+      // Note: DELETE with body requires custom implementation
+      // Using fetch directly for DELETE with body
+      const result = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com'}/api/admin/coupons/bulk`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ couponIds }),
+        }
+      );
+
+      if (!result.ok) {
+        throw new Error('Erro ao deletar cupons');
+      }
+
+      const data = await result.json();
+
+      toast({
+        title: 'Operação concluída',
+        description: data.message || `${data.deleted} deletado(s), ${data.deactivated} desativado(s)`,
+        status: 'success',
+        duration: 5000,
+      });
+
+      setSelectedCouponIds(new Set());
+      loadCoupons();
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao deletar cupons',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
   return (
     <AdminLayout>
       <VStack spacing={6} align="stretch">
@@ -500,6 +641,49 @@ export const AdminCouponsPage: React.FC = () => {
           </CardBody>
         </Card>
 
+        {/* Bulk Actions Bar (appears when items are selected) */}
+        {selectedCouponIds.size > 0 && (
+          <Card bg="blue.50" borderColor="blue.300" borderWidth="2px">
+            <CardBody>
+              <HStack justify="space-between" flexWrap="wrap">
+                <Text fontWeight="bold" color="blue.800">
+                  {selectedCouponIds.size} cupom(ns) selecionado(s)
+                </Text>
+                <HStack spacing={2}>
+                  <Button
+                    size="sm"
+                    colorScheme="green"
+                    onClick={handleBulkActivate}
+                  >
+                    ✅ Ativar Selecionados
+                  </Button>
+                  <Button
+                    size="sm"
+                    colorScheme="gray"
+                    onClick={handleBulkDeactivate}
+                  >
+                    ⏸️ Desativar Selecionados
+                  </Button>
+                  <Button
+                    size="sm"
+                    colorScheme="red"
+                    onClick={handleBulkDelete}
+                  >
+                    🗑️ Deletar Selecionados
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedCouponIds(new Set())}
+                  >
+                    Limpar Seleção
+                  </Button>
+                </HStack>
+              </HStack>
+            </CardBody>
+          </Card>
+        )}
+
         {/* Coupons Table */}
         <Card>
           <CardBody>
@@ -512,6 +696,13 @@ export const AdminCouponsPage: React.FC = () => {
                 <Table variant="simple" size="sm">
                   <Thead>
                     <Tr>
+                      <Th>
+                        <Checkbox
+                          isChecked={coupons.length > 0 && selectedCouponIds.size === coupons.length}
+                          isIndeterminate={selectedCouponIds.size > 0 && selectedCouponIds.size < coupons.length}
+                          onChange={handleSelectAll}
+                        />
+                      </Th>
                       <Th>Código</Th>
                       <Th>Descrição</Th>
                       <Th>Tipo</Th>
@@ -526,13 +717,19 @@ export const AdminCouponsPage: React.FC = () => {
                   <Tbody>
                     {coupons.length === 0 ? (
                       <Tr>
-                        <Td colSpan={9} textAlign="center" py={8} color="gray.500">
+                        <Td colSpan={10} textAlign="center" py={8} color="gray.500">
                           Nenhum cupom encontrado
                         </Td>
                       </Tr>
                     ) : (
                       coupons.map((coupon) => (
                         <Tr key={coupon.id}>
+                          <Td>
+                            <Checkbox
+                              isChecked={selectedCouponIds.has(coupon.id)}
+                              onChange={() => handleSelectCoupon(coupon.id)}
+                            />
+                          </Td>
                           <Td fontWeight="bold">{coupon.code}</Td>
                           <Td maxW="200px" isTruncated>
                             {coupon.description || '-'}

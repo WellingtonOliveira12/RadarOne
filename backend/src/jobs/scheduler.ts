@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { checkTrialExpiring } from './checkTrialExpiring';
 import { checkSubscriptionExpired } from './checkSubscriptionExpired';
 import { resetMonthlyQueries } from './resetMonthlyQueries';
+import { checkCouponAlerts } from './checkCouponAlerts';
 
 /**
  * Scheduler de Jobs Automáticos
@@ -77,10 +78,30 @@ export function startScheduler() {
     timezone: 'America/Sao_Paulo'
   });
 
+  // ============================================
+  // JOB 4: Verificar cupons para alertas
+  // ============================================
+  // Executa diariamente às 11h
+  // - Verifica cupons expirando em 3 dias
+  // - Verifica cupons próximos do limite de usos (>80%)
+  // - Cria alertas automáticos no painel admin
+  cron.schedule('0 11 * * *', async () => {
+    console.log('[SCHEDULER] ⏰ Executando checkCouponAlerts...');
+    try {
+      await checkCouponAlerts();
+      console.log('[SCHEDULER] ✅ checkCouponAlerts executado com sucesso');
+    } catch (error) {
+      console.error('[SCHEDULER] ❌ Erro ao executar checkCouponAlerts:', error);
+    }
+  }, {
+    timezone: 'America/Sao_Paulo'
+  });
+
   console.log('[SCHEDULER] ✅ Jobs agendados:');
   console.log('[SCHEDULER]    📧 checkTrialExpiring - Diariamente às 9h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    💳 checkSubscriptionExpired - Diariamente às 10h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    🔄 resetMonthlyQueries - Mensalmente no dia 1 às 3h (America/Sao_Paulo)');
+  console.log('[SCHEDULER]    🎟️  checkCouponAlerts - Diariamente às 11h (America/Sao_Paulo)');
 }
 
 /**
@@ -117,11 +138,19 @@ export async function runJobsNow() {
   }
 
   try {
-    console.log('[SCHEDULER] 3/3 Executando resetMonthlyQueries...');
+    console.log('[SCHEDULER] 3/4 Executando resetMonthlyQueries...');
     await resetMonthlyQueries();
     console.log('[SCHEDULER] ✅ resetMonthlyQueries OK');
   } catch (error) {
     console.error('[SCHEDULER] ❌ Erro resetMonthlyQueries:', error);
+  }
+
+  try {
+    console.log('[SCHEDULER] 4/4 Executando checkCouponAlerts...');
+    await checkCouponAlerts();
+    console.log('[SCHEDULER] ✅ checkCouponAlerts OK');
+  } catch (error) {
+    console.error('[SCHEDULER] ❌ Erro checkCouponAlerts:', error);
   }
 
   console.log('[SCHEDULER] 🎉 Todos os jobs executados');
