@@ -394,7 +394,7 @@ export class SubscriptionController {
   static async createCheckout(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.userId;
-      const { planSlug } = req.body;
+      const { planSlug, couponCode } = req.body; // FASE: Cupons de Desconto
 
       if (!userId) {
         res.status(401).json({ error: 'Não autenticado' });
@@ -406,11 +406,47 @@ export class SubscriptionController {
         return;
       }
 
+      // FASE: Cupons de Desconto - Validar cupom se fornecido
+      // NOTA: Validação apenas, aplicação real depende da API Kiwify
+      if (couponCode) {
+        const { prisma } = await import('../server');
+
+        const coupon = await prisma.coupon.findUnique({
+          where: { code: couponCode.trim().toUpperCase() },
+        });
+
+        if (!coupon || !coupon.isActive) {
+          res.status(400).json({ error: 'Cupom inválido ou inativo' });
+          return;
+        }
+
+        if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+          res.status(400).json({ error: 'Cupom expirado' });
+          return;
+        }
+
+        if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) {
+          res.status(400).json({ error: 'Cupom atingiu o limite de usos' });
+          return;
+        }
+
+        // Verificar se cupom é de DISCOUNT (não TRIAL_UPGRADE)
+        if (coupon.purpose === 'TRIAL_UPGRADE') {
+          res.status(400).json({
+            error: 'Este cupom é de trial upgrade. Use-o na página /plans, não no checkout.',
+          });
+          return;
+        }
+
+        console.log(`[Checkout] Cupom validado: ${couponCode} (${coupon.discountType} ${coupon.discountValue})`);
+      }
+
       // Gerar URL de checkout
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const checkoutData = await generateCheckoutUrl({
         userId,
         planSlug,
+        couponCode: couponCode?.trim().toUpperCase(), // FASE: Cupons de Desconto
         successUrl: `${frontendUrl}/checkout/success`,
         cancelUrl: `${frontendUrl}/plans`,
       });

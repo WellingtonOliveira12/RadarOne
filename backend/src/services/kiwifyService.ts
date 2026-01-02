@@ -17,6 +17,7 @@ export interface CheckoutParams {
   planSlug: string;
   successUrl?: string;
   cancelUrl?: string;
+  couponCode?: string; // FASE: Cupons de Desconto
 }
 
 export interface CheckoutResponse {
@@ -37,7 +38,7 @@ export interface CheckoutResponse {
  * 6. Webhook ativa subscription no RadarOne
  */
 export async function generateCheckoutUrl(params: CheckoutParams): Promise<CheckoutResponse> {
-  const { userId, planSlug, successUrl, cancelUrl } = params;
+  const { userId, planSlug, successUrl, cancelUrl, couponCode } = params;
 
   // 1. Buscar plano
   const plan = await prisma.plan.findUnique({
@@ -80,6 +81,34 @@ export async function generateCheckoutUrl(params: CheckoutParams): Promise<Check
   }
   if (cancelUrl) {
     checkoutUrl.searchParams.set('cancel_url', cancelUrl);
+  }
+
+  // FASE: Cupons de Desconto
+  // Adicionar cupom à URL se fornecido
+  // NOTA: A aplicação real do desconto depende da API Kiwify suportar cupons via query param
+  // ou via API REST. Por ora, apenas passamos o código para que o Kiwify possa validar.
+  //
+  // INTEGRAÇÃO FUTURA:
+  // 1. Validar cupom antes de gerar URL (já fazemos em /api/coupons/validate)
+  // 2. Passar código do cupom para Kiwify (via query param 'coupon' ou 'discount_code')
+  // 3. Kiwify aplica desconto automaticamente
+  // 4. Webhook Kiwify retorna valor final pago
+  //
+  // Se Kiwify não suportar cupons nativamente, alternativas:
+  // - Criar produtos Kiwify com preço reduzido temporariamente
+  // - Processar reembolso parcial após pagamento
+  // - Migrar para outro gateway que suporte cupons (Stripe, Paddle, etc.)
+  if (couponCode) {
+    // Tentativa 1: Query param 'coupon'
+    checkoutUrl.searchParams.set('coupon', couponCode);
+
+    // Tentativa 2: Query param 'discount_code' (caso Kiwify use outro nome)
+    checkoutUrl.searchParams.set('discount_code', couponCode);
+
+    console.log(`[KIWIFY] Cupom '${couponCode}' adicionado à URL de checkout`);
+    console.warn(
+      '[KIWIFY] ⚠️ Aplicação real do desconto depende da API Kiwify suportar cupons. Verifique documentação Kiwify.'
+    );
   }
 
   console.log('[KIWIFY] Checkout URL gerada:', checkoutUrl.toString());
