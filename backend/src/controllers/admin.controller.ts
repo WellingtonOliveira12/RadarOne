@@ -3120,6 +3120,8 @@ export class AdminController {
               code: true,
               discountType: true,
               discountValue: true,
+              purpose: true, // FASE: Cupons de Upgrade
+              durationDays: true, // FASE: Cupons de Upgrade
             },
           },
         },
@@ -3132,6 +3134,10 @@ export class AdminController {
       const usageByPeriod: Record<string, number> = {};
       const usageByCoupon: Record<string, { count: number; type: string; value: number }> = {};
       const usageByType: Record<string, number> = { PERCENTAGE: 0, FIXED: 0 };
+
+      // FASE: Cupons de Upgrade - Métricas por finalidade (purpose)
+      const usageByPurpose: Record<string, number> = { DISCOUNT: 0, TRIAL_UPGRADE: 0 };
+      let totalTrialDaysGranted = 0;
 
       for (const usage of usages) {
         const date = new Date(usage.usedAt);
@@ -3165,6 +3171,15 @@ export class AdminController {
 
         // Contagem por tipo
         usageByType[usage.coupon.discountType] += 1;
+
+        // FASE: Cupons de Upgrade - Contagem por finalidade (purpose)
+        const purpose = usage.coupon.purpose || 'DISCOUNT';
+        usageByPurpose[purpose] = (usageByPurpose[purpose] || 0) + 1;
+
+        // Somar dias concedidos em trial upgrades
+        if (purpose === 'TRIAL_UPGRADE' && usage.coupon.durationDays) {
+          totalTrialDaysGranted += usage.coupon.durationDays;
+        }
       }
 
       // Converter para arrays para gráficos
@@ -3262,6 +3277,11 @@ export class AdminController {
           inactiveCoupons,
           expiringSoon,
           nearLimit,
+
+          // FASE: Cupons de Upgrade - Métricas por finalidade
+          discountCoupons: usageByPurpose.DISCOUNT || 0,
+          trialUpgradeCoupons: usageByPurpose.TRIAL_UPGRADE || 0,
+          totalTrialDaysGranted,
           percentageCoupons,
           fixedCoupons,
         },

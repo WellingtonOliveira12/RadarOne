@@ -717,4 +717,211 @@ AB,Cupom inválido,PERCENTAGE,10,100,2027-12-31,`;
       await expect(page.locator('th:has-text("Usos")')).toBeVisible();
     }
   });
+
+  // =========================================
+  // TESTES TRIAL_UPGRADE (FASE: CUPONS DE UPGRADE)
+  // =========================================
+
+  test('deve criar cupom de TRIAL_UPGRADE com duração em dias', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    // Abrir modal de criação
+    await page.click('button:has-text("Novo Cupom")');
+    await expect(page.locator('text=Criar Novo Cupom')).toBeVisible();
+
+    // Preencher código
+    const uniqueCode = `VIP${Date.now().toString().slice(-6)}`;
+    await page.fill('input[placeholder*="PROMO"]', uniqueCode);
+    await page.fill('input[placeholder*="Descrição"]', 'Acesso VIP por 7 dias');
+
+    // Selecionar finalidade "Trial Upgrade"
+    const purposeSelect = page.locator('select').filter({ hasText: /Finalidade/i }).or(
+      page.locator('label:has-text("Finalidade")').locator('..').locator('select')
+    );
+    await purposeSelect.selectOption('TRIAL_UPGRADE');
+
+    // Aguardar campos condicionais aparecerem
+    await page.waitForTimeout(500);
+
+    // Preencher duração em dias
+    const durationInput = page.locator('input[placeholder*="Ex: 7"]').or(
+      page.locator('label:has-text("Duração")').locator('..').locator('input[type="number"]')
+    );
+    await durationInput.fill('7');
+
+    // Criar cupom
+    await page.click('button:has-text("Criar Cupom")');
+
+    // Aguardar sucesso
+    await expect(page.locator('text=/cupom criado/i')).toBeVisible({ timeout: 5000 });
+
+    // Verificar que aparece na tabela
+    await page.waitForTimeout(1000);
+    await expect(page.locator(`text=${uniqueCode}`)).toBeVisible();
+  });
+
+  test('deve validar duração mínima de 1 dia para TRIAL_UPGRADE', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    await page.click('button:has-text("Novo Cupom")');
+    await page.fill('input[placeholder*="PROMO"]', `TEST${Date.now()}`);
+
+    // Selecionar TRIAL_UPGRADE
+    const purposeSelect = page.locator('select').filter({ hasText: /Finalidade/i }).or(
+      page.locator('label:has-text("Finalidade")').locator('..').locator('select')
+    );
+    await purposeSelect.selectOption('TRIAL_UPGRADE');
+    await page.waitForTimeout(500);
+
+    // Tentar duração 0
+    const durationInput = page.locator('input[placeholder*="Ex: 7"]').or(
+      page.locator('label:has-text("Duração")').locator('..').locator('input[type="number"]')
+    );
+    await durationInput.fill('0');
+
+    await page.click('button:has-text("Criar Cupom")');
+
+    // Deve mostrar erro
+    await expect(page.locator('text=/pelo menos 1 dia/i')).toBeVisible({ timeout: 3000 });
+  });
+
+  test('deve validar duração máxima de 60 dias para TRIAL_UPGRADE', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    await page.click('button:has-text("Novo Cupom")');
+    await page.fill('input[placeholder*="PROMO"]', `TEST${Date.now()}`);
+
+    // Selecionar TRIAL_UPGRADE
+    const purposeSelect = page.locator('select').filter({ hasText: /Finalidade/i }).or(
+      page.locator('label:has-text("Finalidade")').locator('..').locator('select')
+    );
+    await purposeSelect.selectOption('TRIAL_UPGRADE');
+    await page.waitForTimeout(500);
+
+    // Tentar duração 61
+    const durationInput = page.locator('input[placeholder*="Ex: 7"]').or(
+      page.locator('label:has-text("Duração")').locator('..').locator('input[type="number"]')
+    );
+    await durationInput.fill('61');
+
+    await page.click('button:has-text("Criar Cupom")');
+
+    // Deve mostrar erro
+    await expect(page.locator('text=/não pode ser maior que 60/i')).toBeVisible({ timeout: 3000 });
+  });
+
+  test('usuário deve conseguir aplicar cupom TRIAL_UPGRADE na página /plans', async ({ page }) => {
+    // Criar cupom como admin
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    await page.click('button:has-text("Novo Cupom")');
+    const uniqueCode = `TESTPLAN${Date.now().toString().slice(-6)}`;
+    await page.fill('input[placeholder*="PROMO"]', uniqueCode);
+    await page.fill('input[placeholder*="Descrição"]', 'Cupom para teste E2E em /plans');
+
+    // TRIAL_UPGRADE
+    const purposeSelect = page.locator('select').filter({ hasText: /Finalidade/i }).or(
+      page.locator('label:has-text("Finalidade")').locator('..').locator('select')
+    );
+    await purposeSelect.selectOption('TRIAL_UPGRADE');
+    await page.waitForTimeout(500);
+
+    const durationInput = page.locator('input[placeholder*="Ex: 7"]').or(
+      page.locator('label:has-text("Duração")').locator('..').locator('input[type="number"]')
+    );
+    await durationInput.fill('14');
+
+    await page.click('button:has-text("Criar Cupom")');
+    await expect(page.locator('text=/criado/i')).toBeVisible({ timeout: 5000 });
+
+    // Logout e login como USER
+    await clearStorage(page);
+    await loginReal(page, 'USER');
+
+    // Ir para /plans
+    await page.goto('/plans');
+    await page.waitForLoadState('networkidle');
+
+    // Verificar se seção de cupom está visível
+    await expect(page.locator('text=/Tem um cupom/i')).toBeVisible({ timeout: 10000 });
+
+    // Preencher código do cupom
+    const couponInput = page.locator('input[placeholder*="Digite o código"]').or(
+      page.locator('input[placeholder*="cupom"]')
+    );
+    await couponInput.fill(uniqueCode);
+
+    // Clicar em "Aplicar cupom"
+    await page.click('button:has-text("Aplicar cupom")');
+
+    // Aguardar sucesso
+    await expect(page.locator('text=/Cupom aplicado/i')).toBeVisible({ timeout: 10000 });
+
+    // Verificar mensagem de sucesso com duração
+    await expect(page.locator('text=/14 dias/i')).toBeVisible();
+
+    // Botão "Ir para o Dashboard" deve aparecer
+    await expect(page.locator('button:has-text("Dashboard")')).toBeVisible();
+  });
+
+  test('deve mostrar erro ao aplicar cupom TRIAL_UPGRADE inválido', async ({ page }) => {
+    await loginReal(page, 'USER');
+    await page.goto('/plans');
+    await page.waitForLoadState('networkidle');
+
+    // Tentar aplicar cupom inexistente
+    const couponInput = page.locator('input[placeholder*="Digite o código"]').or(
+      page.locator('input[placeholder*="cupom"]')
+    );
+    await couponInput.fill('INVALIDCODE123');
+
+    await page.click('button:has-text("Aplicar cupom")');
+
+    // Deve mostrar erro
+    await expect(page.locator('text=/inválido|não encontrado/i')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('campos de desconto devem aparecer/desaparecer ao trocar purpose', async ({ page }) => {
+    await loginReal(page, 'ADMIN_SUPER');
+    await page.goto('/admin/coupons');
+    await page.waitForLoadState('networkidle');
+
+    await page.click('button:has-text("Novo Cupom")');
+    await page.fill('input[placeholder*="PROMO"]', `TOGGLE${Date.now()}`);
+
+    // Inicialmente está em DISCOUNT - campos de desconto devem estar visíveis
+    await expect(page.locator('label:has-text("Tipo de Desconto")')).toBeVisible();
+    await expect(page.locator('label:has-text("Valor do Desconto")')).toBeVisible();
+
+    // Trocar para TRIAL_UPGRADE
+    const purposeSelect = page.locator('select').filter({ hasText: /Finalidade/i }).or(
+      page.locator('label:has-text("Finalidade")').locator('..').locator('select')
+    );
+    await purposeSelect.selectOption('TRIAL_UPGRADE');
+    await page.waitForTimeout(500);
+
+    // Campos de desconto devem sumir
+    await expect(page.locator('label:has-text("Tipo de Desconto")')).not.toBeVisible();
+
+    // Campo de duração deve aparecer
+    await expect(page.locator('label:has-text("Duração")')).toBeVisible();
+
+    // Voltar para DISCOUNT
+    await purposeSelect.selectOption('DISCOUNT');
+    await page.waitForTimeout(500);
+
+    // Campos de desconto devem voltar
+    await expect(page.locator('label:has-text("Tipo de Desconto")')).toBeVisible();
+
+    // Campo de duração deve sumir
+    await expect(page.locator('label:has-text("Duração")').and(page.locator('text=/dias/i'))).not.toBeVisible();
+  });
 });
