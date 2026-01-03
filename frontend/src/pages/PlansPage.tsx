@@ -353,77 +353,29 @@ export const PlansPage: React.FC = () => {
           </div>
         )}
 
-        {/* Seção de Cupom de Trial Upgrade (só aparece se usuário logado) */}
-        {user && !couponSuccess && (
-          <div style={styles.couponSection}>
-            <h3 style={styles.couponTitle}>{getABMessage('couponUpgradeTitle')}</h3>
-            <p style={styles.couponSubtitle}>
-              {getABMessage('couponUpgradeSubtitle')}
+        {/* Sucesso do cupom de Trial Upgrade - Mostrar no topo se aplicado */}
+        {couponSuccess && (
+          <div style={styles.couponSuccessBox}>
+            <h3 style={styles.couponSuccessTitle}>
+              ✅ Cupom aplicado com sucesso!
+            </h3>
+            <p style={styles.couponSuccessText}>
+              Você ganhou acesso ao plano <strong>{couponSuccess.planName}</strong> por{' '}
+              <strong>{couponSuccess.daysGranted} dias</strong>!
             </p>
-            <div style={styles.couponInputGroup}>
-              <input
-                type="text"
-                placeholder="Digite o código do cupom"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                style={styles.couponInput}
-                disabled={couponLoading}
-              />
-              <button
-                onClick={handleApplyCoupon}
-                disabled={couponLoading || !couponCode.trim()}
-                style={{
-                  ...styles.couponButton,
-                  ...(couponLoading || !couponCode.trim() ? styles.couponButtonDisabled : {})
-                }}
-              >
-                {couponLoading ? 'Aplicando...' : 'Aplicar cupom'}
-              </button>
-            </div>
-            {couponError && (
-              <div style={styles.couponError}>
-                ❌ {couponError}
-              </div>
-            )}
+            <p style={styles.couponSuccessText}>
+              Válido até: <strong>{couponSuccess.endsAt.toLocaleDateString('pt-BR')}</strong>
+            </p>
+            <button
+              onClick={() => navigate('/dashboard')}
+              style={styles.couponSuccessButton}
+            >
+              Ir para o Dashboard
+            </button>
           </div>
         )}
 
-        {/* Seção de Cupom de Desconto (DISCOUNT) - sempre visível */}
-        {!discountCouponData && (
-          <div style={styles.discountCouponSection}>
-            <h3 style={styles.discountCouponTitle}>{getABMessage('couponDiscountTitle')}</h3>
-            <p style={styles.discountCouponSubtitle}>
-              {getABMessage('couponDiscountSubtitle')}
-            </p>
-            <div style={styles.couponInputGroup}>
-              <input
-                type="text"
-                placeholder="Digite o código do cupom"
-                value={discountCouponCode}
-                onChange={(e) => setDiscountCouponCode(e.target.value.toUpperCase())}
-                style={styles.couponInput}
-                disabled={discountCouponLoading}
-              />
-              <button
-                onClick={handleValidateDiscountCoupon}
-                disabled={discountCouponLoading || !discountCouponCode.trim()}
-                style={{
-                  ...styles.discountCouponButton,
-                  ...(discountCouponLoading || !discountCouponCode.trim() ? styles.couponButtonDisabled : {})
-                }}
-              >
-                {discountCouponLoading ? 'Validando...' : 'Validar cupom'}
-              </button>
-            </div>
-            {discountCouponError && (
-              <div style={styles.couponError}>
-                ❌ {discountCouponError}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Cupom de Desconto Validado */}
+        {/* Cupom de Desconto Validado - Mostrar no topo se validado */}
         {discountCouponData && (
           <div style={styles.discountCouponSuccessBox}>
             <h3 style={styles.discountCouponSuccessTitle}>
@@ -454,28 +406,6 @@ export const PlansPage: React.FC = () => {
               style={styles.discountCouponClearButton}
             >
               Limpar cupom
-            </button>
-          </div>
-        )}
-
-        {/* Sucesso do cupom */}
-        {couponSuccess && (
-          <div style={styles.couponSuccessBox}>
-            <h3 style={styles.couponSuccessTitle}>
-              ✅ Cupom aplicado com sucesso!
-            </h3>
-            <p style={styles.couponSuccessText}>
-              Você ganhou acesso ao plano <strong>{couponSuccess.planName}</strong> por{' '}
-              <strong>{couponSuccess.daysGranted} dias</strong>!
-            </p>
-            <p style={styles.couponSuccessText}>
-              Válido até: <strong>{couponSuccess.endsAt.toLocaleDateString('pt-BR')}</strong>
-            </p>
-            <button
-              onClick={() => navigate('/dashboard')}
-              style={styles.couponSuccessButton}
-            >
-              Ir para o Dashboard
             </button>
           </div>
         )}
@@ -551,13 +481,99 @@ export const PlansPage: React.FC = () => {
           ))}
         </div>
 
-        <div style={styles.footer}>
-          <p>
-            Todos os planos podem ser cancelados a qualquer momento.
-          </p>
-          <p>
-            Planos pagos contam com 7 dias de garantia.
-          </p>
+        {/* SEÇÕES DE CUPOM - Agora abaixo dos planos */}
+        <div style={styles.couponsContainer}>
+          {/* Seção de Cupom de Trial Upgrade (só aparece se usuário logado e não aplicado) */}
+          {user && !couponSuccess && (
+            <div style={styles.couponSection}>
+              <h3 style={styles.couponTitle}>{getABMessage('couponUpgradeTitle')}</h3>
+              <p style={styles.couponSubtitle}>
+                {getABMessage('couponUpgradeSubtitle')}
+              </p>
+              <div style={styles.couponInputGroup}>
+                <input
+                  type="text"
+                  placeholder="Digite o código do cupom"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  style={styles.couponInput}
+                  disabled={couponLoading}
+                />
+                <button
+                  onClick={handleApplyCoupon}
+                  disabled={couponLoading || !couponCode.trim()}
+                  style={{
+                    ...styles.couponButton,
+                    ...(couponLoading || !couponCode.trim() ? styles.couponButtonDisabled : {})
+                  }}
+                >
+                  {couponLoading ? 'Aplicando...' : 'Aplicar cupom'}
+                </button>
+              </div>
+              {couponError && (
+                <div style={styles.couponError}>
+                  ❌ {couponError}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Seção de Cupom de Desconto (DISCOUNT) - sempre visível se não validado */}
+          {!discountCouponData && (
+            <div style={styles.discountCouponSection}>
+              <h3 style={styles.discountCouponTitle}>{getABMessage('couponDiscountTitle')}</h3>
+              <p style={styles.discountCouponSubtitle}>
+                {getABMessage('couponDiscountSubtitle')}
+              </p>
+              <div style={styles.couponInputGroup}>
+                <input
+                  type="text"
+                  placeholder="Digite o código do cupom"
+                  value={discountCouponCode}
+                  onChange={(e) => setDiscountCouponCode(e.target.value.toUpperCase())}
+                  style={styles.couponInput}
+                  disabled={discountCouponLoading}
+                />
+                <button
+                  onClick={handleValidateDiscountCoupon}
+                  disabled={discountCouponLoading || !discountCouponCode.trim()}
+                  style={{
+                    ...styles.discountCouponButton,
+                    ...(discountCouponLoading || !discountCouponCode.trim() ? styles.couponButtonDisabled : {})
+                  }}
+                >
+                  {discountCouponLoading ? 'Validando...' : 'Validar cupom'}
+                </button>
+              </div>
+              {discountCouponError && (
+                <div style={styles.couponError}>
+                  ❌ {discountCouponError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer melhorado */}
+        <div style={styles.footerContainer}>
+          <div style={styles.footerLinks}>
+            <a href="/manual" style={styles.footerLink}>MANUAL</a>
+            <span style={styles.footerSeparator}>|</span>
+            <a href="/faq" style={styles.footerLink}>FAQ</a>
+            <span style={styles.footerSeparator}>|</span>
+            <a href="/contato" style={styles.footerLink}>CONTATO</a>
+          </div>
+          <div style={styles.footerCopyright}>
+            @2025 Radar One v. 1.0
+          </div>
+          <div style={styles.footerInfo}>
+            <p style={{margin: 0}}>
+              Todos os planos podem ser cancelados a qualquer momento.
+            </p>
+            <p style={{margin: 0}}>
+              Planos pagos contam com 7 dias de garantia.
+            </p>
+          </div>
         </div>
       </section>
     </PublicLayout>
@@ -589,10 +605,14 @@ const styles = {
     textAlign: 'center' as const,
   },
   plansGrid: {
-    ...responsive.grid,
-    gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))',
+    display: 'grid',
+    gap: 'clamp(16px, 3vw, 24px)',
+    gridTemplateColumns: '1fr', // Mobile: 1 coluna
     marginBottom: responsive.spacing.xl,
-  },
+    '@media (min-width: 769px)': {
+      gridTemplateColumns: 'repeat(2, 1fr)', // Desktop: 2 colunas
+    },
+  } as any,
   planCard: {
     ...responsive.card,
     position: 'relative' as const,
@@ -678,11 +698,56 @@ const styles = {
   planButtonRecommended: {
     backgroundColor: '#3b82f6',
   },
-  footer: {
+  // Container para seções de cupom (abaixo dos planos)
+  couponsContainer: {
+    marginTop: responsive.spacing.xxl,
+    marginBottom: responsive.spacing.xl,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: responsive.spacing.lg,
+  },
+  // Footer melhorado
+  footerContainer: {
+    marginTop: responsive.spacing.xxl,
+    paddingTop: responsive.spacing.xl,
+    borderTop: '1px solid #e5e7eb',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center' as const,
+    gap: responsive.spacing.md,
+  },
+  footerLinks: {
+    display: 'flex',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: responsive.spacing.sm,
+    flexWrap: 'wrap' as const,
+  },
+  footerLink: {
+    color: '#3b82f6',
+    textDecoration: 'none',
+    fontSize: responsive.typography.body.fontSize,
+    fontWeight: '500' as const,
+    transition: 'color 0.2s',
+    cursor: 'pointer',
+  },
+  footerSeparator: {
+    color: '#cbd5e1',
+    fontSize: responsive.typography.body.fontSize,
+  },
+  footerCopyright: {
+    color: '#6b7280',
+    fontSize: responsive.typography.small.fontSize,
+    textAlign: 'center' as const,
+  },
+  footerInfo: {
     textAlign: 'center' as const,
     color: '#6b7280',
-    fontSize: responsive.typography.body.fontSize,
-    marginTop: responsive.spacing.xl,
+    fontSize: responsive.typography.small.fontSize,
+    marginTop: responsive.spacing.sm,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
   },
   trialExpiredBanner: {
     backgroundColor: '#fef3c7',
