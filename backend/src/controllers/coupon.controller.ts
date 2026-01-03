@@ -8,6 +8,20 @@ import { AppError } from '../errors/AppError';
  * FASE UPGRADE: Resgate de cupons de trial upgrade
  */
 
+/**
+ * Normaliza código de cupom para evitar problemas com acentos
+ * - Remove espaços em branco
+ * - Converte para uppercase
+ * - Remove acentos/diacríticos
+ */
+function normalizeCouponCode(code: string): string {
+  return code
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 export class CouponController {
   /**
    * POST /api/coupons/validate
@@ -22,9 +36,10 @@ export class CouponController {
         return;
       }
 
-      // Buscar cupom
+      // Buscar cupom (com normalização para lidar com acentos)
+      const normalizedCode = normalizeCouponCode(code);
       const coupon = await prisma.coupon.findUnique({
-        where: { code: code.toUpperCase() },
+        where: { code: normalizedCode },
         include: {
           plan: true
         }
@@ -137,9 +152,10 @@ export class CouponController {
         return;
       }
 
-      // Buscar cupom
+      // Buscar cupom (com normalização para lidar com acentos)
+      const normalizedCode = normalizeCouponCode(code);
       const coupon = await prisma.coupon.findUnique({
-        where: { code: code.toUpperCase() }
+        where: { code: normalizedCode }
       });
 
       if (!coupon || !coupon.isActive) {
@@ -307,9 +323,10 @@ export class CouponController {
         return;
       }
 
-      // 1. Buscar e validar cupom
+      // 1. Buscar e validar cupom (com normalização para lidar com acentos)
+      const normalizedCode = normalizeCouponCode(code);
       const coupon = await prisma.coupon.findUnique({
-        where: { code: code.trim().toUpperCase() },
+        where: { code: normalizedCode },
         include: { plan: true }
       });
 

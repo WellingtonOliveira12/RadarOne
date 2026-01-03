@@ -14,6 +14,7 @@ import { showInfo } from '../lib/toast';
 import { getABMessage, trackABVariantShown } from '../lib/abtest';
 import { getToken } from '../lib/auth';
 import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
+import { normalizeCouponCode } from '../utils/couponHelpers';
 import { PublicLayout } from '../components/PublicLayout';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { API_BASE_URL } from '../constants/app';
@@ -142,13 +143,14 @@ export const PlansPage: React.FC = () => {
 
     try {
       const token = getToken();
+      const normalizedCode = normalizeCouponCode(couponCode);
       const response = await fetch(`${API_BASE_URL}/api/coupons/redeem-trial-upgrade`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ code: couponCode })
+        body: JSON.stringify({ code: normalizedCode })
       });
 
       const data = await response.json();
@@ -203,12 +205,13 @@ export const PlansPage: React.FC = () => {
     setDiscountCouponData(null);
 
     try {
+      const normalizedCode = normalizeCouponCode(discountCouponCode);
       const response = await fetch(`${API_BASE_URL}/api/coupons/validate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code: discountCouponCode })
+        body: JSON.stringify({ code: normalizedCode })
       });
 
       const data = await response.json();
@@ -584,6 +587,8 @@ const styles = {
   plansSection: {
     ...responsive.container,
     padding: `${responsive.spacing.xxl} ${responsive.spacing.md}`,
+    position: 'relative' as const,
+    zIndex: 1,
   },
   title: {
     ...responsive.typography.h1,
@@ -607,16 +612,16 @@ const styles = {
   plansGrid: {
     display: 'grid',
     gap: 'clamp(16px, 3vw, 24px)',
-    gridTemplateColumns: '1fr', // Mobile: 1 coluna
+    // Grid responsivo: 1 coluna no mobile, 2-3 colunas no desktop (baseado na largura mínima de 320px)
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
     marginBottom: responsive.spacing.xl,
-    '@media (min-width: 769px)': {
-      gridTemplateColumns: 'repeat(2, 1fr)', // Desktop: 2 colunas
-    },
-  } as any,
+  },
   planCard: {
     ...responsive.card,
     position: 'relative' as const,
     border: '2px solid transparent',
+    zIndex: 5,
+    pointerEvents: 'auto' as const,
   },
   planCardRecommended: {
     border: '2px solid #3b82f6',
@@ -694,6 +699,9 @@ const styles = {
     width: '100%',
     backgroundColor: '#374151',
     color: 'white',
+    position: 'relative' as const,
+    zIndex: 10,
+    pointerEvents: 'auto' as const,
   },
   planButtonRecommended: {
     backgroundColor: '#3b82f6',
