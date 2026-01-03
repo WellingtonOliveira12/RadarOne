@@ -2,6 +2,7 @@ import { chromium, Browser, Page } from 'playwright';
 import { ScrapedAd, MonitorWithFilters } from '../types/scraper';
 import { rateLimiter } from '../utils/rate-limiter';
 import { retry, retryPresets } from '../utils/retry-helper';
+import { captchaSolver } from '../utils/captcha-solver';
 
 /**
  * OLX Scraper - Implementação Real
@@ -55,6 +56,20 @@ async function scrapeOLXInternal(monitor: MonitorWithFilters): Promise<ScrapedAd
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
+
+    // Detectar e resolver captcha
+    const hasCaptcha = await page.evaluate(() => {
+      return !!(document.querySelector('.g-recaptcha') || document.querySelector('.h-captcha'));
+    });
+
+    if (hasCaptcha && captchaSolver.isEnabled()) {
+      console.log('🔐 Captcha detectado, resolvendo...');
+      const result = await captchaSolver.autoSolve(page);
+      if (result.success) {
+        console.log('✅ Captcha resolvido');
+        await page.waitForTimeout(2000);
+      }
+    }
 
     // Wait for results to load
     try {

@@ -8,6 +8,8 @@ import { scrapeVivaReal } from '../scrapers/vivareal-scraper';
 import { scrapeImovelweb } from '../scrapers/imovelweb-scraper';
 import { scrapeLeilao } from '../scrapers/leilao-scraper';
 import { TelegramService } from './telegram-service';
+import { circuitBreaker } from '../utils/circuit-breaker';
+import { log } from '../utils/logger';
 
 /**
  * MonitorRunner
@@ -33,12 +35,12 @@ export class MonitorRunner {
    */
   static async run(monitor: any) {
     const startTime = Date.now();
-    console.log(`\n🔍 Executando monitor: ${monitor.name} (${monitor.site})`);
+    log.monitorStart(monitor.id, monitor.name, monitor.site);
 
     try {
       // Verifica se usuário tem assinatura ativa
       if (!monitor.user.subscriptions || monitor.user.subscriptions.length === 0) {
-        console.log('⚠️  Usuário sem assinatura ativa. Pulando...');
+        log.warn('Usuário sem assinatura ativa', { monitorId: monitor.id });
         return;
       }
 
@@ -46,17 +48,19 @@ export class MonitorRunner {
 
       // Verifica se usuário tem consultas disponíveis
       if (subscription.queriesUsed >= subscription.queriesLimit) {
-        console.log('⚠️  Limite de consultas atingido. Pulando...');
+        log.warn('Limite de consultas atingido', {
+          monitorId: monitor.id,
+          queriesUsed: subscription.queriesUsed,
+          queriesLimit: subscription.queriesLimit,
+        });
         return;
       }
 
-      // Executa scraping conforme o site
-      const ads = await this.scrape(monitor);
-      console.log(`📦 ${ads.length} anúncios encontrados`);
+      // Executa scraping com circuit breaker
+      const ads = await circuitBreaker.execute(monitor.site, () => this.scrape(monitor));
 
       // Processa anúncios
       const newAds = await this.processAds(monitor.id, ads);
-      console.log(`✨ ${newAds.length} anúncios novos`);
 
       // Envia alertas para anúncios novos
       let alertsSent = 0;
@@ -90,9 +94,11 @@ export class MonitorRunner {
         },
       });
 
-      console.log(`✅ Monitor executado com sucesso (${Date.now() - startTime}ms)`);
+      const duration = Date.now() - startTime;
+      log.monitorSuccess(monitor.id, ads.length, newAds.length, alertsSent, duration);
     } catch (error: any) {
-      console.error(`❌ Erro ao executar monitor:`, error.message);
+      const duration = Date.now() - startTime;
+      log.monitorError(monitor.id, error, duration);
 
       // Registra log de erro
       await this.logExecution(monitor.id, {

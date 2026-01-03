@@ -2,6 +2,8 @@ import { chromium, Browser, Page } from 'playwright';
 import { ScrapedAd, MonitorWithFilters } from '../types/scraper';
 import { rateLimiter } from '../utils/rate-limiter';
 import { retry, retryPresets } from '../utils/retry-helper';
+import { captchaSolver } from '../utils/captcha-solver';
+import { randomUA } from '../utils/user-agents';
 
 /**
  * Mercado Livre Scraper - Implementação Real
@@ -45,8 +47,7 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
     });
 
     const context = await browser.newContext({
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      userAgent: randomUA(),
       locale: 'pt-BR',
     });
 
@@ -58,6 +59,33 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
+
+    // Detectar e resolver captcha (se presente)
+    const hasCaptcha = await page.evaluate(() => {
+      return !!(
+        document.querySelector('.g-recaptcha') ||
+        document.querySelector('#g-recaptcha') ||
+        document.querySelector('[data-sitekey]')
+      );
+    });
+
+    if (hasCaptcha) {
+      console.log('🔐 Captcha detectado na página');
+
+      if (captchaSolver.isEnabled()) {
+        const result = await captchaSolver.autoSolve(page);
+
+        if (result.success) {
+          console.log('✅ Captcha resolvido com sucesso');
+          await page.waitForTimeout(2000); // Aguarda form submit
+        } else {
+          console.warn(`⚠️  Captcha não resolvido: ${result.error}`);
+          // Continua mesmo assim (pode funcionar sem captcha em algumas situações)
+        }
+      } else {
+        console.warn('⚠️  Captcha detectado mas solver não configurado (CAPTCHA_SERVICE e CAPTCHA_API_KEY)');
+      }
+    }
 
     // Wait for results to load
     try {

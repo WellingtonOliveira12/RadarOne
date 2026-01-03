@@ -2,6 +2,7 @@ import { chromium, Browser, Page } from 'playwright';
 import { ScrapedAd, MonitorWithFilters } from '../types/scraper';
 import { rateLimiter } from '../utils/rate-limiter';
 import { retry, retryPresets } from '../utils/retry-helper';
+import { captchaSolver } from '../utils/captcha-solver';
 
 /**
  * Leilão Scraper - Implementação Genérica
@@ -69,6 +70,22 @@ async function scrapeLeilaoInternal(
 
     // Wait a bit for JS to load
     await page.waitForTimeout(2000);
+
+    // Detectar e resolver captcha (sites de leilão frequentemente usam)
+    const hasCaptcha = await page.evaluate(() => {
+      return !!(document.querySelector('.g-recaptcha') || document.querySelector('.h-captcha'));
+    });
+
+    if (hasCaptcha && captchaSolver.isEnabled()) {
+      console.log('🔐 Captcha detectado em site de leilão, resolvendo...');
+      const result = await captchaSolver.autoSolve(page);
+      if (result.success) {
+        console.log('✅ Captcha resolvido');
+        await page.waitForTimeout(3000); // Sites de leilão podem ter delay maior
+      } else {
+        console.warn('⚠️  Captcha não resolvido, tentando continuar...');
+      }
+    }
 
     // Detect site type and extract ads
     const ads = await detectAndExtract(page, monitor);

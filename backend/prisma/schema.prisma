@@ -296,12 +296,13 @@ model PushSubscription {
 enum MonitorSite {
   MERCADO_LIVRE
   OLX
-  FACEBOOK_MARKETPLACE
+  FACEBOOK_MARKETPLACE // Mantido por compatibilidade - Scraper não disponível
   WEBMOTORS // Portal de veículos
   ICARROS // Portal de veículos
   ZAP_IMOVEIS // Portal de imóveis
   VIVA_REAL // Portal de imóveis
   IMOVELWEB // Portal de imóveis
+  LEILAO // Sites de leilão (Superbid, VIP Leilões, Sodré Santoro, etc)
   OUTRO // Outros sites
 }
 

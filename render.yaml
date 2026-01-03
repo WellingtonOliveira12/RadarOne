@@ -1,0 +1,139 @@
+# Render Blueprint - RadarOne
+# Configuração Infrastructure as Code para deploy automático
+
+services:
+  # ===========================================
+  # BACKEND API (Web Service)
+  # ===========================================
+  - type: web
+    name: radarone-backend
+    runtime: node
+    region: oregon
+    plan: starter
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false  # Configurar manualmente (segredo)
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: RadarOne <noreply@radarone.com.br>
+      - key: EMAIL_FROM_NAME
+        value: RadarOne
+      - key: EMAIL_REPLY_TO
+        value: contato@radarone.com.br
+      - key: FRONTEND_URL
+        value: https://radarone.com.br
+      - key: CPF_ENCRYPTION_KEY
+        sync: false
+      - key: KIWIFY_API_KEY
+        sync: false
+      - key: KIWIFY_WEBHOOK_SECRET
+        sync: false
+      - key: KIWIFY_BASE_URL
+        value: https://api.kiwify.com.br
+      - key: SENTRY_DSN
+        sync: false
+
+  # ===========================================
+  # WORKER DE MONITORAMENTO (Background Worker)
+  # ===========================================
+  - type: worker
+    name: radarone-worker
+    runtime: node
+    region: oregon
+    plan: starter
+    rootDir: worker
+    buildCommand: npm install && npm run playwright:install && npx prisma generate && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false  # Mesmo banco do backend
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false  # Mesmo token do backend
+      - key: CHECK_INTERVAL_MINUTES
+        value: "5"
+      - key: MONITOR_DELAY_MS
+        value: "2000"
+      - key: REQUEST_DELAY_MS
+        value: "3000"
+      - key: REQUEST_TIMEOUT_MS
+        value: "30000"
+      - key: MAX_RETRIES
+        value: "3"
+      - key: LOG_LEVEL
+        value: info
+      - key: SENTRY_DSN
+        sync: false
+      # Opcional: REDIS (se usar BullMQ)
+      - fromService:
+          type: redis
+          name: radarone-redis
+          property: connectionString
+        key: REDIS_URL
+      # Opcional: Captcha Solver
+      # - key: CAPTCHA_SERVICE
+      #   value: 2captcha
+      # - key: CAPTCHA_API_KEY
+      #   sync: false
+
+# ===========================================
+# DATABASES E RECURSOS
+# ===========================================
+databases:
+  # PostgreSQL (Neon já está sendo usado)
+  # Não precisa criar aqui, DATABASE_URL será configurado manualmente
+
+# ===========================================
+# REDIS (Para BullMQ - Opcional mas Recomendado)
+# ===========================================
+# Descomente para habilitar fila distribuída
+# services:
+#   - type: redis
+#     name: radarone-redis
+#     region: oregon
+#     plan: starter
+#     maxmemoryPolicy: allkeys-lru
+#     ipAllowList: []  # Allow all (worker precisa acessar)
+
+# ===========================================
+# NOTAS DE DEPLOY
+# ===========================================
+# 1. Após primeiro deploy, configurar env vars secretas no painel:
+#    - DATABASE_URL
+#    - JWT_SECRET
+#    - TELEGRAM_BOT_TOKEN
+#    - RESEND_API_KEY (se usar email)
+#    - SENTRY_DSN (se usar Sentry)
+#    - CPF_ENCRYPTION_KEY
+#
+# 2. Para habilitar fila (escalabilidade):
+#    - Descomentar serviço Redis acima
+#    - Worker usará REDIS_URL automaticamente
+#
+# 3. Monitorar logs:
+#    - Backend: Render Dashboard → radarone-backend → Logs
+#    - Worker: Render Dashboard → radarone-worker → Logs
+#
+# 4. Healthcheck:
+#    - Backend: https://radarone-backend.onrender.com/health
+#    - Worker: Logs devem mostrar "RadarOne Worker iniciado"
+#
+# 5. Validar worker funcionando:
+#    - Logs: "Executando monitor: ..."
+#    - Banco: SELECT * FROM monitor_logs ORDER BY created_at DESC LIMIT 10;
