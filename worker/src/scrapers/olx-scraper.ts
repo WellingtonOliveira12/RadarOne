@@ -3,6 +3,7 @@ import { ScrapedAd, MonitorWithFilters } from '../types/scraper';
 import { rateLimiter } from '../utils/rate-limiter';
 import { retry, retryPresets } from '../utils/retry-helper';
 import { captchaSolver } from '../utils/captcha-solver';
+import { screenshotHelper } from '../utils/screenshot-helper';
 
 /**
  * OLX Scraper - Implementação Real
@@ -34,6 +35,7 @@ async function scrapeOLXInternal(monitor: MonitorWithFilters): Promise<ScrapedAd
   console.log(`🔍 Starting OLX scraper for: ${monitor.name}`);
 
   let browser: Browser | null = null;
+  let page: Page | null = null;
 
   try {
     // Launch browser
@@ -48,7 +50,7 @@ async function scrapeOLXInternal(monitor: MonitorWithFilters): Promise<ScrapedAd
       locale: 'pt-BR',
     });
 
-    const page = await context.newPage();
+    page = await context.newPage();
 
     // Navigate to search URL
     console.log(`📄 Navigating to: ${monitor.searchUrl}`);
@@ -94,6 +96,20 @@ async function scrapeOLXInternal(monitor: MonitorWithFilters): Promise<ScrapedAd
     return ads;
   } catch (error: any) {
     console.error(`❌ Error in OLX scraper: ${error.message}`);
+
+    // Captura screenshot para debug
+    if (page && screenshotHelper.isEnabled()) {
+      try {
+        await screenshotHelper.captureError(page, {
+          monitorId: monitor.id,
+          monitorName: monitor.name,
+          site: 'OLX',
+          errorMessage: error.message,
+        });
+      } catch (screenshotError) {
+        console.error('Failed to capture error screenshot:', screenshotError);
+      }
+    }
 
     if (browser) {
       await browser.close();

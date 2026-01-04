@@ -2,6 +2,7 @@ import { chromium, Browser, Page } from 'playwright';
 import { ScrapedAd, MonitorWithFilters } from '../types/scraper';
 import { rateLimiter } from '../utils/rate-limiter';
 import { retry, retryPresets } from '../utils/retry-helper';
+import { screenshotHelper } from '../utils/screenshot-helper';
 
 /**
  * Zap Imóveis Scraper - Implementação Real
@@ -37,6 +38,7 @@ async function scrapeZapImoveisInternal(
   console.log(`🔍 Starting Zap Imóveis scraper for: ${monitor.name}`);
 
   let browser: Browser | null = null;
+  let page: Page | null = null;
 
   try {
     // Launch browser
@@ -51,7 +53,7 @@ async function scrapeZapImoveisInternal(
       locale: 'pt-BR',
     });
 
-    const page = await context.newPage();
+    page = await context.newPage();
 
     // Navigate to search URL
     console.log(`📄 Navigating to: ${monitor.searchUrl}`);
@@ -81,6 +83,20 @@ async function scrapeZapImoveisInternal(
     return ads;
   } catch (error: any) {
     console.error(`❌ Error in Zap Imóveis scraper: ${error.message}`);
+
+    // Captura screenshot para debug
+    if (page && screenshotHelper.isEnabled()) {
+      try {
+        await screenshotHelper.captureError(page, {
+          monitorId: monitor.id,
+          monitorName: monitor.name,
+          site: 'ZAP_IMOVEIS',
+          errorMessage: error.message,
+        });
+      } catch (screenshotError) {
+        console.error('Failed to capture error screenshot:', screenshotError);
+      }
+    }
 
     if (browser) {
       await browser.close();

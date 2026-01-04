@@ -4,6 +4,7 @@ import { rateLimiter } from '../utils/rate-limiter';
 import { retry, retryPresets } from '../utils/retry-helper';
 import { captchaSolver } from '../utils/captcha-solver';
 import { randomUA } from '../utils/user-agents';
+import { screenshotHelper } from '../utils/screenshot-helper';
 
 /**
  * Mercado Livre Scraper - Implementação Real
@@ -38,6 +39,7 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
   console.log(`🔍 Starting Mercado Livre scraper for: ${monitor.name}`);
 
   let browser: Browser | null = null;
+  let page: Page | null = null;
 
   try {
     // Launch browser
@@ -51,7 +53,7 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
       locale: 'pt-BR',
     });
 
-    const page = await context.newPage();
+    page = await context.newPage();
 
     // Navigate to search URL
     console.log(`📄 Navigating to: ${monitor.searchUrl}`);
@@ -108,6 +110,20 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
     return ads;
   } catch (error: any) {
     console.error(`❌ Error in Mercado Livre scraper: ${error.message}`);
+
+    // Captura screenshot para debug
+    if (page && screenshotHelper.isEnabled()) {
+      try {
+        await screenshotHelper.captureError(page, {
+          monitorId: monitor.id,
+          monitorName: monitor.name,
+          site: 'MERCADO_LIVRE',
+          errorMessage: error.message,
+        });
+      } catch (screenshotError) {
+        console.error('Failed to capture error screenshot:', screenshotError);
+      }
+    }
 
     if (browser) {
       await browser.close();

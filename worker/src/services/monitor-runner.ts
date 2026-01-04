@@ -8,6 +8,7 @@ import { scrapeVivaReal } from '../scrapers/vivareal-scraper';
 import { scrapeImovelweb } from '../scrapers/imovelweb-scraper';
 import { scrapeLeilao } from '../scrapers/leilao-scraper';
 import { TelegramService } from './telegram-service';
+import { emailService } from './email-service';
 import { circuitBreaker } from '../utils/circuit-breaker';
 import { log } from '../utils/logger';
 
@@ -191,24 +192,82 @@ export class MonitorRunner {
   }
 
   /**
-   * Envia alertas via Telegram
+   * Envia alertas via Telegram e Email (multi-canal)
    */
   private static async sendAlerts(monitor: any, ads: Ad[]): Promise<number> {
-    if (!monitor.user.telegramChatId) {
-      console.log('⚠️  Usuário sem Telegram configurado');
+    const hasTelegram = !!monitor.user.telegramChatId;
+    const hasEmail = !!monitor.user.email;
+
+    if (!hasTelegram && !hasEmail) {
+      console.log('⚠️  Usuário sem canais de notificação configurados (Telegram ou Email)');
       return 0;
     }
 
     let sentCount = 0;
 
     for (const ad of ads) {
-      try {
-        await TelegramService.sendAdAlert(monitor.user.telegramChatId, {
-          monitorName: monitor.name,
-          ad,
-        });
+      let alertSent = false;
 
-        // Marca alerta como enviado
+      // Tenta enviar por Telegram
+      if (hasTelegram) {
+        try {
+          await TelegramService.sendAdAlert(monitor.user.telegramChatId, {
+            monitorName: monitor.name,
+            ad,
+          });
+
+          alertSent = true;
+          log.info({
+            monitorId: monitor.id,
+            adId: ad.externalId,
+            channel: 'telegram',
+          }, '📱 Alerta enviado por Telegram');
+
+          // Delay entre alertas para evitar rate limit do Telegram
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } catch (error: any) {
+          log.error({
+            monitorId: monitor.id,
+            adId: ad.externalId,
+            channel: 'telegram',
+            error: error.message,
+          }, '❌ Erro ao enviar alerta por Telegram');
+        }
+      }
+
+      // Tenta enviar por Email
+      if (hasEmail && emailService.isEnabled()) {
+        try {
+          const result = await emailService.sendAdAlert({
+            to: monitor.user.email,
+            monitorName: monitor.name,
+            ad,
+          });
+
+          if (result.success) {
+            alertSent = true;
+            log.info({
+              monitorId: monitor.id,
+              adId: ad.externalId,
+              channel: 'email',
+              messageId: result.messageId,
+            }, '📧 Alerta enviado por Email');
+          }
+
+          // Delay entre emails
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        } catch (error: any) {
+          log.error({
+            monitorId: monitor.id,
+            adId: ad.externalId,
+            channel: 'email',
+            error: error.message,
+          }, '❌ Erro ao enviar alerta por Email');
+        }
+      }
+
+      // Marca alerta como enviado se pelo menos um canal funcionou
+      if (alertSent) {
         await prisma.adSeen.updateMany({
           where: {
             monitorId: monitor.id,
@@ -221,11 +280,6 @@ export class MonitorRunner {
         });
 
         sentCount++;
-
-        // Delay entre alertas para evitar rate limit do Telegram
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      } catch (error) {
-        console.error('❌ Erro ao enviar alerta:', error);
       }
     }
 

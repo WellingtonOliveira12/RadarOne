@@ -29,6 +29,7 @@ import subscriptionRoutes from './routes/subscription.routes';
 import devRoutes from './routes/dev.routes';
 import webhookRoutes from './routes/webhook.routes';
 import adminRoutes from './routes/admin.routes';
+import metricsRoutes from './routes/metrics';
 import couponRoutes from './routes/coupon.routes';
 import notificationRoutes from './routes/notification.routes';
 import telegramRoutes from './routes/telegram.routes';
@@ -216,6 +217,7 @@ app.use('/api/plans', planRoutes); // Rota pública
 app.use('/api/subscriptions', authenticateToken, subscriptionRoutes); // Protegida
 app.use('/api/me', authenticateToken, userRoutes); // Protegida
 app.use('/api/admin', authenticateToken, adminRoutes); // Protegida (auth + admin)
+app.use('/api/metrics', metricsRoutes); // Métricas (protegida - auth + admin no controller)
 app.use('/api/dev', devRoutes); // Rotas de desenvolvimento (apenas em dev)
 app.use('/api/webhooks', webhookRoutes); // Webhooks (SEM autenticação JWT - usa HMAC)
 app.use('/api/telegram', telegramRoutes); // Telegram webhook (SEM JWT - usa secret)
