@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middlewares/auth.middleware';
+import { prisma } from '../server';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * GET /api/metrics/overview
