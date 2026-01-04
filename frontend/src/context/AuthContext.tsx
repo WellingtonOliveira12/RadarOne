@@ -32,6 +32,7 @@ interface AuthContextData {
     notificationPreference?: 'TELEGRAM' | 'EMAIL';
     telegramUsername?: string;
   }) => Promise<void>;
+  refetchUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -116,8 +117,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     logout('session_expired');
   }, timeoutMinutes);
 
+  const refetchUser = async () => {
+    await loadUser();
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, register }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, register, refetchUser }}>
       {children}
     </AuthContext.Provider>
   );

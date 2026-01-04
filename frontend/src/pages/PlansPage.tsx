@@ -48,7 +48,7 @@ export const PlansPage: React.FC = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { user } = useAuth();
+  const { user, refetchUser } = useAuth();
   const navigate = useNavigate();
 
   // Estado de seleção de plano (para aplicar cupom)
@@ -186,6 +186,10 @@ export const PlansPage: React.FC = () => {
       });
 
       showInfo(`Cupom aplicado! ${data.message}`);
+
+      // CRÍTICO: Atualizar estado do usuário no AuthContext
+      // para que RequireSubscriptionRoute reconheça a nova subscription
+      await refetchUser();
 
     } catch (err: any) {
       const errorMessage = err.message || 'Erro ao aplicar cupom';
