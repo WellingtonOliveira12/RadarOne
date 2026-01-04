@@ -81,7 +81,8 @@ export class CouponController {
         const userId = (req as any).userId;
 
         if (!userId) {
-          // Usuário não autenticado - bloquear acesso ao VITALICIO
+          // Log interno: usuário não autenticado tentou usar VITALICIO
+          console.warn(`[VITALICIO] Acesso negado: usuário não autenticado tentou usar cupom VITALICIO`);
           res.status(404).json({
             valid: false,
             error: 'Cupom inválido ou não encontrado'
@@ -95,13 +96,17 @@ export class CouponController {
         });
 
         if (!user || !isEmailAllowedForVitalicio(user.email)) {
-          // Retornar erro genérico para não revelar que é cupom privado
+          // Log interno: usuário não autorizado tentou usar VITALICIO
+          console.warn(`[VITALICIO] Acesso negado: usuário ${user?.email || 'desconhecido'} (ID: ${userId}) não está na allowlist`);
           res.status(404).json({
             valid: false,
             error: 'Cupom inválido ou não encontrado'
           });
           return;
         }
+
+        // Log interno: acesso autorizado
+        console.info(`[VITALICIO] Acesso autorizado: usuário ${user.email} (ID: ${userId})`);
       }
 
       // Cupom inativo
@@ -131,27 +136,51 @@ export class CouponController {
         return;
       }
 
-      // Verificar se cupom é específico para um plano
-      if (coupon.appliesToPlanId && (planSlug || planId)) {
-        let plan = null;
+      // HARDENING: Validação de planId/planSlug
+      // Regra 1: Se cupom é genérico (não tem appliesToPlanId) e não vem planId → erro
+      if (!coupon.appliesToPlanId && !planId && !planSlug) {
+        res.status(400).json({
+          valid: false,
+          error: 'Este cupom requer que você selecione um plano antes de validar'
+        });
+        return;
+      }
 
-        if (planId) {
-          plan = await prisma.plan.findUnique({
-            where: { id: planId }
-          });
-        } else if (planSlug) {
-          plan = await prisma.plan.findUnique({
-            where: { slug: planSlug }
-          });
-        }
+      // Regra 2 e 3: Se cupom é específico, validar compatibilidade
+      if (coupon.appliesToPlanId) {
+        // Se veio planId/planSlug, verificar se bate
+        if (planId || planSlug) {
+          let plan = null;
 
-        if (plan && plan.id !== coupon.appliesToPlanId) {
-          res.status(400).json({
-            valid: false,
-            error: `Este cupom é válido apenas para o plano ${coupon.plan?.name || 'específico'}`
-          });
-          return;
+          if (planId) {
+            plan = await prisma.plan.findUnique({
+              where: { id: planId }
+            });
+          } else if (planSlug) {
+            plan = await prisma.plan.findUnique({
+              where: { slug: planSlug }
+            });
+          }
+
+          // Plano fornecido não encontrado
+          if (!plan) {
+            res.status(404).json({
+              valid: false,
+              error: 'Plano não encontrado'
+            });
+            return;
+          }
+
+          // Plano fornecido diferente do que o cupom exige
+          if (plan.id !== coupon.appliesToPlanId) {
+            res.status(400).json({
+              valid: false,
+              error: `Este cupom é válido apenas para o plano ${coupon.plan?.name || 'específico'}`
+            });
+            return;
+          }
         }
+        // Se não veio planId/planSlug, tudo bem - cupom específico usa seu próprio plano
       }
 
       // Rastrear validação (para analytics e notificações de abandono)
@@ -414,13 +443,17 @@ export class CouponController {
         });
 
         if (!user || !isEmailAllowedForVitalicio(user.email)) {
-          // Retornar erro genérico para não revelar que é cupom privado
+          // Log interno: usuário não autorizado tentou resgatar VITALICIO
+          console.warn(`[VITALICIO] Resgate negado: usuário ${user?.email || 'desconhecido'} (ID: ${userId}) não está na allowlist`);
           res.status(404).json({
             valid: false,
             error: 'Cupom inválido ou não encontrado'
           });
           return;
         }
+
+        // Log interno: resgate autorizado
+        console.info(`[VITALICIO] Resgate autorizado: usuário ${user.email} (ID: ${userId})`);
       }
 
       // Validar se é cupom de trial upgrade
@@ -467,26 +500,59 @@ export class CouponController {
         return;
       }
 
-      // 2. Determinar plano alvo
+      // 2. HARDENING: Determinar plano alvo com validação robusta
       let targetPlan = null;
-      if (coupon.appliesToPlanId) {
-        // Cupom amarra plano específico
-        targetPlan = coupon.plan;
-      } else if (planId) {
-        // Plano fornecido pelo usuário
+
+      // Regra 1: Cupom genérico (não tem appliesToPlanId) exige planId
+      if (!coupon.appliesToPlanId) {
+        if (!planId) {
+          res.status(400).json({
+            error: 'Este cupom requer que você selecione um plano antes de aplicar'
+          });
+          return;
+        }
+
+        // Buscar plano fornecido pelo usuário
         targetPlan = await prisma.plan.findUnique({
           where: { id: planId }
         });
-      } else {
-        res.status(400).json({
-          error: 'Plano alvo não especificado e cupom não amarra plano específico'
-        });
-        return;
-      }
 
-      if (!targetPlan) {
-        res.status(404).json({ error: 'Plano não encontrado' });
-        return;
+        if (!targetPlan) {
+          res.status(404).json({ error: 'Plano não encontrado' });
+          return;
+        }
+      }
+      // Regra 2 e 3: Cupom específico (tem appliesToPlanId)
+      else {
+        // Se veio planId, validar se bate com o plano do cupom
+        if (planId) {
+          const providedPlan = await prisma.plan.findUnique({
+            where: { id: planId }
+          });
+
+          if (!providedPlan) {
+            res.status(404).json({ error: 'Plano não encontrado' });
+            return;
+          }
+
+          // Plano fornecido diferente do que o cupom exige
+          if (providedPlan.id !== coupon.appliesToPlanId) {
+            res.status(400).json({
+              error: `Este cupom é válido apenas para o plano ${coupon.plan?.name || 'específico'}`
+            });
+            return;
+          }
+
+          targetPlan = providedPlan;
+        } else {
+          // Se não veio planId, usar o plano do cupom (está amarrado)
+          targetPlan = coupon.plan;
+
+          if (!targetPlan) {
+            res.status(500).json({ error: 'Cupom mal configurado: plano amarrado não encontrado' });
+            return;
+          }
+        }
       }
 
       // 3. Verificar subscription atual do usuário
