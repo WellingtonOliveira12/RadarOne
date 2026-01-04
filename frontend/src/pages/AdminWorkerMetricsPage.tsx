@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Loader2, TrendingUp, CheckCircle2, XCircle, Clock, Activity } from 'lucide-react';
-import { apiClient } from '../lib/api';
+import { api } from '../services/api';
 
 /**
  * Admin Worker Metrics Page
@@ -67,14 +67,14 @@ export function AdminWorkerMetricsPage() {
 
     try {
       const [overviewRes, performanceRes, errorsRes] = await Promise.all([
-        apiClient.get('/metrics/overview'),
-        apiClient.get('/metrics/performance?days=30'),
-        apiClient.get('/metrics/errors?days=7&limit=5'),
+        api.get('/metrics/overview'),
+        api.get('/metrics/performance?days=30'),
+        api.get('/metrics/errors?days=7&limit=5'),
       ]);
 
-      setOverview(overviewRes.data);
-      setPerformance(performanceRes.data);
-      setErrors(errorsRes.data);
+      setOverview(overviewRes);
+      setPerformance(performanceRes);
+      setErrors(errorsRes);
     } catch (error) {
       console.error('Erro ao carregar métricas:', error);
     } finally {
