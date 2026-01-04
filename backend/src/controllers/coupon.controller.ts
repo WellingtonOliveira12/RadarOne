@@ -22,6 +22,22 @@ function normalizeCouponCode(code: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+/**
+ * Verifica se um email está na allowlist do cupom VITALICIO
+ * @param email Email do usuário
+ * @returns true se autorizado, false caso contrário
+ */
+function isEmailAllowedForVitalicio(email: string): boolean {
+  const allowedEmails = process.env.VITALICIO_ALLOWED_EMAILS || '';
+  if (!allowedEmails.trim()) {
+    // Se não há allowlist configurada, ninguém pode usar
+    return false;
+  }
+
+  const emailList = allowedEmails.split(',').map(e => e.trim().toLowerCase());
+  return emailList.includes(email.toLowerCase());
+}
+
 export class CouponController {
   /**
    * POST /api/coupons/validate
@@ -29,7 +45,7 @@ export class CouponController {
    */
   static async validateCoupon(req: Request, res: Response): Promise<void> {
     try {
-      const { code, planSlug } = req.body;
+      const { code, planSlug, planId } = req.body;
 
       if (!code) {
         res.status(400).json({ error: 'Código do cupom é obrigatório' });
@@ -57,6 +73,35 @@ export class CouponController {
           error: 'Cupom inválido ou não encontrado'
         });
         return;
+      }
+
+      // Verificar se é cupom VITALICIO (privado - allowlist)
+      if (normalizedCode === 'VITALICIO') {
+        // Buscar userId do request (pode ser undefined se não autenticado)
+        const userId = (req as any).userId;
+
+        if (!userId) {
+          // Usuário não autenticado - bloquear acesso ao VITALICIO
+          res.status(404).json({
+            valid: false,
+            error: 'Cupom inválido ou não encontrado'
+          });
+          return;
+        }
+
+        // Buscar email do usuário
+        const user = await prisma.user.findUnique({
+          where: { id: userId }
+        });
+
+        if (!user || !isEmailAllowedForVitalicio(user.email)) {
+          // Retornar erro genérico para não revelar que é cupom privado
+          res.status(404).json({
+            valid: false,
+            error: 'Cupom inválido ou não encontrado'
+          });
+          return;
+        }
       }
 
       // Cupom inativo
@@ -87,10 +132,18 @@ export class CouponController {
       }
 
       // Verificar se cupom é específico para um plano
-      if (coupon.appliesToPlanId && planSlug) {
-        const plan = await prisma.plan.findUnique({
-          where: { slug: planSlug }
-        });
+      if (coupon.appliesToPlanId && (planSlug || planId)) {
+        let plan = null;
+
+        if (planId) {
+          plan = await prisma.plan.findUnique({
+            where: { id: planId }
+          });
+        } else if (planSlug) {
+          plan = await prisma.plan.findUnique({
+            where: { slug: planSlug }
+          });
+        }
 
         if (plan && plan.id !== coupon.appliesToPlanId) {
           res.status(400).json({
@@ -351,6 +404,23 @@ export class CouponController {
           error: 'Cupom inválido ou não encontrado'
         });
         return;
+      }
+
+      // Verificar se é cupom VITALICIO (privado - allowlist)
+      if (normalizedCode === 'VITALICIO') {
+        // Buscar email do usuário
+        const user = await prisma.user.findUnique({
+          where: { id: userId }
+        });
+
+        if (!user || !isEmailAllowedForVitalicio(user.email)) {
+          // Retornar erro genérico para não revelar que é cupom privado
+          res.status(404).json({
+            valid: false,
+            error: 'Cupom inválido ou não encontrado'
+          });
+          return;
+        }
       }
 
       // Validar se é cupom de trial upgrade

@@ -51,6 +51,9 @@ export const PlansPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Estado de seleção de plano (para aplicar cupom)
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+
   // Estado do cupom de trial upgrade
   const [couponCode, setCouponCode] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
@@ -137,6 +140,11 @@ export const PlansPage: React.FC = () => {
       return;
     }
 
+    if (!selectedPlan) {
+      setCouponError('Selecione um plano antes de aplicar o cupom. Clique no card do plano desejado.');
+      return;
+    }
+
     setCouponLoading(true);
     setCouponError('');
     setCouponSuccess(null);
@@ -150,7 +158,7 @@ export const PlansPage: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ code: normalizedCode })
+        body: JSON.stringify({ code: normalizedCode, planId: selectedPlan.id })
       });
 
       const data = await response.json();
@@ -200,6 +208,11 @@ export const PlansPage: React.FC = () => {
       return;
     }
 
+    if (!selectedPlan) {
+      setDiscountCouponError('Selecione um plano antes de validar o cupom. Clique no card do plano desejado.');
+      return;
+    }
+
     setDiscountCouponLoading(true);
     setDiscountCouponError('');
     setDiscountCouponData(null);
@@ -211,7 +224,7 @@ export const PlansPage: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code: normalizedCode })
+        body: JSON.stringify({ code: normalizedCode, planId: selectedPlan.id })
       });
 
       const data = await response.json();
@@ -336,6 +349,13 @@ export const PlansPage: React.FC = () => {
           Use o RadarOne gratuitamente por 7 dias ou assine um plano com 7 dias de garantia.
         </p>
 
+        {/* Mensagem orientativa sobre seleção */}
+        {!selectedPlan && (
+          <div style={styles.selectionHint}>
+            💡 <strong>Dica:</strong> Clique no card de um plano para selecioná-lo antes de aplicar cupom
+          </div>
+        )}
+
         {/* Banner de trial expirado */}
         {reason === 'trial_expired' && (
           <div style={styles.trialExpiredBanner}>
@@ -417,13 +437,19 @@ export const PlansPage: React.FC = () => {
           {plans.map((plan) => (
             <div
               key={plan.id}
+              onClick={() => setSelectedPlan(plan)}
               style={{
                 ...styles.planCard,
                 ...(plan.isRecommended ? styles.planCardRecommended : {}),
+                ...(selectedPlan?.id === plan.id ? styles.planCardSelected : {}),
+                cursor: 'pointer',
               }}
             >
               {plan.isRecommended && (
                 <div style={styles.recommendedBadge}>⭐ Recomendado</div>
+              )}
+              {selectedPlan?.id === plan.id && (
+                <div style={styles.selectedBadge}>✓ Selecionado</div>
               )}
 
               <h2 style={styles.planName}>{plan.name}</h2>
@@ -601,6 +627,16 @@ const styles = {
     textAlign: 'center' as const,
     marginBottom: responsive.spacing.xl,
   },
+  selectionHint: {
+    backgroundColor: '#dbeafe',
+    border: '1px solid #3b82f6',
+    borderRadius: '8px',
+    padding: responsive.spacing.md,
+    marginBottom: responsive.spacing.lg,
+    textAlign: 'center' as const,
+    color: '#1e40af',
+    fontSize: responsive.typography.small.fontSize,
+  },
   error: {
     backgroundColor: '#fee',
     color: '#c33',
@@ -627,12 +663,28 @@ const styles = {
     border: '2px solid #3b82f6',
     boxShadow: '0 4px 16px rgba(59,130,246,0.2)',
   },
+  planCardSelected: {
+    border: '3px solid #10b981',
+    boxShadow: '0 4px 20px rgba(16,185,129,0.4)',
+    backgroundColor: '#f0fdf4',
+  },
   recommendedBadge: {
     position: 'absolute' as const,
     top: '-12px',
     left: '50%',
     transform: 'translateX(-50%)',
     backgroundColor: '#3b82f6',
+    color: 'white',
+    padding: '4px 12px',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: '600',
+  },
+  selectedBadge: {
+    position: 'absolute' as const,
+    top: '-12px',
+    right: '16px',
+    backgroundColor: '#10b981',
     color: 'white',
     padding: '4px 12px',
     borderRadius: '12px',
