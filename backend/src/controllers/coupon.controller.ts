@@ -36,10 +36,15 @@ export class CouponController {
         return;
       }
 
-      // Buscar cupom (com normalização para lidar com acentos)
+      // Buscar cupom (com normalização para lidar com acentos + case-insensitive)
       const normalizedCode = normalizeCouponCode(code);
-      const coupon = await prisma.coupon.findUnique({
-        where: { code: normalizedCode },
+      const coupon = await prisma.coupon.findFirst({
+        where: {
+          code: {
+            equals: normalizedCode,
+            mode: 'insensitive'
+          }
+        },
         include: {
           plan: true
         }
@@ -152,10 +157,15 @@ export class CouponController {
         return;
       }
 
-      // Buscar cupom (com normalização para lidar com acentos)
+      // Buscar cupom (com normalização para lidar com acentos + case-insensitive)
       const normalizedCode = normalizeCouponCode(code);
-      const coupon = await prisma.coupon.findUnique({
-        where: { code: normalizedCode }
+      const coupon = await prisma.coupon.findFirst({
+        where: {
+          code: {
+            equals: normalizedCode,
+            mode: 'insensitive'
+          }
+        }
       });
 
       if (!coupon || !coupon.isActive) {
@@ -323,10 +333,15 @@ export class CouponController {
         return;
       }
 
-      // 1. Buscar e validar cupom (com normalização para lidar com acentos)
+      // 1. Buscar e validar cupom (com normalização para lidar com acentos + case-insensitive)
       const normalizedCode = normalizeCouponCode(code);
-      const coupon = await prisma.coupon.findUnique({
-        where: { code: normalizedCode },
+      const coupon = await prisma.coupon.findFirst({
+        where: {
+          code: {
+            equals: normalizedCode,
+            mode: 'insensitive'
+          }
+        },
         include: { plan: true }
       });
 

@@ -29,7 +29,8 @@ export class PlanController {
           isRecommended: true,
           priority: true,
           isActive: true,
-          isLifetime: true
+          isLifetime: true,
+          checkoutUrl: true
         }
       });
 
@@ -65,7 +66,8 @@ export class PlanController {
           isRecommended: true,
           priority: true,
           isActive: true,
-          isLifetime: true
+          isLifetime: true,
+          checkoutUrl: true
         }
       });
 
