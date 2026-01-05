@@ -288,6 +288,30 @@ const startServer = async () => {
     const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
     const isProduction = process.env.NODE_ENV === 'production';
 
+    // Configurar webhook do Telegram (apenas em produção)
+    if (isProduction) {
+      try {
+        const { setupTelegramWebhook } = await import('./services/telegramService');
+        const webhookResult = await setupTelegramWebhook();
+
+        if (webhookResult.success) {
+          if (webhookResult.configured) {
+            logInfo('Telegram webhook configured successfully at boot');
+          } else {
+            logInfo('Telegram webhook already configured correctly');
+          }
+        } else {
+          logError('Failed to configure Telegram webhook (non-fatal)', {
+            err: webhookResult.error
+          });
+          // Não falhar o boot por causa disso
+        }
+      } catch (error) {
+        logError('Failed to setup Telegram webhook (non-fatal)', { err: error });
+        // Não falhar o boot por causa disso
+      }
+    }
+
     // Inicia o servidor (0.0.0.0 para aceitar conexões externas na Render)
     app.listen(PORT, '0.0.0.0', () => {
       logInfo('Server started successfully', {

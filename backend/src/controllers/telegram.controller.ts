@@ -5,7 +5,9 @@ import {
   generateConnectToken,
   getTelegramStatus,
   disconnectTelegram,
-  processStartCommand
+  processStartCommand,
+  getWebhookInfo,
+  setTelegramWebhook
 } from '../services/telegramService';
 
 /**
@@ -85,6 +87,98 @@ export class TelegramController {
   }
 
   /**
+   * Configura webhook do Telegram (ADMIN only)
+   * POST /api/telegram/admin/configure-webhook
+   */
+  static async configureWebhook(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const user = await (await import('../server')).prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      // Apenas admins podem acessar
+      if (!user || user.role !== 'ADMIN') {
+        res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+        return;
+      }
+
+      const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+      if (!TELEGRAM_WEBHOOK_SECRET) {
+        res.status(500).json({
+          error: 'TELEGRAM_WEBHOOK_SECRET não configurado',
+          message: 'Configure a variável de ambiente TELEGRAM_WEBHOOK_SECRET antes de configurar o webhook'
+        });
+        return;
+      }
+
+      // Calcular webhook URL esperado
+      const BASE_URL = process.env.BACKEND_BASE_URL || process.env.PUBLIC_URL || process.env.BACKEND_URL || 'https://api.radarone.com.br';
+      const webhookUrl = `${BASE_URL}/api/telegram/webhook?secret=${TELEGRAM_WEBHOOK_SECRET}`;
+
+      console.log('[TelegramController.configureWebhook] Configurando webhook', {
+        userId,
+        webhookUrl: webhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>'),
+        action: 'configure_webhook_start'
+      });
+
+      // Configurar webhook
+      const setResult = await setTelegramWebhook(webhookUrl);
+
+      if (!setResult.success) {
+        console.error('[TelegramController.configureWebhook] Erro ao configurar webhook', {
+          error: setResult.error,
+          action: 'configure_webhook_failed'
+        });
+
+        res.status(500).json({
+          error: 'Erro ao configurar webhook',
+          message: setResult.error,
+          webhookUrl: webhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>')
+        });
+        return;
+      }
+
+      // Validar configuração
+      const webhookInfo = await getWebhookInfo();
+
+      const success = webhookInfo.success && webhookInfo.url === webhookUrl;
+
+      console.log('[TelegramController.configureWebhook] Webhook configurado', {
+        userId,
+        success,
+        currentUrl: webhookInfo.url?.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>'),
+        expectedUrl: webhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>'),
+        action: 'configure_webhook_complete'
+      });
+
+      res.json({
+        success,
+        message: success
+          ? 'Webhook configurado com sucesso'
+          : 'Webhook configurado mas validação falhou',
+        webhookUrl: webhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>'),
+        validation: {
+          currentUrl: webhookInfo.url || null,
+          matches: success,
+          pendingUpdateCount: webhookInfo.pendingUpdateCount,
+          lastErrorMessage: webhookInfo.lastErrorMessage || null
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('[TelegramController.configureWebhook] Erro', { error: error.message });
+      res.status(500).json({ error: 'Erro ao configurar webhook' });
+    }
+  }
+
+  /**
    * Endpoint de debug/health do webhook (protegido por autenticação)
    * GET /api/telegram/webhook-health
    */
@@ -110,16 +204,57 @@ export class TelegramController {
       const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
       const TELEGRAM_BOT_USERNAME = (await import('../constants/telegram')).TELEGRAM_BOT_USERNAME;
 
+      // Calcular webhook esperado (usando BASE_URL com fallbacks)
+      const BASE_URL = process.env.BACKEND_BASE_URL || process.env.PUBLIC_URL || process.env.BACKEND_URL || 'https://api.radarone.com.br';
+      const expectedWebhookUrl = TELEGRAM_WEBHOOK_SECRET
+        ? `${BASE_URL}/api/telegram/webhook?secret=${TELEGRAM_WEBHOOK_SECRET}`
+        : `${BASE_URL}/api/telegram/webhook?secret=<NOT_CONFIGURED>`;
+
+      // Obter informações reais do webhook configurado no Telegram
+      const webhookInfo = await getWebhookInfo();
+
+      // Comparar webhook esperado vs atual
+      const webhookMatches = webhookInfo.success && webhookInfo.url === expectedWebhookUrl;
+
       res.json({
-        webhookPath: '/api/telegram/webhook',
-        webhookUrl: `${process.env.BACKEND_URL || 'https://api-radarone.onrender.com'}/api/telegram/webhook?secret=<SECRET>`,
-        botUsername: TELEGRAM_BOT_USERNAME,
-        botTokenConfigured: !!TELEGRAM_BOT_TOKEN,
-        botTokenPrefix: TELEGRAM_BOT_TOKEN ? TELEGRAM_BOT_TOKEN.substring(0, 10) + '...' : null,
-        webhookSecretConfigured: !!TELEGRAM_WEBHOOK_SECRET,
-        webhookSecretLength: TELEGRAM_WEBHOOK_SECRET?.length || 0,
-        nodeEnv: process.env.NODE_ENV,
-        backendUrl: process.env.BACKEND_URL,
+        // Configuração local
+        local: {
+          webhookPath: '/api/telegram/webhook',
+          expectedWebhookUrl,
+          botUsername: TELEGRAM_BOT_USERNAME,
+          botTokenConfigured: !!TELEGRAM_BOT_TOKEN,
+          botTokenPrefix: TELEGRAM_BOT_TOKEN ? TELEGRAM_BOT_TOKEN.substring(0, 10) + '...' : null,
+          webhookSecretConfigured: !!TELEGRAM_WEBHOOK_SECRET,
+          webhookSecretLength: TELEGRAM_WEBHOOK_SECRET?.length || 0,
+          baseUrl: BASE_URL,
+          nodeEnv: process.env.NODE_ENV
+        },
+        // Webhook real no Telegram
+        telegram: {
+          success: webhookInfo.success,
+          currentWebhookUrl: webhookInfo.url || null,
+          hasCustomCertificate: webhookInfo.hasCustomCertificate,
+          pendingUpdateCount: webhookInfo.pendingUpdateCount,
+          lastErrorDate: webhookInfo.lastErrorDate
+            ? new Date(webhookInfo.lastErrorDate * 1000).toISOString()
+            : null,
+          lastErrorMessage: webhookInfo.lastErrorMessage || null,
+          maxConnections: webhookInfo.maxConnections,
+          ipAddress: webhookInfo.ipAddress,
+          error: webhookInfo.error || null
+        },
+        // Diagnóstico
+        diagnostics: {
+          webhookMatches,
+          status: webhookMatches
+            ? 'OK - Webhook configurado corretamente'
+            : webhookInfo.url
+              ? 'WARNING - Webhook configurado mas URL diferente da esperada'
+              : 'ERROR - Webhook não configurado no Telegram',
+          action: webhookMatches
+            ? null
+            : 'Use POST /api/telegram/admin/configure-webhook para configurar o webhook correto'
+        },
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {

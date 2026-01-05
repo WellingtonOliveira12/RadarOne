@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../server';
-import { generateLinkCode, sendTelegramMessage } from '../services/telegramService';
+import { generateLinkCode, sendTelegramMessage, getChatIdForUser } from '../services/telegramService';
 import { sendWelcomeEmail } from '../services/emailService';
 import { TELEGRAM_BOT_USERNAME } from '../constants/telegram';
 
@@ -247,31 +247,48 @@ export class NotificationController {
         return;
       }
 
-      const settings = await prisma.notificationSettings.findUnique({
-        where: { userId }
-      });
+      // Usar fonte canônica de chatId (TelegramAccount com fallback para NotificationSettings)
+      const chatId = await getChatIdForUser(userId);
 
-      if (!settings || !settings.telegramChatId) {
+      if (!chatId) {
         res.status(400).json({
           error: 'Telegram não vinculado',
-          message: 'Você precisa vincular sua conta do Telegram primeiro. Use o endpoint /telegram/link-code para gerar um código.'
+          message: 'Você precisa vincular sua conta do Telegram primeiro. Use o painel para gerar um link de conexão.'
         });
         return;
       }
 
-      console.log('[NotificationController.testTelegram] Enviando mensagem de teste', { userId });
+      console.log('[NotificationController.testTelegram] Enviando mensagem de teste', {
+        userId,
+        chatId,
+        action: 'test_telegram_start'
+      });
 
       const result = await sendTelegramMessage({
-        chatId: settings.telegramChatId,
+        chatId,
         text: '🎉 Teste de notificação!\n\nSua conta do Telegram está vinculada corretamente ao RadarOne.'
       });
 
       if (result.success) {
+        console.log('[NotificationController.testTelegram] Mensagem enviada com sucesso', {
+          userId,
+          chatId,
+          messageId: result.messageId,
+          action: 'test_telegram_success'
+        });
+
         res.json({
           message: 'Mensagem de teste enviada com sucesso',
           messageId: result.messageId
         });
       } else {
+        console.error('[NotificationController.testTelegram] Erro ao enviar mensagem', {
+          userId,
+          chatId,
+          error: result.error,
+          action: 'test_telegram_failed'
+        });
+
         res.status(500).json({
           error: 'Erro ao enviar mensagem de teste',
           message: result.error

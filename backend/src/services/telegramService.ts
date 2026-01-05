@@ -76,6 +76,65 @@ Monitor: <i>${monitorName}</i>
 }
 
 /**
+ * Obtém informações do webhook configurado no Telegram
+ */
+export async function getWebhookInfo(): Promise<{
+  success: boolean;
+  url?: string;
+  hasCustomCertificate?: boolean;
+  pendingUpdateCount?: number;
+  lastErrorDate?: number;
+  lastErrorMessage?: string;
+  maxConnections?: number;
+  ipAddress?: string;
+  error?: string;
+}> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return {
+      success: false,
+      error: 'TELEGRAM_BOT_TOKEN não configurado'
+    };
+  }
+
+  try {
+    const response = await axios.get(`${TELEGRAM_API_BASE}/getWebhookInfo`);
+
+    if (!response.data.ok) {
+      return {
+        success: false,
+        error: response.data.description || 'Erro desconhecido ao buscar webhook info'
+      };
+    }
+
+    const result = response.data.result;
+
+    console.log('[TelegramService] Webhook info obtido', {
+      url: result.url,
+      pendingUpdates: result.pending_update_count,
+      lastError: result.last_error_message
+    });
+
+    return {
+      success: true,
+      url: result.url || '',
+      hasCustomCertificate: result.has_custom_certificate || false,
+      pendingUpdateCount: result.pending_update_count || 0,
+      lastErrorDate: result.last_error_date || undefined,
+      lastErrorMessage: result.last_error_message || undefined,
+      maxConnections: result.max_connections || undefined,
+      ipAddress: result.ip_address || undefined
+    };
+  } catch (error: any) {
+    console.error('[TelegramService] Erro ao obter webhook info', { error: error.message });
+
+    return {
+      success: false,
+      error: error.response?.data?.description || error.message
+    };
+  }
+}
+
+/**
  * Configura webhook do Telegram
  */
 export async function setTelegramWebhook(webhookUrl: string): Promise<{ success: boolean; error?: string }> {
@@ -103,6 +162,122 @@ export async function setTelegramWebhook(webhookUrl: string): Promise<{ success:
     return {
       success: false,
       error: error.response?.data?.description || error.message
+    };
+  }
+}
+
+/**
+ * Configura webhook do Telegram automaticamente (boot time)
+ * REGRA: Verifica se já está configurado antes de reconfigurar (idempotente)
+ */
+export async function setupTelegramWebhook(): Promise<{ success: boolean; configured: boolean; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    console.warn('[TelegramService.setupWebhook] TELEGRAM_BOT_TOKEN não configurado, pulando setup de webhook');
+    return {
+      success: false,
+      configured: false,
+      error: 'TELEGRAM_BOT_TOKEN não configurado'
+    };
+  }
+
+  if (!TELEGRAM_WEBHOOK_SECRET) {
+    console.warn('[TelegramService.setupWebhook] TELEGRAM_WEBHOOK_SECRET não configurado, pulando setup de webhook');
+    return {
+      success: false,
+      configured: false,
+      error: 'TELEGRAM_WEBHOOK_SECRET não configurado'
+    };
+  }
+
+  try {
+    // Calcular webhook URL esperado
+    const BASE_URL = process.env.BACKEND_BASE_URL || process.env.PUBLIC_URL || process.env.BACKEND_URL || 'https://api.radarone.com.br';
+    const expectedWebhookUrl = `${BASE_URL}/api/telegram/webhook?secret=${TELEGRAM_WEBHOOK_SECRET}`;
+
+    console.log('[TelegramService.setupWebhook] Verificando configuração de webhook...', {
+      action: 'setup_webhook_start',
+      expectedUrl: expectedWebhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>')
+    });
+
+    // Verificar se já está configurado
+    const info = await getWebhookInfo();
+
+    if (!info.success) {
+      console.error('[TelegramService.setupWebhook] Erro ao obter webhook info', {
+        action: 'setup_webhook_failed',
+        error: info.error
+      });
+      return {
+        success: false,
+        configured: false,
+        error: info.error
+      };
+    }
+
+    // Se já está configurado corretamente, não fazer nada
+    if (info.url === expectedWebhookUrl) {
+      console.log('[TelegramService.setupWebhook] Webhook já configurado corretamente', {
+        action: 'setup_webhook_skip',
+        url: info.url.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>'),
+        pendingUpdates: info.pendingUpdateCount
+      });
+      return {
+        success: true,
+        configured: false // Não foi configurado agora, já estava configurado
+      };
+    }
+
+    // Configurar webhook
+    console.log('[TelegramService.setupWebhook] Configurando webhook...', {
+      action: 'setup_webhook_configure',
+      currentUrl: info.url || 'none',
+      newUrl: expectedWebhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>')
+    });
+
+    const result = await setTelegramWebhook(expectedWebhookUrl);
+
+    if (!result.success) {
+      console.error('[TelegramService.setupWebhook] Erro ao configurar webhook', {
+        action: 'setup_webhook_failed',
+        error: result.error
+      });
+      return {
+        success: false,
+        configured: false,
+        error: result.error
+      };
+    }
+
+    // Validar configuração
+    const verifyInfo = await getWebhookInfo();
+    const isValid = verifyInfo.success && verifyInfo.url === expectedWebhookUrl;
+
+    if (isValid) {
+      console.log('[TelegramService.setupWebhook] Webhook configurado com sucesso', {
+        action: 'setup_webhook_success',
+        url: expectedWebhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>')
+      });
+    } else {
+      console.warn('[TelegramService.setupWebhook] Webhook configurado mas validação falhou', {
+        action: 'setup_webhook_validation_failed',
+        expectedUrl: expectedWebhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>'),
+        actualUrl: verifyInfo.url || 'none'
+      });
+    }
+
+    return {
+      success: isValid,
+      configured: true
+    };
+  } catch (error: any) {
+    console.error('[TelegramService.setupWebhook] Erro inesperado', {
+      action: 'setup_webhook_error',
+      error: error.message
+    });
+    return {
+      success: false,
+      configured: false,
+      error: error.message
     };
   }
 }
@@ -221,10 +396,12 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
     if (existingChatLink && existingChatLink.userId !== settings.userId) {
       // CONFLITO: Este Telegram já está vinculado a outra conta
       console.error('[TELEGRAM] Conflito: chatId já vinculado a outro usuário (sistema legado)', {
+        action: 'link_conflict',
+        reason: 'chat_already_linked_to_different_user',
         chatId,
         currentUserId: existingChatLink.userId,
         attemptedUserId: settings.userId,
-        action: 'link_conflict'
+        timestamp: new Date().toISOString()
       });
 
       await sendTelegramMessage({
@@ -272,11 +449,13 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
     // ✅ VALIDAR se mensagem foi enviada
     if (!sendResult.success) {
       console.error('[TELEGRAM] CRÍTICO: Vínculo criado no DB mas mensagem de confirmação FALHOU', {
+        action: 'link_success_but_confirmation_failed',
+        severity: 'CRITICAL',
         userId: settings.userId,
         chatId,
         username: username ? `@${username}` : null,
         sendError: sendResult.error,
-        action: 'link_success_but_message_failed'
+        timestamp: new Date().toISOString()
       });
       // ⚠️ Mesmo assim retornar sucesso pois o vínculo foi criado no DB
       // Mas logar CRÍTICO para investigação
@@ -290,11 +469,12 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
     }
 
     console.log('[TELEGRAM] Conta vinculada via código legado', {
+      action: 'link_success_legacy',
       userId: settings.userId,
       chatId,
       username: username ? `@${username}` : null,
-      messageSent: sendResult.success,
-      action: 'link_success_legacy'
+      confirmationSent: sendResult.success,
+      timestamp: new Date().toISOString()
     });
 
     return { success: true };
@@ -338,20 +518,112 @@ export function validateWebhookSecret(secret: string | undefined): boolean {
 }
 
 /**
- * Busca conta do Telegram do usuário
+ * Obtém chatId do usuário (fonte canônica: TelegramAccount)
+ * REGRA: TelegramAccount é a fonte de verdade, NotificationSettings é cache/compatibilidade
+ * Se encontrar em NotificationSettings mas não em TelegramAccount, faz migração automática
  */
-export async function getUserTelegramAccount(userId: string): Promise<{ chatId: string; username: string } | null> {
+export async function getChatIdForUser(userId: string): Promise<string | null> {
+  // PASSO 1: Tentar TelegramAccount primeiro (fonte canônica)
+  const account = await prisma.telegramAccount.findFirst({
+    where: { userId, active: true }
+  });
+
+  if (account?.chatId) {
+    console.log('[TelegramService.getChatIdForUser] ChatId encontrado em TelegramAccount', {
+      userId,
+      chatId: account.chatId,
+      source: 'TelegramAccount'
+    });
+    return account.chatId;
+  }
+
+  // PASSO 2: Fallback para NotificationSettings (compatibilidade/migração)
   const settings = await prisma.notificationSettings.findUnique({
     where: { userId }
   });
 
-  if (!settings || !settings.telegramChatId || !settings.telegramEnabled) {
+  if (settings?.telegramChatId && settings.telegramEnabled) {
+    console.log('[TelegramService.getChatIdForUser] ChatId encontrado em NotificationSettings, migrando...', {
+      userId,
+      chatId: settings.telegramChatId,
+      source: 'NotificationSettings',
+      action: 'migrate_to_telegram_account'
+    });
+
+    // SYNC: Criar TelegramAccount para consistência
+    try {
+      await prisma.telegramAccount.create({
+        data: {
+          userId,
+          chatId: settings.telegramChatId,
+          username: settings.telegramUsername,
+          active: true
+        }
+      });
+
+      console.log('[TelegramService.getChatIdForUser] Migração completa', {
+        userId,
+        chatId: settings.telegramChatId,
+        action: 'migration_success'
+      });
+    } catch (error: any) {
+      // Se já existir (race condition), ignorar
+      if (error.code === 'P2002') {
+        console.log('[TelegramService.getChatIdForUser] TelegramAccount já existe (race condition)', {
+          userId,
+          chatId: settings.telegramChatId
+        });
+      } else {
+        console.error('[TelegramService.getChatIdForUser] Erro ao migrar', {
+          userId,
+          error: error.message
+        });
+      }
+    }
+
+    return settings.telegramChatId;
+  }
+
+  console.log('[TelegramService.getChatIdForUser] ChatId não encontrado', {
+    userId,
+    hasAccount: !!account,
+    hasSettings: !!settings,
+    settingsEnabled: settings?.telegramEnabled || false
+  });
+
+  return null;
+}
+
+/**
+ * Busca conta do Telegram do usuário (LEGADO - usa NotificationSettings)
+ * DEPRECATED: Use getChatIdForUser() para obter apenas chatId
+ */
+export async function getUserTelegramAccount(userId: string): Promise<{ chatId: string; username: string } | null> {
+  const chatId = await getChatIdForUser(userId);
+
+  if (!chatId) {
     return null;
   }
 
+  // Buscar username de TelegramAccount ou NotificationSettings
+  const account = await prisma.telegramAccount.findFirst({
+    where: { userId, active: true }
+  });
+
+  if (account) {
+    return {
+      chatId: account.chatId,
+      username: account.username || ''
+    };
+  }
+
+  const settings = await prisma.notificationSettings.findUnique({
+    where: { userId }
+  });
+
   return {
-    chatId: settings.telegramChatId,
-    username: settings.telegramUsername || ''
+    chatId,
+    username: settings?.telegramUsername || ''
   };
 }
 
@@ -396,10 +668,12 @@ export async function generateConnectToken(userId: string): Promise<{ connectUrl
   const connectUrl = `${TELEGRAM_BOT_LINK}?start=connect_${token}`;
 
   console.log('[TELEGRAM] Token de conexão gerado', {
+    action: 'generate_connect_token',
     userId,
     tokenPrefix: token.substring(0, 8) + '...',
     expiresAt,
-    action: 'generate_connect_token'
+    expiresInMinutes: 15,
+    timestamp: new Date().toISOString()
   });
 
   return { connectUrl, token, expiresAt };
@@ -417,7 +691,13 @@ export async function processStartCommand(chatId: string, startParam: string, te
   try {
     // VALIDAÇÃO 1: Verificar formato do parâmetro
     if (!startParam || !startParam.startsWith('connect_')) {
-      console.warn('[TELEGRAM] Parâmetro inválido no /start', { chatId, startParam, action: 'link_rejected' });
+      console.warn('[TELEGRAM] Parâmetro inválido no /start', {
+        action: 'link_rejected',
+        reason: 'invalid_start_param',
+        chatId,
+        startParam,
+        timestamp: new Date().toISOString()
+      });
       return { success: false, error: 'Parâmetro inválido' };
     }
 
@@ -430,7 +710,13 @@ export async function processStartCommand(chatId: string, startParam: string, te
     });
 
     if (!tokenRecord) {
-      console.warn('[TELEGRAM] Token não encontrado', { chatId: chatIdStr, tokenPrefix: token.substring(0, 8) + '...', action: 'link_rejected' });
+      console.warn('[TELEGRAM] Token não encontrado', {
+        action: 'link_rejected',
+        reason: 'token_not_found',
+        chatId: chatIdStr,
+        tokenPrefix: token.substring(0, 8) + '...',
+        timestamp: new Date().toISOString()
+      });
       await sendTelegramMessage({
         chatId: chatIdStr,
         text: '❌ Token inválido.\n\nPor favor, gere um novo link de conexão no painel RadarOne.'
@@ -600,11 +886,13 @@ export async function processStartCommand(chatId: string, startParam: string, te
     }
 
     console.log('[TELEGRAM] Link bem-sucedido', {
+      action: 'link_success',
       userId: user.id,
       chatId: chatIdStr,
       username: username ? `@${username}` : null,
-      messageSent: sendResult.success,
-      action: 'link_success'
+      confirmationSent: sendResult.success,
+      tokenUsed: true,
+      timestamp: new Date().toISOString()
     });
 
     return { success: true };

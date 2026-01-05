@@ -23,7 +23,8 @@ router.post('/connect-token', authenticateToken, TelegramController.generateConn
 router.get('/status', authenticateToken, TelegramController.getStatus);
 router.post('/disconnect', authenticateToken, TelegramController.disconnect);
 
-// Debug/Health (requer autenticação + role ADMIN)
+// Admin only - Webhook management
+router.post('/admin/configure-webhook', authenticateToken, TelegramController.configureWebhook);
 router.get('/webhook-health', authenticateToken, TelegramController.webhookHealth);
 
 export default router;
