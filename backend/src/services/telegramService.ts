@@ -108,7 +108,8 @@ export async function setTelegramWebhook(webhookUrl: string): Promise<{ success:
 }
 
 /**
- * Gera código de vínculo para o usuário
+ * Gera código de vínculo para o usuário (SISTEMA LEGADO - RADAR-XXXXXX)
+ * REGRA: Substitui código anterior (apenas um código ativo por vez)
  */
 export async function generateLinkCode(userId: string): Promise<{ code: string; expiresAt: Date }> {
   // Gerar código único: RADAR-XXXXXX (6 caracteres alfanuméricos)
@@ -118,7 +119,7 @@ export async function generateLinkCode(userId: string): Promise<{ code: string; 
   const expiresAt = new Date();
   expiresAt.setMinutes(expiresAt.getMinutes() + 30);
 
-  // Salvar no banco
+  // Salvar no banco (upsert substitui código anterior se existir)
   await prisma.notificationSettings.upsert({
     where: { userId },
     create: {
@@ -134,13 +135,23 @@ export async function generateLinkCode(userId: string): Promise<{ code: string; 
     }
   });
 
-  console.log('[TelegramService] Código de vínculo gerado', { userId, code, expiresAt });
+  console.log('[TELEGRAM] Código de vínculo gerado (sistema legado)', {
+    userId,
+    code,
+    expiresAt,
+    action: 'generate_link_code_legacy'
+  });
 
   return { code, expiresAt };
 }
 
 /**
- * Processa mensagem recebida do webhook Telegram
+ * Processa mensagem recebida do webhook Telegram (SISTEMA LEGADO - RADAR-XXXXXX)
+ * REGRAS:
+ * - Validação de código e expiração
+ * - Verifica conflito de chatId (outro usuário)
+ * - Cria TelegramAccount para consistência com sistema novo
+ * - Atualiza NotificationSettings para compatibilidade
  */
 export async function processWebhookMessage(message: any): Promise<{ success: boolean; error?: string }> {
   try {
@@ -152,12 +163,12 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
       return { success: false, error: 'Mensagem inválida' };
     }
 
-    console.log('[TelegramService] Processando mensagem do webhook', { chatId, text });
+    console.log('[TELEGRAM] Processando mensagem do webhook (sistema legado)', { chatId, textLength: text.length });
 
     // Verificar se a mensagem contém um código RADAR-
     const codeMatch = text.match(/RADAR-([A-Z0-9]{6})/i);
     if (!codeMatch) {
-      // Mensagem não é um código de vínculo, ignorar ou enviar help
+      // Mensagem não é um código de vínculo, enviar ajuda
       await sendTelegramMessage({
         chatId,
         text: '❌ Código inválido.\n\nPara vincular sua conta, use o código gerado no painel RadarOne.\nFormato: RADAR-XXXXXX'
@@ -167,7 +178,7 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
 
     const fullCode = codeMatch[0].toUpperCase();
 
-    // Buscar settings com esse código
+    // Buscar settings com esse código (não expirado)
     const now = new Date();
     const settings = await prisma.notificationSettings.findFirst({
       where: {
@@ -182,6 +193,7 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
     });
 
     if (!settings) {
+      console.warn('[TELEGRAM] Código não encontrado ou expirado (sistema legado)', { chatId, code: fullCode, action: 'link_rejected' });
       await sendTelegramMessage({
         chatId,
         text: '❌ Código inválido ou expirado.\n\nGere um novo código no painel RadarOne.'
@@ -189,7 +201,45 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
       return { success: false, error: 'Código não encontrado ou expirado' };
     }
 
-    // Vincular chatId e ativar Telegram
+    // VALIDAÇÃO: Verificar se chatId já está vinculado a OUTRO usuário
+    const existingChatLink = await prisma.telegramAccount.findUnique({
+      where: { chatId }
+    });
+
+    if (existingChatLink && existingChatLink.userId !== settings.userId) {
+      // CONFLITO: Este Telegram já está vinculado a outra conta
+      console.error('[TELEGRAM] Conflito: chatId já vinculado a outro usuário (sistema legado)', {
+        chatId,
+        currentUserId: existingChatLink.userId,
+        attemptedUserId: settings.userId,
+        action: 'link_conflict'
+      });
+
+      await sendTelegramMessage({
+        chatId,
+        text: '❌ Este Telegram já está vinculado a outra conta RadarOne.\n\nSe você possui múltiplas contas, desvincule este Telegram da outra conta primeiro.'
+      });
+
+      return { success: false, error: 'Telegram já vinculado a outra conta' };
+    }
+
+    // VINCULAÇÃO
+    // PASSO 1: Remover vínculos antigos do usuário (se existirem)
+    await prisma.telegramAccount.deleteMany({
+      where: { userId: settings.userId }
+    });
+
+    // PASSO 2: Criar TelegramAccount (para consistência com sistema novo)
+    await prisma.telegramAccount.create({
+      data: {
+        userId: settings.userId,
+        chatId,
+        username: username ? `@${username}` : null,
+        active: true
+      }
+    });
+
+    // PASSO 3: Atualizar NotificationSettings
     await prisma.notificationSettings.update({
       where: { id: settings.id },
       data: {
@@ -201,17 +251,39 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
       }
     });
 
-    // Enviar confirmação
+    // PASSO 4: Enviar confirmação
     await sendTelegramMessage({
       chatId,
       text: `✅ Conta vinculada com sucesso!\n\nOlá, ${settings.user.name}!\n\nVocê receberá notificações de novos anúncios aqui no Telegram.`
     });
 
-    console.log('[TelegramService] Conta vinculada com sucesso', { userId: settings.userId, chatId });
+    console.log('[TELEGRAM] Conta vinculada via código legado', {
+      userId: settings.userId,
+      chatId,
+      username: username ? `@${username}` : null,
+      action: 'link_success_legacy'
+    });
 
     return { success: true };
   } catch (error: any) {
-    console.error('[TelegramService] Erro ao processar webhook', { error: error.message });
+    console.error('[TELEGRAM] Erro ao processar webhook (sistema legado)', {
+      error: error.message,
+      stack: error.stack,
+      action: 'link_error'
+    });
+
+    // Enviar mensagem genérica ao usuário
+    try {
+      if (message.chat?.id) {
+        await sendTelegramMessage({
+          chatId: message.chat.id.toString(),
+          text: '❌ Erro ao vincular sua conta.\n\nPor favor, tente novamente. Se o problema persistir, entre em contato com o suporte.'
+        });
+      }
+    } catch (sendError) {
+      console.error('[TELEGRAM] Erro ao enviar mensagem de erro', { sendError });
+    }
+
     return { success: false, error: error.message };
   }
 }
@@ -256,16 +328,29 @@ export async function getUserTelegramAccount(userId: string): Promise<{ chatId: 
 
 /**
  * Gera token seguro de conexão com deep link
+ * REGRA: Invalida tokens pendentes anteriores do usuário (one-time use)
  */
 export async function generateConnectToken(userId: string): Promise<{ connectUrl: string; token: string; expiresAt: Date }> {
-  // Gerar token seguro (32 chars)
+  // PASSO 1: Invalidar tokens PENDING anteriores deste usuário
+  // Previne múltiplos tokens ativos e garante que apenas o mais recente funcione
+  await prisma.telegramConnectToken.updateMany({
+    where: {
+      userId,
+      status: 'PENDING'
+    },
+    data: {
+      status: 'EXPIRED'
+    }
+  });
+
+  // PASSO 2: Gerar token seguro (32+ chars)
   const token = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2) + Date.now().toString(36);
 
-  // Expira em 15 minutos
+  // PASSO 3: Expira em 15 minutos
   const expiresAt = new Date();
   expiresAt.setMinutes(expiresAt.getMinutes() + 15);
 
-  // Salvar no banco
+  // PASSO 4: Salvar no banco com status PENDING
   await prisma.telegramConnectToken.create({
     data: {
       userId,
@@ -277,37 +362,50 @@ export async function generateConnectToken(userId: string): Promise<{ connectUrl
 
   const connectUrl = `${TELEGRAM_BOT_LINK}?start=connect_${token}`;
 
-  console.log('[TelegramService] Token de conexão gerado', { userId, token: token.substring(0, 8) + '...', expiresAt });
+  console.log('[TELEGRAM] Token de conexão gerado', {
+    userId,
+    tokenPrefix: token.substring(0, 8) + '...',
+    expiresAt,
+    action: 'generate_connect_token'
+  });
 
   return { connectUrl, token, expiresAt };
 }
 
 /**
  * Processa comando /start com token de conexão
+ * REGRAS:
+ * - Validação completa de token (existe, não expirou, não usado)
+ * - Idempotência: se chatId já vinculado ao MESMO usuário → sucesso
+ * - Conflito: se chatId vinculado a OUTRO usuário → erro 409
+ * - Limpeza: remove vínculos antigos do usuário antes de criar novo
  */
 export async function processStartCommand(chatId: string, startParam: string, telegramUserId: number, username?: string, firstName?: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // Verificar se é um connect token
+    // VALIDAÇÃO 1: Verificar formato do parâmetro
     if (!startParam || !startParam.startsWith('connect_')) {
+      console.warn('[TELEGRAM] Parâmetro inválido no /start', { chatId, startParam, action: 'link_rejected' });
       return { success: false, error: 'Parâmetro inválido' };
     }
 
     const token = startParam.replace('connect_', '');
+    const chatIdStr = chatId.toString();
 
-    // Buscar token no banco
+    // VALIDAÇÃO 2: Buscar token no banco
     const tokenRecord = await prisma.telegramConnectToken.findUnique({
       where: { token }
     });
 
     if (!tokenRecord) {
+      console.warn('[TELEGRAM] Token não encontrado', { chatId: chatIdStr, tokenPrefix: token.substring(0, 8) + '...', action: 'link_rejected' });
       await sendTelegramMessage({
-        chatId: chatId.toString(),
+        chatId: chatIdStr,
         text: '❌ Token inválido.\n\nPor favor, gere um novo link de conexão no painel RadarOne.'
       });
       return { success: false, error: 'Token não encontrado' };
     }
 
-    // Verificar se expirou
+    // VALIDAÇÃO 3: Verificar expiração
     const now = new Date();
     if (tokenRecord.expiresAt < now) {
       await prisma.telegramConnectToken.update({
@@ -315,77 +413,125 @@ export async function processStartCommand(chatId: string, startParam: string, te
         data: { status: 'EXPIRED' }
       });
 
+      console.warn('[TELEGRAM] Token expirado', { chatId: chatIdStr, userId: tokenRecord.userId, expiresAt: tokenRecord.expiresAt, action: 'link_rejected' });
       await sendTelegramMessage({
-        chatId: chatId.toString(),
+        chatId: chatIdStr,
         text: '❌ Token expirado.\n\nPor favor, gere um novo link de conexão no painel RadarOne.'
       });
       return { success: false, error: 'Token expirado' };
     }
 
-    // Verificar se já foi usado
+    // VALIDAÇÃO 4: Verificar se já foi usado
     if (tokenRecord.status === 'USED') {
+      console.warn('[TELEGRAM] Token já usado', { chatId: chatIdStr, userId: tokenRecord.userId, usedAt: tokenRecord.usedAt, action: 'link_rejected' });
       await sendTelegramMessage({
-        chatId: chatId.toString(),
+        chatId: chatIdStr,
         text: '❌ Token já utilizado.\n\nSe você já conectou, sua conta já está vinculada. Se não, gere um novo link de conexão no painel RadarOne.'
       });
       return { success: false, error: 'Token já usado' };
     }
 
-    // Buscar usuário
+    // VALIDAÇÃO 5: Buscar usuário
     const user = await prisma.user.findUnique({
       where: { id: tokenRecord.userId }
     });
 
     if (!user) {
+      console.error('[TELEGRAM] Usuário não encontrado', { userId: tokenRecord.userId, chatId: chatIdStr, action: 'link_failed' });
       return { success: false, error: 'Usuário não encontrado' };
     }
 
-    // Vincular conta Telegram
-    // Verificar se já existe TelegramAccount para este usuário
-    const existingAccount = await prisma.telegramAccount.findFirst({
+    // VALIDAÇÃO 6: Verificar se chatId já está vinculado a OUTRO usuário
+    const existingChatLink = await prisma.telegramAccount.findUnique({
+      where: { chatId: chatIdStr }
+    });
+
+    if (existingChatLink && existingChatLink.userId !== user.id) {
+      // CONFLITO: Este Telegram já está vinculado a outra conta
+      console.error('[TELEGRAM] Conflito: chatId já vinculado a outro usuário', {
+        chatId: chatIdStr,
+        currentUserId: existingChatLink.userId,
+        attemptedUserId: user.id,
+        action: 'link_conflict'
+      });
+
+      await sendTelegramMessage({
+        chatId: chatIdStr,
+        text: '❌ Este Telegram já está vinculado a outra conta RadarOne.\n\nSe você possui múltiplas contas, desvincule este Telegram da outra conta primeiro.'
+      });
+
+      return { success: false, error: 'Telegram já vinculado a outra conta' };
+    }
+
+    // IDEMPOTÊNCIA: Se chatId já está vinculado ao MESMO usuário, apenas confirmar
+    if (existingChatLink && existingChatLink.userId === user.id && existingChatLink.active) {
+      console.info('[TELEGRAM] Link idempotente: já vinculado ao mesmo usuário', {
+        chatId: chatIdStr,
+        userId: user.id,
+        action: 'link_idempotent'
+      });
+
+      // Atualizar username se mudou
+      if (username && existingChatLink.username !== `@${username}`) {
+        await prisma.telegramAccount.update({
+          where: { id: existingChatLink.id },
+          data: { username: `@${username}` }
+        });
+      }
+
+      // Marcar token como usado
+      await prisma.telegramConnectToken.update({
+        where: { id: tokenRecord.id },
+        data: {
+          status: 'USED',
+          usedAt: new Date()
+        }
+      });
+
+      // Enviar confirmação
+      await sendTelegramMessage({
+        chatId: chatIdStr,
+        text: `✅ Telegram já estava conectado!\n\nOlá novamente, ${user.name}!\n\nVocê continuará recebendo alertas de novos anúncios aqui.`,
+        parseMode: 'HTML'
+      });
+
+      return { success: true };
+    }
+
+    // VINCULAÇÃO: Criar ou atualizar TelegramAccount
+    // PASSO 1: Remover vínculos antigos do usuário (se existirem)
+    await prisma.telegramAccount.deleteMany({
       where: { userId: user.id }
     });
 
-    if (existingAccount) {
-      // Atualizar
-      await prisma.telegramAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          chatId: chatId.toString(),
-          username: username ? `@${username}` : existingAccount.username,
-          active: true
-        }
-      });
-    } else {
-      // Criar novo
-      await prisma.telegramAccount.create({
-        data: {
-          userId: user.id,
-          chatId: chatId.toString(),
-          username: username ? `@${username}` : null,
-          active: true
-        }
-      });
-    }
+    // PASSO 2: Criar novo vínculo
+    await prisma.telegramAccount.create({
+      data: {
+        userId: user.id,
+        chatId: chatIdStr,
+        username: username ? `@${username}` : null,
+        active: true
+      }
+    });
 
-    // Atualizar NotificationSettings
+    // PASSO 3: Atualizar NotificationSettings (para compatibilidade com código legado)
     await prisma.notificationSettings.upsert({
       where: { userId: user.id },
       create: {
         userId: user.id,
         emailEnabled: true,
         telegramEnabled: true,
-        telegramChatId: chatId.toString(),
+        telegramChatId: chatIdStr,
         telegramUsername: username ? `@${username}` : null
       },
       update: {
         telegramEnabled: true,
-        telegramChatId: chatId.toString(),
+        telegramChatId: chatIdStr,
         telegramUsername: username ? `@${username}` : null
       }
     });
 
-    // Marcar token como usado
+    // PASSO 4: Marcar token como usado
     await prisma.telegramConnectToken.update({
       where: { id: tokenRecord.id },
       data: {
@@ -394,18 +540,39 @@ export async function processStartCommand(chatId: string, startParam: string, te
       }
     });
 
-    // Enviar confirmação
+    // PASSO 5: Enviar confirmação ao usuário
     await sendTelegramMessage({
-      chatId: chatId.toString(),
+      chatId: chatIdStr,
       text: `✅ Telegram conectado ao RadarOne com sucesso!\n\nOlá, ${user.name}!\n\nVocê receberá alertas de novos anúncios aqui.`,
       parseMode: 'HTML'
     });
 
-    console.log('[TelegramService] Conta conectada via token', { userId: user.id, chatId });
+    console.log('[TELEGRAM] Link bem-sucedido', {
+      userId: user.id,
+      chatId: chatIdStr,
+      username: username ? `@${username}` : null,
+      action: 'link_success'
+    });
 
     return { success: true };
   } catch (error: any) {
-    console.error('[TelegramService] Erro ao processar start command', { error: error.message });
+    console.error('[TELEGRAM] Erro ao processar start command', {
+      chatId,
+      error: error.message,
+      stack: error.stack,
+      action: 'link_error'
+    });
+
+    // Enviar mensagem genérica ao usuário (não vazar detalhes internos)
+    try {
+      await sendTelegramMessage({
+        chatId: chatId.toString(),
+        text: '❌ Erro ao conectar sua conta.\n\nPor favor, tente novamente. Se o problema persistir, entre em contato com o suporte.'
+      });
+    } catch (sendError) {
+      console.error('[TELEGRAM] Erro ao enviar mensagem de erro', { sendError });
+    }
+
     return { success: false, error: error.message };
   }
 }
@@ -432,27 +599,52 @@ export async function getTelegramStatus(userId: string): Promise<{ connected: bo
 
 /**
  * Desconecta conta do Telegram
+ * REGRA: Limpeza COMPLETA de todos os dados para permitir re-vinculação limpa
  */
 export async function disconnectTelegram(userId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // DELETAR TelegramAccount completamente (em vez de apenas marcar como inativo)
-    // Isso permite reconexão limpa sem estado inconsistente
-    await prisma.telegramAccount.deleteMany({
+    console.log('[TELEGRAM] Iniciando desconexão', { userId, action: 'unlink_start' });
+
+    // PASSO 1: Buscar dados atuais (para log)
+    const currentAccount = await prisma.telegramAccount.findFirst({
       where: { userId }
     });
 
-    // Atualizar NotificationSettings (limpar todos os campos relacionados)
+    const oldChatId = currentAccount?.chatId || null;
+
+    // PASSO 2: DELETAR TelegramAccount completamente
+    // (não apenas marcar como inativo - permite reconexão limpa)
+    const deletedCount = await prisma.telegramAccount.deleteMany({
+      where: { userId }
+    });
+
+    console.log('[TELEGRAM] TelegramAccount deletado', {
+      userId,
+      deletedCount: deletedCount.count,
+      oldChatId,
+      action: 'unlink_delete_account'
+    });
+
+    // PASSO 3: Limpar TODOS os campos relacionados no NotificationSettings
+    // (incluindo campos legados: telegramLinkCode e telegramLinkExpiresAt)
     await prisma.notificationSettings.updateMany({
       where: { userId },
       data: {
         telegramEnabled: false,
         telegramChatId: null,
-        telegramUsername: null  // Adicionar limpeza do username também
+        telegramUsername: null,
+        telegramLinkCode: null,
+        telegramLinkExpiresAt: null
       }
     });
 
-    // Invalidar tokens de conexão pendentes deste usuário
-    await prisma.telegramConnectToken.updateMany({
+    console.log('[TELEGRAM] NotificationSettings limpo', {
+      userId,
+      action: 'unlink_clear_settings'
+    });
+
+    // PASSO 4: Invalidar tokens de conexão pendentes deste usuário
+    const expiredTokens = await prisma.telegramConnectToken.updateMany({
       where: {
         userId,
         status: 'PENDING'
@@ -462,11 +654,26 @@ export async function disconnectTelegram(userId: string): Promise<{ success: boo
       }
     });
 
-    console.log('[TelegramService] Telegram desconectado completamente', { userId });
+    console.log('[TELEGRAM] Tokens pendentes invalidados', {
+      userId,
+      expiredCount: expiredTokens.count,
+      action: 'unlink_expire_tokens'
+    });
+
+    console.log('[TELEGRAM] Desconexão concluída com sucesso', {
+      userId,
+      oldChatId,
+      action: 'unlink_success'
+    });
 
     return { success: true };
   } catch (error: any) {
-    console.error('[TelegramService] Erro ao desconectar Telegram', { userId, error: error.message });
+    console.error('[TELEGRAM] Erro ao desconectar Telegram', {
+      userId,
+      error: error.message,
+      stack: error.stack,
+      action: 'unlink_error'
+    });
     return { success: false, error: error.message };
   }
 }
