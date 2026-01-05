@@ -85,6 +85,50 @@ export class TelegramController {
   }
 
   /**
+   * Endpoint de debug/health do webhook (protegido por autenticação)
+   * GET /api/telegram/webhook-health
+   */
+  static async webhookHealth(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const user = await (await import('../server')).prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      // Apenas admins podem acessar
+      if (!user || user.role !== 'ADMIN') {
+        res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+        return;
+      }
+
+      const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+      const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
+      const TELEGRAM_BOT_USERNAME = (await import('../constants/telegram')).TELEGRAM_BOT_USERNAME;
+
+      res.json({
+        webhookPath: '/api/telegram/webhook',
+        webhookUrl: `${process.env.BACKEND_URL || 'https://api-radarone.onrender.com'}/api/telegram/webhook?secret=<SECRET>`,
+        botUsername: TELEGRAM_BOT_USERNAME,
+        botTokenConfigured: !!TELEGRAM_BOT_TOKEN,
+        botTokenPrefix: TELEGRAM_BOT_TOKEN ? TELEGRAM_BOT_TOKEN.substring(0, 10) + '...' : null,
+        webhookSecretConfigured: !!TELEGRAM_WEBHOOK_SECRET,
+        webhookSecretLength: TELEGRAM_WEBHOOK_SECRET?.length || 0,
+        nodeEnv: process.env.NODE_ENV,
+        backendUrl: process.env.BACKEND_URL,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('[TelegramController.webhookHealth] Erro', { error: error.message });
+      res.status(500).json({ error: 'Erro ao verificar health do webhook' });
+    }
+  }
+
+  /**
    * Processa webhook do Telegram
    * POST /api/telegram/webhook
    */

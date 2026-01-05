@@ -158,12 +158,24 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
     const chatId = message.chat?.id?.toString();
     const text = message.text?.trim();
     const username = message.from?.username;
+    const telegramUserId = message.from?.id;
+
+    // ✅ LOG CRÍTICO: Webhook recebido
+    console.log('[TELEGRAM] Webhook recebido (sistema legado)', {
+      chatId,
+      telegramUserId,
+      username,
+      textLength: text?.length || 0,
+      textPreview: text?.substring(0, 20) || '',
+      hasRadarCode: text ? /RADAR-[A-Z0-9]{6}/i.test(text) : false,
+      timestamp: new Date().toISOString(),
+      action: 'webhook_received'
+    });
 
     if (!chatId || !text) {
+      console.warn('[TELEGRAM] Mensagem inválida recebida no webhook', { chatId, hasText: !!text });
       return { success: false, error: 'Mensagem inválida' };
     }
-
-    console.log('[TELEGRAM] Processando mensagem do webhook (sistema legado)', { chatId, textLength: text.length });
 
     // Verificar se a mensagem contém um código RADAR-
     const codeMatch = text.match(/RADAR-([A-Z0-9]{6})/i);
@@ -252,15 +264,36 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
     });
 
     // PASSO 4: Enviar confirmação
-    await sendTelegramMessage({
+    const sendResult = await sendTelegramMessage({
       chatId,
       text: `✅ Conta vinculada com sucesso!\n\nOlá, ${settings.user.name}!\n\nVocê receberá notificações de novos anúncios aqui no Telegram.`
     });
+
+    // ✅ VALIDAR se mensagem foi enviada
+    if (!sendResult.success) {
+      console.error('[TELEGRAM] CRÍTICO: Vínculo criado no DB mas mensagem de confirmação FALHOU', {
+        userId: settings.userId,
+        chatId,
+        username: username ? `@${username}` : null,
+        sendError: sendResult.error,
+        action: 'link_success_but_message_failed'
+      });
+      // ⚠️ Mesmo assim retornar sucesso pois o vínculo foi criado no DB
+      // Mas logar CRÍTICO para investigação
+    } else {
+      console.log('[TELEGRAM] Mensagem de confirmação enviada com sucesso', {
+        userId: settings.userId,
+        chatId,
+        messageId: sendResult.messageId,
+        action: 'confirmation_sent'
+      });
+    }
 
     console.log('[TELEGRAM] Conta vinculada via código legado', {
       userId: settings.userId,
       chatId,
       username: username ? `@${username}` : null,
+      messageSent: sendResult.success,
       action: 'link_success_legacy'
     });
 
@@ -541,16 +574,36 @@ export async function processStartCommand(chatId: string, startParam: string, te
     });
 
     // PASSO 5: Enviar confirmação ao usuário
-    await sendTelegramMessage({
+    const sendResult = await sendTelegramMessage({
       chatId: chatIdStr,
       text: `✅ Telegram conectado ao RadarOne com sucesso!\n\nOlá, ${user.name}!\n\nVocê receberá alertas de novos anúncios aqui.`,
       parseMode: 'HTML'
     });
 
+    // ✅ VALIDAR se mensagem foi enviada
+    if (!sendResult.success) {
+      console.error('[TELEGRAM] CRÍTICO: Vínculo criado no DB mas mensagem de confirmação FALHOU', {
+        userId: user.id,
+        chatId: chatIdStr,
+        username: username ? `@${username}` : null,
+        sendError: sendResult.error,
+        action: 'link_success_but_message_failed'
+      });
+      // ⚠️ Mesmo assim retornar sucesso pois o vínculo foi criado no DB
+    } else {
+      console.log('[TELEGRAM] Mensagem de confirmação enviada com sucesso', {
+        userId: user.id,
+        chatId: chatIdStr,
+        messageId: sendResult.messageId,
+        action: 'confirmation_sent'
+      });
+    }
+
     console.log('[TELEGRAM] Link bem-sucedido', {
       userId: user.id,
       chatId: chatIdStr,
       username: username ? `@${username}` : null,
+      messageSent: sendResult.success,
       action: 'link_success'
     });
 
