@@ -296,9 +296,9 @@ const startServer = async () => {
 
         if (webhookResult.success) {
           if (webhookResult.configured) {
-            logInfo('Telegram webhook configured successfully at boot');
+            logInfo('Telegram webhook configured successfully at boot', {});
           } else {
-            logInfo('Telegram webhook already configured correctly');
+            logInfo('Telegram webhook already configured correctly', {});
           }
         } else {
           logError('Failed to configure Telegram webhook (non-fatal)', {

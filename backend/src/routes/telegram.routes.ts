@@ -27,4 +27,9 @@ router.post('/disconnect', authenticateToken, TelegramController.disconnect);
 router.post('/admin/configure-webhook', authenticateToken, TelegramController.configureWebhook);
 router.get('/webhook-health', authenticateToken, TelegramController.webhookHealth);
 
+// Admin only - Advanced diagnostics (NOVO)
+router.get('/admin/diagnose', authenticateToken, TelegramController.diagnose);
+router.post('/admin/reconfigure-webhook', authenticateToken, TelegramController.reconfigureWebhook);
+router.get('/admin/ping-webhook', authenticateToken, TelegramController.pingWebhook);
+
 export default router;

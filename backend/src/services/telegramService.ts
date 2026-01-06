@@ -76,6 +76,80 @@ Monitor: <i>${monitorName}</i>
 }
 
 /**
+ * Obtém informações do bot (getMe) para validar token
+ */
+export async function getBotInfo(): Promise<{
+  success: boolean;
+  id?: number;
+  isBot?: boolean;
+  firstName?: string;
+  username?: string;
+  canJoinGroups?: boolean;
+  canReadAllGroupMessages?: boolean;
+  supportsInlineQueries?: boolean;
+  error?: string;
+  errorCode?: number;
+}> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return {
+      success: false,
+      error: 'TELEGRAM_BOT_TOKEN não configurado'
+    };
+  }
+
+  try {
+    const response = await axios.get(`${TELEGRAM_API_BASE}/getMe`, {
+      timeout: 10000
+    });
+
+    if (!response.data.ok) {
+      return {
+        success: false,
+        error: response.data.description || 'Erro desconhecido ao buscar bot info',
+        errorCode: response.data.error_code
+      };
+    }
+
+    const result = response.data.result;
+
+    console.log('[TelegramService.getBotInfo] Bot info obtido', {
+      action: 'get_bot_info_success',
+      botId: result.id,
+      username: result.username,
+      timestamp: new Date().toISOString()
+    });
+
+    return {
+      success: true,
+      id: result.id,
+      isBot: result.is_bot,
+      firstName: result.first_name,
+      username: result.username,
+      canJoinGroups: result.can_join_groups,
+      canReadAllGroupMessages: result.can_read_all_group_messages,
+      supportsInlineQueries: result.supports_inline_queries
+    };
+  } catch (error: any) {
+    const statusCode = error.response?.status;
+    const description = error.response?.data?.description;
+
+    console.error('[TelegramService.getBotInfo] Erro ao obter bot info', {
+      action: 'get_bot_info_failed',
+      error: error.message,
+      statusCode,
+      description,
+      timestamp: new Date().toISOString()
+    });
+
+    return {
+      success: false,
+      error: description || error.message,
+      errorCode: statusCode
+    };
+  }
+}
+
+/**
  * Obtém informações do webhook configurado no Telegram
  */
 export async function getWebhookInfo(): Promise<{
@@ -342,19 +416,48 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
       username,
       textLength: text?.length || 0,
       textPreview: text?.substring(0, 20) || '',
+      textRaw: JSON.stringify(text), // mostra \n, espaços, etc
       hasRadarCode: text ? /RADAR-[A-Z0-9]{6}/i.test(text) : false,
       timestamp: new Date().toISOString(),
       action: 'webhook_received'
     });
 
     if (!chatId || !text) {
-      console.warn('[TELEGRAM] Mensagem inválida recebida no webhook', { chatId, hasText: !!text });
+      console.warn('[TELEGRAM] Mensagem inválida recebida no webhook', {
+        action: 'link_rejected',
+        reason: 'missing_chatid_or_text',
+        chatId,
+        hasText: !!text
+      });
       return { success: false, error: 'Mensagem inválida' };
     }
 
-    // Verificar se a mensagem contém um código RADAR-
-    const codeMatch = text.match(/RADAR-([A-Z0-9]{6})/i);
+    // Normalizar texto: remover espaços extras, newlines, tabs
+    const normalizedText = text.replace(/\s+/g, ' ').trim();
+
+    // Verificar se a mensagem contém um código RADAR- (case-insensitive, permite espaços)
+    // Aceita: "RADAR-ABC123", "radar-abc123", " RADAR-ABC123 ", "RADAR-ABC123\n", etc
+    const codeMatch = normalizedText.match(/RADAR-([A-Z0-9]{6})/i);
+
+    console.log('[TELEGRAM] Parsing do código', {
+      action: 'code_parsing',
+      chatId,
+      originalText: text,
+      normalizedText,
+      codeMatch: !!codeMatch,
+      extractedCode: codeMatch?.[0] || null,
+      timestamp: new Date().toISOString()
+    });
+
     if (!codeMatch) {
+      console.warn('[TELEGRAM] Código não detectado na mensagem', {
+        action: 'link_rejected',
+        reason: 'code_not_detected',
+        chatId,
+        text: normalizedText,
+        timestamp: new Date().toISOString()
+      });
+
       // Mensagem não é um código de vínculo, enviar ajuda
       await sendTelegramMessage({
         chatId,
@@ -364,6 +467,13 @@ export async function processWebhookMessage(message: any): Promise<{ success: bo
     }
 
     const fullCode = codeMatch[0].toUpperCase();
+
+    console.log('[TELEGRAM] Código extraído', {
+      action: 'code_extracted',
+      chatId,
+      code: fullCode,
+      timestamp: new Date().toISOString()
+    });
 
     // Buscar settings com esse código (não expirado)
     const now = new Date();
@@ -935,6 +1045,213 @@ export async function getTelegramStatus(userId: string): Promise<{ connected: bo
     chatId: account.chatId,
     username: account.username || undefined,
     connectedAt: account.linkedAt
+  };
+}
+
+/**
+ * Obtém versão/build info do backend (para diagnóstico)
+ */
+export function getBackendInfo() {
+  const BASE_URL = process.env.BACKEND_BASE_URL || process.env.PUBLIC_URL || process.env.BACKEND_URL || 'https://api.radarone.com.br';
+  const NODE_ENV = process.env.NODE_ENV || 'development';
+
+  return {
+    backendBaseUrl: BASE_URL,
+    nodeEnv: NODE_ENV,
+    webhookPath: '/api/telegram/webhook',
+    botTokenConfigured: !!TELEGRAM_BOT_TOKEN,
+    botTokenPrefix: TELEGRAM_BOT_TOKEN ? TELEGRAM_BOT_TOKEN.substring(0, 10) + '...' : null,
+    webhookSecretConfigured: !!TELEGRAM_WEBHOOK_SECRET,
+    webhookSecretLength: TELEGRAM_WEBHOOK_SECRET?.length || 0,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Calcula a URL esperada do webhook
+ */
+export function getExpectedWebhookUrl(): string {
+  const BASE_URL = process.env.BACKEND_BASE_URL || process.env.PUBLIC_URL || process.env.BACKEND_URL || 'https://api.radarone.com.br';
+  const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+  if (!TELEGRAM_WEBHOOK_SECRET) {
+    return `${BASE_URL}/api/telegram/webhook?secret=<NOT_CONFIGURED>`;
+  }
+
+  return `${BASE_URL}/api/telegram/webhook?secret=${TELEGRAM_WEBHOOK_SECRET}`;
+}
+
+/**
+ * Diagnóstico completo do sistema Telegram
+ */
+export async function diagnoseTelegram(userId?: string): Promise<{
+  success: boolean;
+  backend: any;
+  bot: any;
+  webhook: any;
+  database: any;
+  diagnostics: any;
+}> {
+  console.log('[TelegramService.diagnoseTelegram] Iniciando diagnóstico completo', {
+    action: 'diagnose_start',
+    userId: userId || 'admin',
+    timestamp: new Date().toISOString()
+  });
+
+  // 1. Backend info
+  const backendInfo = getBackendInfo();
+  const expectedWebhookUrl = getExpectedWebhookUrl();
+
+  // 2. Bot info (valida token)
+  const botInfo = await getBotInfo();
+
+  // 3. Webhook info (valida configuração)
+  const webhookInfo = await getWebhookInfo();
+
+  // 4. Database info (se userId fornecido)
+  let dbInfo: any = null;
+  if (userId) {
+    try {
+      const telegramAccount = await prisma.telegramAccount.findFirst({
+        where: { userId, active: true }
+      });
+
+      const notificationSettings = await prisma.notificationSettings.findUnique({
+        where: { userId }
+      });
+
+      dbInfo = {
+        userId,
+        hasAccount: !!telegramAccount,
+        accountActive: telegramAccount?.active || false,
+        accountChatId: telegramAccount?.chatId || null,
+        accountUsername: telegramAccount?.username || null,
+        accountLinkedAt: telegramAccount?.linkedAt || null,
+        settingsTelegramEnabled: notificationSettings?.telegramEnabled || false,
+        settingsChatId: notificationSettings?.telegramChatId || null,
+        settingsUsername: notificationSettings?.telegramUsername || null,
+        consistency: {
+          bothExist: !!telegramAccount && !!notificationSettings,
+          chatIdMatch: telegramAccount?.chatId === notificationSettings?.telegramChatId,
+          usernameMatch: telegramAccount?.username === notificationSettings?.telegramUsername
+        }
+      };
+    } catch (error: any) {
+      dbInfo = { error: error.message };
+    }
+  }
+
+  // 5. Diagnostics (problemas identificados)
+  const diagnostics: any = {
+    overall: 'OK',
+    issues: [],
+    warnings: [],
+    recommendations: []
+  };
+
+  // Token inválido?
+  if (!botInfo.success) {
+    diagnostics.overall = 'CRITICAL';
+    diagnostics.issues.push({
+      severity: 'CRITICAL',
+      code: 'BOT_TOKEN_INVALID',
+      message: 'TELEGRAM_BOT_TOKEN inválido ou não configurado',
+      detail: botInfo.error,
+      fix: 'Configure TELEGRAM_BOT_TOKEN com um token válido do @BotFather'
+    });
+  }
+
+  // Webhook não configurado?
+  if (!webhookInfo.url) {
+    diagnostics.overall = diagnostics.overall === 'CRITICAL' ? 'CRITICAL' : 'ERROR';
+    diagnostics.issues.push({
+      severity: 'ERROR',
+      code: 'WEBHOOK_NOT_CONFIGURED',
+      message: 'Webhook não configurado no Telegram',
+      fix: 'Use POST /api/telegram/admin/reconfigure-webhook'
+    });
+  }
+
+  // Webhook URL diferente?
+  const webhookMatches = webhookInfo.url === expectedWebhookUrl;
+  if (webhookInfo.url && !webhookMatches) {
+    diagnostics.overall = diagnostics.overall === 'CRITICAL' ? 'CRITICAL' : 'WARNING';
+    diagnostics.warnings.push({
+      severity: 'WARNING',
+      code: 'WEBHOOK_URL_MISMATCH',
+      message: 'Webhook configurado mas URL diferente da esperada',
+      expected: expectedWebhookUrl.replace(TELEGRAM_WEBHOOK_SECRET || '', '<SECRET>'),
+      actual: webhookInfo.url,
+      fix: 'Use POST /api/telegram/admin/reconfigure-webhook'
+    });
+  }
+
+  // Pending updates?
+  if (webhookInfo.pendingUpdateCount && webhookInfo.pendingUpdateCount > 0) {
+    diagnostics.warnings.push({
+      severity: 'INFO',
+      code: 'PENDING_UPDATES',
+      message: `${webhookInfo.pendingUpdateCount} updates pendentes no Telegram`,
+      detail: 'Isso pode indicar que o webhook não está sendo processado corretamente',
+      fix: 'Verifique se o backend está acessível publicamente e se o secret está correto'
+    });
+  }
+
+  // Last error?
+  if (webhookInfo.lastErrorMessage) {
+    diagnostics.overall = diagnostics.overall === 'CRITICAL' ? 'CRITICAL' : 'WARNING';
+    diagnostics.warnings.push({
+      severity: 'WARNING',
+      code: 'WEBHOOK_LAST_ERROR',
+      message: 'Último erro reportado pelo Telegram',
+      detail: webhookInfo.lastErrorMessage,
+      errorDate: webhookInfo.lastErrorDate
+        ? new Date(webhookInfo.lastErrorDate * 1000).toISOString()
+        : null
+    });
+  }
+
+  // Secret não configurado?
+  if (!TELEGRAM_WEBHOOK_SECRET) {
+    diagnostics.warnings.push({
+      severity: 'WARNING',
+      code: 'WEBHOOK_SECRET_NOT_CONFIGURED',
+      message: 'TELEGRAM_WEBHOOK_SECRET não configurado',
+      detail: 'Webhook está sem validação de secret (inseguro)',
+      fix: 'Configure TELEGRAM_WEBHOOK_SECRET no ambiente'
+    });
+  }
+
+  // DB inconsistente?
+  if (dbInfo && dbInfo.consistency && !dbInfo.consistency.chatIdMatch) {
+    diagnostics.warnings.push({
+      severity: 'WARNING',
+      code: 'DATABASE_INCONSISTENCY',
+      message: 'chatId diferente entre TelegramAccount e NotificationSettings',
+      detail: `Account: ${dbInfo.accountChatId}, Settings: ${dbInfo.settingsChatId}`,
+      fix: 'Usuário deve desvincular e reconectar'
+    });
+  }
+
+  console.log('[TelegramService.diagnoseTelegram] Diagnóstico completo', {
+    action: 'diagnose_complete',
+    overall: diagnostics.overall,
+    issuesCount: diagnostics.issues.length,
+    warningsCount: diagnostics.warnings.length,
+    timestamp: new Date().toISOString()
+  });
+
+  return {
+    success: true,
+    backend: backendInfo,
+    bot: botInfo,
+    webhook: {
+      ...webhookInfo,
+      expectedUrl: expectedWebhookUrl.replace(TELEGRAM_WEBHOOK_SECRET || '', '<SECRET>'),
+      matches: webhookMatches
+    },
+    database: dbInfo,
+    diagnostics
   };
 }
 
