@@ -21,6 +21,7 @@ export const prisma = new PrismaClient({
 });
 
 // Importa rotas
+import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
 import monitorRoutes from './routes/monitorRoutes';
 import userRoutes from './routes/user.routes';
@@ -211,6 +212,7 @@ app.get('/api/_routes', (req: Request, res: Response) => {
 // ============================================
 // ROTAS PRINCIPAIS
 // ============================================
+app.use('/api/health', healthRoutes); // Health check e versão (público)
 app.use('/api/auth', authRoutes);
 app.use('/api/monitors', monitorRoutes);
 app.use('/api/plans', planRoutes); // Rota pública

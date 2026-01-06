@@ -51,6 +51,7 @@ interface Subscription {
   id: string;
   status: 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' | 'EXPIRED' | 'SUSPENDED';
   isTrial: boolean;
+  isLifetime?: boolean;
   trialEndsAt: string | null;
   validUntil: string | null;
   plan: Plan;
@@ -83,6 +84,7 @@ export const SubscriptionSettingsPage: React.FC = () => {
           id: subData.subscription.id,
           status: subData.subscription.status,
           isTrial: subData.subscription.isTrial,
+          isLifetime: subData.subscription.isLifetime,
           trialEndsAt: subData.subscription.trialEndsAt,
           validUntil: subData.subscription.validUntil,
           plan: subData.subscription.plan
@@ -147,6 +149,15 @@ export const SubscriptionSettingsPage: React.FC = () => {
 
   const getStatusBadge = () => {
     if (!subscription) return null;
+
+    // Se é vitalício, mostrar badge especial
+    if (subscription.isLifetime && subscription.status === 'ACTIVE') {
+      return (
+        <Badge colorScheme="purple" fontSize="sm" px={3} py={1} borderRadius="md">
+          ♾️ Vitalício
+        </Badge>
+      );
+    }
 
     const statusConfig: Record<string, { colorScheme: string; label: string }> = {
       TRIAL: { colorScheme: 'blue', label: '🎁 Período de teste' },
@@ -229,12 +240,22 @@ export const SubscriptionSettingsPage: React.FC = () => {
                 {getStatusBadge()}
               </Flex>
 
-              {/* Trial Warning */}
-              {subscription.isTrial && (
+              {/* Trial Warning (não mostrar se vitalício) */}
+              {subscription.isTrial && !subscription.isLifetime && (
                 <Alert status="info" borderRadius="md" mb={4}>
                   <AlertIcon />
                   <AlertDescription>
                     ⏰ Seu período de teste termina em <strong>{daysLeft} dias</strong>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Lifetime Info */}
+              {subscription.isLifetime && (
+                <Alert status="success" borderRadius="md" mb={4}>
+                  <AlertIcon />
+                  <AlertDescription>
+                    ♾️ Você possui acesso <strong>VITALÍCIO</strong> ao plano {subscription.plan.name}. Seu acesso não expira!
                   </AlertDescription>
                 </Alert>
               )}

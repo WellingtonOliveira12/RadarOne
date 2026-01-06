@@ -568,12 +568,39 @@ export class CouponController {
       });
 
       // Regra: não permitir downgrade (se já tem plano ativo igual ou superior)
-      // Simplificação: checar apenas se já é o mesmo plano e está ACTIVE
+      // EXCETO se o cupom for vitalício e a subscription atual não for
       if (currentSubscription && currentSubscription.status === 'ACTIVE' && currentSubscription.planId === targetPlan.id) {
-        res.status(400).json({
-          error: `Você já possui assinatura ativa do plano ${targetPlan.name}. Este cupom não pode ser usado.`
-        });
-        return;
+        // Se ambos são vitalícios, é idempotente - retornar sucesso sem criar nova
+        if (coupon.isLifetime && currentSubscription.isLifetime) {
+          res.status(200).json({
+            success: true,
+            message: `Você já possui acesso VITALÍCIO ao plano ${targetPlan.name}.`,
+            subscription: {
+              id: currentSubscription.id,
+              planName: targetPlan.name,
+              planSlug: targetPlan.slug,
+              isLifetime: true,
+              endsAt: null,
+              daysGranted: null
+            }
+          });
+          return;
+        }
+
+        // Se cupom é vitalício e subscription atual não é, permitir (upgrade para vitalício)
+        if (coupon.isLifetime && !currentSubscription.isLifetime) {
+          // Cancelar subscription antiga e permitir aplicar vitalício
+          await prisma.subscription.update({
+            where: { id: currentSubscription.id },
+            data: { status: 'CANCELLED' }
+          });
+        } else {
+          // Senão, bloquear
+          res.status(400).json({
+            error: `Você já possui assinatura ativa do plano ${targetPlan.name}. Este cupom não pode ser usado.`
+          });
+          return;
+        }
       }
 
       // Regra de stacking: se já tem trial/upgrade ativo, verificar data (não aplicável para vitalício)

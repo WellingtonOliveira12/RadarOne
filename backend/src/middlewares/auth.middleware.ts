@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../server';
 import { logWithUser } from '../utils/loggerHelpers';
 import { AppError } from '../errors/AppError';
+import { getCurrentSubscriptionForUser } from '../services/subscriptionService';
 
 // Estende o tipo Request para incluir userId
 declare global {
@@ -101,46 +102,16 @@ export const checkTrialExpired = async (
       throw AppError.unauthorized('Usuário não autenticado');
     }
 
-    // Buscar assinatura ativa ou trial do usuário
-    const subscription = await prisma.subscription.findFirst({
-      where: {
-        userId: req.userId,
-        status: { in: ['ACTIVE', 'TRIAL'] }
-      },
-      include: {
-        plan: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    // FONTE CANÔNICA: Usar subscriptionService para determinar subscription válida
+    const subscription = await getCurrentSubscriptionForUser(req.userId);
 
-    // Se não tem assinatura, bloquear acesso
+    // Se não tem assinatura válida, bloquear acesso
     if (!subscription) {
       throw AppError.subscriptionRequired('Você precisa assinar um plano para acessar este recurso');
     }
 
-    // Se é trial e já expirou, bloquear acesso (exceto se for vitalício)
-    if (subscription.status === 'TRIAL' && subscription.trialEndsAt && !subscription.isLifetime) {
-      const now = new Date();
-      if (subscription.trialEndsAt < now) {
-        // Calcular quantos dias expirou
-        const daysExpired = Math.ceil((now.getTime() - subscription.trialEndsAt.getTime()) / (1000 * 60 * 60 * 24));
-
-        // Logar evento TRIAL_EXPIRED para analytics/monitoramento
-        logWithUser(req.userId, 'warn', 'Trial expirado - acesso bloqueado', {
-          eventType: 'TRIAL_EXPIRED',
-          planName: subscription.plan.name,
-          planSlug: subscription.plan.slug,
-          trialEndedAt: subscription.trialEndsAt.toISOString(),
-          daysExpired,
-          endpoint: `${req.method} ${req.path}`,
-          userAgent: req.headers['user-agent'],
-        });
-
-        throw AppError.trialExpired('Seu período de teste gratuito expirou. Assine um plano para continuar');
-      }
-    }
+    // Se chegou aqui, a subscription é válida (a função canônica já validou)
+    // Não precisa verificar datas ou status - getCurrentSubscriptionForUser já faz isso
 
     // Se passou por todas as verificações, permitir acesso
     next();

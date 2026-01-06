@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../server';
 import { startTrialForUser } from '../services/billingService';
 import { generateCheckoutUrl } from '../services/kiwifyService';
+import { getCurrentSubscriptionForUser } from '../services/subscriptionService';
 
 /**
  * Controller de Assinaturas
@@ -22,70 +23,13 @@ export class SubscriptionController {
 
       console.log('[getMySubscription] Buscando subscription do usuário', { userId });
 
-      // Buscar subscription ativa ou trial
-      let subscription = await prisma.subscription.findFirst({
-        where: {
-          userId,
-          status: { in: ['ACTIVE', 'TRIAL'] }
-        },
-        include: {
-          plan: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              description: true,
-              priceCents: true,
-              billingPeriod: true,
-              maxMonitors: true,
-              maxSites: true,
-              maxAlertsPerDay: true,
-              checkInterval: true,
-              isRecommended: true,
-              isLifetime: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      // FONTE CANÔNICA: Usar subscriptionService para determinar subscription válida
+      const subscription = await getCurrentSubscriptionForUser(userId);
 
-      // Se não houver subscription ativa/trial, verificar se há alguma expirada
-      if (!subscription) {
-        console.log('[getMySubscription] Nenhuma subscription ACTIVE/TRIAL encontrada, buscando qualquer subscription', { userId });
-
-        subscription = await prisma.subscription.findFirst({
-          where: { userId },
-          include: {
-            plan: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                description: true,
-                priceCents: true,
-                billingPeriod: true,
-                maxMonitors: true,
-                maxSites: true,
-                maxAlertsPerDay: true,
-                checkInterval: true,
-                isRecommended: true,
-                isLifetime: true
-              }
-            }
-          },
-          orderBy: {
-            createdAt: 'desc'
-          }
-        });
-      }
-
-      // Se realmente não houver subscription, verificar trial baseado em user.createdAt
+      // Se não houver subscription, verificar trial implícito baseado em user.createdAt
       if (!subscription) {
         console.warn('[getMySubscription] Usuário sem subscription, verificando trial de 7 dias', { userId });
 
-        // Buscar user.createdAt
         const user = await prisma.user.findUnique({
           where: { id: userId },
           select: { createdAt: true }
@@ -142,49 +86,33 @@ export class SubscriptionController {
         return;
       }
 
-      // Verificar se trial expirou e atualizar status (exceto se for vitalício)
+      // Se chegou aqui, subscription é válida (a função canônica já validou)
       const now = new Date();
-      if (subscription.status === 'TRIAL' && subscription.trialEndsAt && !subscription.isLifetime) {
-        if (subscription.trialEndsAt < now) {
-          console.log('[getMySubscription] Trial expirado, atualizando status para EXPIRED', { subscriptionId: subscription.id });
 
-          subscription = await prisma.subscription.update({
-            where: { id: subscription.id },
-            data: { status: 'EXPIRED' },
-            include: {
-              plan: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  description: true,
-                  priceCents: true,
-                  billingPeriod: true,
-                  maxMonitors: true,
-                  maxSites: true,
-                  maxAlertsPerDay: true,
-                  checkInterval: true,
-                  isRecommended: true,
-                  isLifetime: true
-                }
-              }
-            }
-          });
-        }
-      }
-
-      // Calcular dias restantes (now já foi declarado acima)
+      // Calcular dias restantes
       let daysRemaining = 0;
       let expiresAt: Date | null = null;
+      let isExpired = false;
 
-      if (subscription.status === 'TRIAL' && subscription.trialEndsAt) {
+      // Vitalício → sem expiração
+      if (subscription.isLifetime) {
+        daysRemaining = -1; // Convenção: -1 = ilimitado
+        expiresAt = null;
+        isExpired = false;
+      }
+      // TRIAL com data de expiração
+      else if (subscription.status === 'TRIAL' && subscription.trialEndsAt) {
         expiresAt = subscription.trialEndsAt;
         const diffTime = expiresAt.getTime() - now.getTime();
         daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      } else if (subscription.validUntil) {
+        isExpired = daysRemaining <= 0;
+      }
+      // ACTIVE com validUntil
+      else if (subscription.validUntil) {
         expiresAt = subscription.validUntil;
         const diffTime = expiresAt.getTime() - now.getTime();
         daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        isExpired = daysRemaining <= 0;
       }
 
       // Contar monitores criados
@@ -214,9 +142,9 @@ export class SubscriptionController {
           canCreateMore: monitorCount < subscription.plan.maxMonitors
         },
         timeRemaining: {
-          daysRemaining: Math.max(0, daysRemaining),
+          daysRemaining: subscription.isLifetime ? -1 : Math.max(0, daysRemaining),
           expiresAt,
-          isExpired: daysRemaining <= 0
+          isExpired
         }
       };
 
