@@ -24,11 +24,12 @@ async function checkTrialExpiring() {
     const threeDaysFromNow = new Date();
     threeDaysFromNow.setDate(now.getDate() + DAYS_BEFORE_WARNING);
 
-    // 1. Buscar trials que estão expirando em 3 dias
+    // 1. Buscar trials que estão expirando em 3 dias (ignorar vitalícios)
     const trialsExpiringSoon = await prisma.subscription.findMany({
       where: {
         status: 'TRIAL',
         isTrial: true,
+        isLifetime: false, // Nunca notificar vitalícios
         trialEndsAt: {
           gte: now,
           lte: threeDaysFromNow
@@ -63,11 +64,12 @@ async function checkTrialExpiring() {
       }
     }
 
-    // 2. Buscar trials que já expiraram (mas ainda estão marcados como TRIAL)
+    // 2. Buscar trials que já expiraram (mas ainda estão marcados como TRIAL, ignorar vitalícios)
     const trialsExpired = await prisma.subscription.findMany({
       where: {
         status: 'TRIAL',
         isTrial: true,
+        isLifetime: false, // Nunca expirar vitalícios
         trialEndsAt: {
           lt: now
         }

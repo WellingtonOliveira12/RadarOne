@@ -39,10 +39,14 @@ async function fixVitalicioSubscriptions() {
         where: { id: vitalicioCoupon.id },
         data: {
           isLifetime: true,
-          purpose: 'TRIAL_UPGRADE'
+          purpose: 'TRIAL_UPGRADE',
+          durationDays: null // Vitalício não precisa de durationDays
         }
       });
-      console.log(`✅ Cupom VITALICIO atualizado (id: ${vitalicioCoupon.id}, isLifetime=true)\n`);
+      console.log(`✅ Cupom VITALICIO atualizado:`);
+      console.log(`   - isLifetime=true`);
+      console.log(`   - purpose=TRIAL_UPGRADE`);
+      console.log(`   - durationDays=null\n`);
     }
 
     // 2. Buscar usuários allowlisted

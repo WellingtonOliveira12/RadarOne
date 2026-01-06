@@ -999,11 +999,23 @@ export const AdminCouponsPage: React.FC = () => {
                             {coupon.description || '-'}
                           </Td>
                           <Td>
-                            <Badge colorScheme={coupon.discountType === 'PERCENTAGE' ? 'purple' : 'orange'}>
-                              {coupon.discountType === 'PERCENTAGE' ? 'Percentual' : 'Fixo'}
-                            </Badge>
+                            {coupon.purpose === 'TRIAL_UPGRADE' ? (
+                              <Badge colorScheme={coupon.isLifetime ? 'purple' : 'blue'}>
+                                {coupon.isLifetime ? '♾️ Vitalício' : 'Trial Upgrade'}
+                              </Badge>
+                            ) : (
+                              <Badge colorScheme={coupon.discountType === 'PERCENTAGE' ? 'purple' : 'orange'}>
+                                {coupon.discountType === 'PERCENTAGE' ? 'Percentual' : 'Fixo'}
+                              </Badge>
+                            )}
                           </Td>
-                          <Td>{formatDiscount(coupon.discountType, coupon.discountValue)}</Td>
+                          <Td>
+                            {coupon.purpose === 'TRIAL_UPGRADE' ? (
+                              coupon.isLifetime ? '♾️ Permanente' : `${coupon.durationDays || 0} dias`
+                            ) : (
+                              formatDiscount(coupon.discountType, coupon.discountValue)
+                            )}
+                          </Td>
                           <Td fontSize="sm">{coupon.plan?.name || 'Todos'}</Td>
                           <Td>
                             {coupon._count.usageLogs}

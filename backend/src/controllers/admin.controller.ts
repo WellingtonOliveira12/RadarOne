@@ -2335,6 +2335,7 @@ export class AdminController {
         discountType,
         discountValue,
         durationDays, // FASE: Cupons de Upgrade
+        isLifetime, // FASE: Cupons Vitalícios
         maxUses,
         expiresAt,
         appliesToPlanId
@@ -2361,10 +2362,13 @@ export class AdminController {
           });
         }
       } else if (couponPurpose === 'TRIAL_UPGRADE') {
-        if (!durationDays || durationDays < 1 || durationDays > 60) {
-          return res.status(400).json({
-            error: 'Cupom de trial upgrade requer durationDays entre 1 e 60'
-          });
+        // Se é vitalício, não precisa de durationDays
+        if (!isLifetime) {
+          if (!durationDays || durationDays < 1 || durationDays > 60) {
+            return res.status(400).json({
+              error: 'Cupom de trial upgrade requer durationDays entre 1 e 60'
+            });
+          }
         }
       }
 
@@ -2431,7 +2435,8 @@ export class AdminController {
           purpose: couponPurpose, // FASE: Cupons de Upgrade
           discountType: couponPurpose === 'DISCOUNT' ? discountType : 'FIXED', // Default se não aplicável
           discountValue: couponPurpose === 'DISCOUNT' ? discountValue : 0, // Default se não aplicável
-          durationDays: couponPurpose === 'TRIAL_UPGRADE' ? durationDays : null, // FASE: Cupons de Upgrade
+          durationDays: couponPurpose === 'TRIAL_UPGRADE' && !isLifetime ? durationDays : null, // FASE: Cupons de Upgrade
+          isLifetime: couponPurpose === 'TRIAL_UPGRADE' ? Boolean(isLifetime) : false, // FASE: Cupons Vitalícios
           maxUses: maxUses || null,
           expiresAt: expiresAt ? new Date(expiresAt) : null,
           appliesToPlanId: appliesToPlanId || null,
@@ -2483,6 +2488,7 @@ export class AdminController {
         discountType,
         discountValue,
         durationDays, // FASE: Cupons de Upgrade
+        isLifetime, // FASE: Cupons Vitalícios
         maxUses,
         expiresAt,
         appliesToPlanId
@@ -2500,8 +2506,9 @@ export class AdminController {
         return res.status(404).json({ error: 'Cupom não encontrado' });
       }
 
-      // Determinar purpose a ser usado (do req ou do existente)
+      // Determinar purpose e isLifetime a serem usados (do req ou do existente)
       const couponPurpose = purpose !== undefined ? purpose : existing.purpose || 'DISCOUNT';
+      const effectiveIsLifetime = isLifetime !== undefined ? isLifetime : existing.isLifetime;
 
       // Validações específicas por tipo de cupom
       if (couponPurpose === 'DISCOUNT') {
@@ -2517,10 +2524,13 @@ export class AdminController {
           });
         }
       } else if (couponPurpose === 'TRIAL_UPGRADE') {
-        if (durationDays !== undefined && (durationDays < 1 || durationDays > 60)) {
-          return res.status(400).json({
-            error: 'Duração deve estar entre 1 e 60 dias'
-          });
+        // Se não é vitalício, validar durationDays
+        if (!effectiveIsLifetime) {
+          if (durationDays !== undefined && (durationDays < 1 || durationDays > 60)) {
+            return res.status(400).json({
+              error: 'Duração deve estar entre 1 e 60 dias'
+            });
+          }
         }
       }
 
@@ -2552,7 +2562,13 @@ export class AdminController {
           purpose: purpose !== undefined ? purpose : existing.purpose, // FASE: Cupons de Upgrade
           discountType: discountType || existing.discountType,
           discountValue: discountValue !== undefined ? discountValue : existing.discountValue,
-          durationDays: durationDays !== undefined ? durationDays : existing.durationDays, // FASE: Cupons de Upgrade
+          // Se é vitalício, durationDays deve ser null; senão, usar valor do request ou existente
+          durationDays: couponPurpose === 'TRIAL_UPGRADE' && effectiveIsLifetime
+            ? null
+            : (durationDays !== undefined ? durationDays : existing.durationDays),
+          isLifetime: couponPurpose === 'TRIAL_UPGRADE'
+            ? Boolean(effectiveIsLifetime)
+            : false, // FASE: Cupons Vitalícios
           maxUses: maxUses !== undefined ? maxUses : existing.maxUses,
           expiresAt: expiresAt !== undefined ? (expiresAt ? new Date(expiresAt) : null) : existing.expiresAt,
           appliesToPlanId: appliesToPlanId !== undefined ? appliesToPlanId : existing.appliesToPlanId

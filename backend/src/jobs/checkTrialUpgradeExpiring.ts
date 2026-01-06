@@ -34,11 +34,12 @@ export async function checkTrialUpgradeExpiring(): Promise<void> {
       const startDate = new Date(now.getTime() + window.startHours * 60 * 60 * 1000);
       const endDate = new Date(now.getTime() + window.endHours * 60 * 60 * 1000);
 
-      // Buscar subscriptions TRIAL criadas por cupons que expiram nesta janela
+      // Buscar subscriptions TRIAL criadas por cupons que expiram nesta janela (ignorar vitalícios)
       const expiringSubscriptions = await prisma.subscription.findMany({
         where: {
           status: 'TRIAL',
           externalProvider: 'COUPON_TRIAL_UPGRADE',
+          isLifetime: false, // Nunca notificar vitalícios
           trialEndsAt: {
             gte: startDate,
             lte: endDate,
