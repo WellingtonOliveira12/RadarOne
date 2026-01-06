@@ -190,18 +190,21 @@ export const AdminCouponsPage: React.FC = () => {
   } | null>(null);
 
   // Form State
-  const [formData, setFormData] = useState({
+  // Helper: Retorna formData vazio com todos os campos obrigatórios
+  const getEmptyFormData = () => ({
     code: '',
     description: '',
-    purpose: 'DISCOUNT' as 'DISCOUNT' | 'TRIAL_UPGRADE', // FASE: Cupons de Upgrade
+    purpose: 'DISCOUNT' as 'DISCOUNT' | 'TRIAL_UPGRADE',
     discountType: 'PERCENTAGE',
     discountValue: 0,
-    durationDays: null as number | null, // Apenas para TRIAL_UPGRADE
-    isLifetime: false, // Se true, cria assinatura vitalícia
+    durationDays: null as number | null,
+    isLifetime: false,
     maxUses: null as number | null,
     expiresAt: '',
     appliesToPlanId: null as string | null,
   });
+
+  const [formData, setFormData] = useState(getEmptyFormData());
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -541,11 +544,11 @@ export const AdminCouponsPage: React.FC = () => {
     setFormData({
       code: coupon.code,
       description: coupon.description || '',
-      purpose: (coupon.purpose as 'DISCOUNT' | 'TRIAL_UPGRADE') || 'DISCOUNT', // FASE: Cupons de Upgrade
+      purpose: (coupon.purpose as 'DISCOUNT' | 'TRIAL_UPGRADE') || 'DISCOUNT',
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
-      durationDays: coupon.durationDays || null, // FASE: Cupons de Upgrade
-      isLifetime: coupon.isLifetime || false, // Vitalício
+      durationDays: coupon.isLifetime ? null : (coupon.durationDays ?? null), // Normalizar: vitalício sempre null
+      isLifetime: Boolean(coupon.isLifetime), // Normalizar para boolean
       maxUses: coupon.maxUses,
       expiresAt: coupon.expiresAt ? coupon.expiresAt.substring(0, 16) : '',
       appliesToPlanId: coupon.plan?.id || null,
@@ -554,17 +557,7 @@ export const AdminCouponsPage: React.FC = () => {
   };
 
   const resetForm = () => {
-    setFormData({
-      code: '',
-      description: '',
-      purpose: 'DISCOUNT', // FASE: Cupons de Upgrade
-      discountType: 'PERCENTAGE',
-      discountValue: 0,
-      durationDays: null, // FASE: Cupons de Upgrade
-      maxUses: null,
-      expiresAt: '',
-      appliesToPlanId: null,
-    });
+    setFormData(getEmptyFormData());
     setFormErrors({});
   };
 
