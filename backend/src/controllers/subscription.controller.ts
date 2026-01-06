@@ -142,9 +142,9 @@ export class SubscriptionController {
         return;
       }
 
-      // Verificar se trial expirou e atualizar status
+      // Verificar se trial expirou e atualizar status (exceto se for vitalício)
       const now = new Date();
-      if (subscription.status === 'TRIAL' && subscription.trialEndsAt) {
+      if (subscription.status === 'TRIAL' && subscription.trialEndsAt && !subscription.isLifetime) {
         if (subscription.trialEndsAt < now) {
           console.log('[getMySubscription] Trial expirado, atualizando status para EXPIRED', { subscriptionId: subscription.id });
 

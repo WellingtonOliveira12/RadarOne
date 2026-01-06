@@ -184,13 +184,14 @@ export async function activatePaidSubscription(
 }
 
 /**
- * Verifica e expira assinaturas vencidas
+ * Verifica e expira assinaturas vencidas (ignorando vitalícias)
  */
 export async function checkAndExpireSubscriptions(): Promise<number> {
   const now = new Date();
 
   const result = await prisma.subscription.updateMany({
     where: {
+      isLifetime: false,
       validUntil: { lt: now },
       status: { in: ['ACTIVE', 'TRIAL', 'PAST_DUE'] }
     },

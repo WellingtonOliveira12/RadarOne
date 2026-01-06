@@ -492,12 +492,14 @@ export class CouponController {
         return;
       }
 
-      // Validar durationDays
-      if (!coupon.durationDays || coupon.durationDays < 1 || coupon.durationDays > 60) {
-        res.status(500).json({
-          error: 'Cupom mal configurado: duração inválida'
-        });
-        return;
+      // Validar durationDays (ignorar se cupom é vitalício)
+      if (!coupon.isLifetime) {
+        if (!coupon.durationDays || coupon.durationDays < 1 || coupon.durationDays > 60) {
+          res.status(500).json({
+            error: 'Cupom mal configurado: duração inválida'
+          });
+          return;
+        }
       }
 
       // 2. HARDENING: Determinar plano alvo com validação robusta
@@ -574,37 +576,52 @@ export class CouponController {
         return;
       }
 
-      // Regra de stacking: se já tem trial/upgrade ativo, verificar data
+      // Regra de stacking: se já tem trial/upgrade ativo, verificar data (não aplicável para vitalício)
       const now = new Date();
-      const newEndDate = new Date(now.getTime() + coupon.durationDays * 24 * 60 * 60 * 1000);
+      let newEndDate: Date | null = null;
 
-      if (currentSubscription && currentSubscription.status === 'TRIAL') {
-        // Já tem trial ativo
-        const currentEndDate = currentSubscription.trialEndsAt || currentSubscription.validUntil;
+      if (!coupon.isLifetime) {
+        newEndDate = new Date(now.getTime() + coupon.durationDays! * 24 * 60 * 60 * 1000);
 
-        if (currentEndDate && newEndDate <= currentEndDate) {
-          res.status(400).json({
-            error: 'Você já possui um trial/upgrade ativo com prazo igual ou maior. Não é possível acumular cupons.'
+        if (currentSubscription && currentSubscription.status === 'TRIAL') {
+          // Já tem trial ativo
+          const currentEndDate = currentSubscription.trialEndsAt || currentSubscription.validUntil;
+
+          if (currentEndDate && newEndDate <= currentEndDate) {
+            res.status(400).json({
+              error: 'Você já possui um trial/upgrade ativo com prazo igual ou maior. Não é possível acumular cupons.'
+            });
+            return;
+          }
+
+          // Se chegou aqui, o novo prazo é maior - permitir e cancelar o atual
+          await prisma.subscription.update({
+            where: { id: currentSubscription.id },
+            data: { status: 'CANCELLED' }
           });
-          return;
         }
-
-        // Se chegou aqui, o novo prazo é maior - permitir e cancelar o atual
-        await prisma.subscription.update({
-          where: { id: currentSubscription.id },
-          data: { status: 'CANCELLED' }
-        });
+      } else {
+        // Cupom vitalício: cancelar qualquer subscription ativa/trial anterior
+        if (currentSubscription) {
+          await prisma.subscription.update({
+            where: { id: currentSubscription.id },
+            data: { status: 'CANCELLED' }
+          });
+        }
       }
 
-      // 4. Criar nova subscription de trial upgrade
+      // 4. Criar nova subscription
+      // Se vitalício: ACTIVE + isLifetime=true + validUntil=null
+      // Se temporário: TRIAL + validUntil=data calculada
       const newSubscription = await prisma.subscription.create({
         data: {
           userId,
           planId: targetPlan.id,
-          status: 'TRIAL',
-          isTrial: true,
-          trialEndsAt: newEndDate,
-          validUntil: newEndDate,
+          status: coupon.isLifetime ? 'ACTIVE' : 'TRIAL',
+          isTrial: !coupon.isLifetime,
+          isLifetime: coupon.isLifetime,
+          trialEndsAt: coupon.isLifetime ? null : newEndDate,
+          validUntil: coupon.isLifetime ? null : newEndDate,
           queriesLimit: targetPlan.maxMonitors * 100, // Limite generoso
           externalProvider: 'COUPON_TRIAL_UPGRADE'
         },
@@ -630,15 +647,20 @@ export class CouponController {
       });
 
       // 6. Retornar sucesso
+      const message = coupon.isLifetime
+        ? `Cupom aplicado! Você ganhou acesso VITALÍCIO ao plano ${targetPlan.name}.`
+        : `Cupom aplicado! Você ganhou acesso ao plano ${targetPlan.name} até ${newEndDate!.toLocaleDateString('pt-BR')}.`;
+
       res.status(200).json({
         success: true,
-        message: `Cupom aplicado! Você ganhou acesso ao plano ${targetPlan.name} até ${newEndDate.toLocaleDateString('pt-BR')}.`,
+        message,
         subscription: {
           id: newSubscription.id,
           planName: targetPlan.name,
           planSlug: targetPlan.slug,
-          endsAt: newEndDate,
-          daysGranted: coupon.durationDays
+          isLifetime: coupon.isLifetime,
+          endsAt: coupon.isLifetime ? null : newEndDate,
+          daysGranted: coupon.isLifetime ? null : coupon.durationDays
         }
       });
 

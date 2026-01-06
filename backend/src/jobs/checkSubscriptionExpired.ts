@@ -21,9 +21,11 @@ async function checkSubscriptionExpired() {
     const now = new Date();
 
     // Buscar assinaturas ATIVAS que já expiraram (validUntil < now)
+    // Ignorar assinaturas vitalícias (isLifetime=true)
     const subscriptionsExpired = await prisma.subscription.findMany({
       where: {
         status: 'ACTIVE',
+        isLifetime: false,
         validUntil: {
           lt: now
         }

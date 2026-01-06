@@ -7,6 +7,7 @@ export interface Subscription {
   id: string;
   status: 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' | 'EXPIRED' | 'SUSPENDED';
   isTrial?: boolean;
+  isLifetime?: boolean;
   trialEndsAt?: string | null;
   validUntil?: string | null;
   plan?: {
@@ -72,8 +73,16 @@ export function getSubscriptionStatus(user: User | null): SubscriptionStatus {
     };
   }
 
-  // Subscription TRIAL → verificar se expirou
+  // Subscription TRIAL → verificar se expirou (exceto se vitalício)
   if (subscription.status === 'TRIAL') {
+    // Se é vitalício, sempre válido
+    if (subscription.isLifetime) {
+      return {
+        hasValidSubscription: true,
+        subscription,
+      };
+    }
+
     if (subscription.trialEndsAt) {
       const trialEnd = new Date(subscription.trialEndsAt);
       const now = new Date();

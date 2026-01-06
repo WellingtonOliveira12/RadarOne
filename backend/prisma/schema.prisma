@@ -221,6 +221,7 @@ model Coupon {
   // TRIAL_UPGRADE = libera acesso premium temporário
   purpose      String? @map("purpose") // DISCOUNT, TRIAL_UPGRADE
   durationDays Int?    @map("duration_days") // Duração em dias (usado apenas se purpose=TRIAL_UPGRADE, 1-60 dias)
+  isLifetime   Boolean @default(false) @map("is_lifetime") // Se true, cria assinatura vitalícia (sem expiração)
 
   // Restrições
   appliesToPlanId String?   @map("applies_to_plan_id") // Se null, vale para qualquer plano

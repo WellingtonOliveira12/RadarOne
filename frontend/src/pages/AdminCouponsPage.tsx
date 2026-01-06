@@ -53,6 +53,7 @@ interface Coupon {
   discountValue: number;
   purpose?: 'DISCOUNT' | 'TRIAL_UPGRADE'; // FASE: Cupons de Upgrade
   durationDays?: number | null; // FASE: Cupons de Upgrade
+  isLifetime?: boolean; // Se true, cupom cria assinatura vitalícia
   maxUses: number | null;
   usedCount: number;
   expiresAt: string | null;
@@ -196,6 +197,7 @@ export const AdminCouponsPage: React.FC = () => {
     discountType: 'PERCENTAGE',
     discountValue: 0,
     durationDays: null as number | null, // Apenas para TRIAL_UPGRADE
+    isLifetime: false, // Se true, cria assinatura vitalícia
     maxUses: null as number | null,
     expiresAt: '',
     appliesToPlanId: null as string | null,
@@ -331,13 +333,15 @@ export const AdminCouponsPage: React.FC = () => {
         errors.discountValue = 'Desconto percentual não pode ser maior que 100%';
       }
     } else if (formData.purpose === 'TRIAL_UPGRADE') {
-      // Cupom de trial upgrade: validar durationDays
-      if (!formData.durationDays || formData.durationDays < 1) {
-        errors.durationDays = 'Duração deve ser pelo menos 1 dia';
-      }
+      // Cupom de trial upgrade: validar durationDays (ignorar se vitalício)
+      if (!formData.isLifetime) {
+        if (!formData.durationDays || formData.durationDays < 1) {
+          errors.durationDays = 'Duração deve ser pelo menos 1 dia';
+        }
 
-      if (formData.durationDays && formData.durationDays > 60) {
-        errors.durationDays = 'Duração não pode ser maior que 60 dias';
+        if (formData.durationDays && formData.durationDays > 60) {
+          errors.durationDays = 'Duração não pode ser maior que 60 dias';
+        }
       }
     }
 
@@ -364,7 +368,8 @@ export const AdminCouponsPage: React.FC = () => {
           purpose: formData.purpose, // FASE: Cupons de Upgrade
           discountType: formData.discountType,
           discountValue: formData.discountValue,
-          durationDays: formData.purpose === 'TRIAL_UPGRADE' ? formData.durationDays : null, // Apenas para TRIAL_UPGRADE
+          durationDays: formData.purpose === 'TRIAL_UPGRADE' && !formData.isLifetime ? formData.durationDays : null, // Apenas para TRIAL_UPGRADE não-vitalício
+          isLifetime: formData.purpose === 'TRIAL_UPGRADE' ? formData.isLifetime : false, // Apenas para TRIAL_UPGRADE
           maxUses: formData.maxUses || null,
           expiresAt: formData.expiresAt || null,
           appliesToPlanId: formData.appliesToPlanId || null,
@@ -407,7 +412,8 @@ export const AdminCouponsPage: React.FC = () => {
           purpose: formData.purpose, // FASE: Cupons de Upgrade
           discountType: formData.discountType,
           discountValue: formData.discountValue,
-          durationDays: formData.purpose === 'TRIAL_UPGRADE' ? formData.durationDays : null, // Apenas para TRIAL_UPGRADE
+          durationDays: formData.purpose === 'TRIAL_UPGRADE' && !formData.isLifetime ? formData.durationDays : null, // Apenas para TRIAL_UPGRADE não-vitalício
+          isLifetime: formData.purpose === 'TRIAL_UPGRADE' ? formData.isLifetime : false, // Apenas para TRIAL_UPGRADE
           maxUses: formData.maxUses || null,
           expiresAt: formData.expiresAt || null,
           appliesToPlanId: formData.appliesToPlanId || null,
@@ -539,6 +545,7 @@ export const AdminCouponsPage: React.FC = () => {
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
       durationDays: coupon.durationDays || null, // FASE: Cupons de Upgrade
+      isLifetime: coupon.isLifetime || false, // Vitalício
       maxUses: coupon.maxUses,
       expiresAt: coupon.expiresAt ? coupon.expiresAt.substring(0, 16) : '',
       appliesToPlanId: coupon.plan?.id || null,
@@ -1177,14 +1184,28 @@ export const AdminCouponsPage: React.FC = () => {
 
               {/* Campos para cupons de TRIAL_UPGRADE */}
               {formData.purpose === 'TRIAL_UPGRADE' && (
-                <FormControl isInvalid={!!formErrors.durationDays}>
-                  <FormLabel>Duração (dias) *</FormLabel>
-                  <NumberInput
-                    value={formData.durationDays || ''}
-                    onChange={(_, val) => setFormData({ ...formData, durationDays: val || null })}
-                    min={1}
-                    max={60}
-                  >
+                <>
+                  <FormControl>
+                    <Checkbox
+                      isChecked={formData.isLifetime}
+                      onChange={(e) => setFormData({ ...formData, isLifetime: e.target.checked, durationDays: e.target.checked ? null : formData.durationDays })}
+                    >
+                      Cupom Vitalício (acesso permanente)
+                    </Checkbox>
+                    <FormHelperText>
+                      Se marcado, o cupom concede acesso permanente sem expiração
+                    </FormHelperText>
+                  </FormControl>
+
+                  <FormControl isInvalid={!!formErrors.durationDays} isDisabled={formData.isLifetime}>
+                    <FormLabel>Duração (dias) {formData.isLifetime ? '' : '*'}</FormLabel>
+                    <NumberInput
+                      value={formData.durationDays || ''}
+                      onChange={(_, val) => setFormData({ ...formData, durationDays: val || null })}
+                      min={1}
+                      max={60}
+                      isDisabled={formData.isLifetime}
+                    >
                     <NumberInputField placeholder="Ex: 7" />
                   </NumberInput>
                   <FormHelperText>
@@ -1192,6 +1213,7 @@ export const AdminCouponsPage: React.FC = () => {
                   </FormHelperText>
                   <FormErrorMessage>{formErrors.durationDays}</FormErrorMessage>
                 </FormControl>
+                </>
               )}
 
               <FormControl>
@@ -1315,14 +1337,28 @@ export const AdminCouponsPage: React.FC = () => {
 
               {/* Campos para cupons de TRIAL_UPGRADE */}
               {formData.purpose === 'TRIAL_UPGRADE' && (
-                <FormControl isInvalid={!!formErrors.durationDays}>
-                  <FormLabel>Duração (dias) *</FormLabel>
-                  <NumberInput
-                    value={formData.durationDays || ''}
-                    onChange={(_, val) => setFormData({ ...formData, durationDays: val || null })}
-                    min={1}
-                    max={60}
-                  >
+                <>
+                  <FormControl>
+                    <Checkbox
+                      isChecked={formData.isLifetime}
+                      onChange={(e) => setFormData({ ...formData, isLifetime: e.target.checked, durationDays: e.target.checked ? null : formData.durationDays })}
+                    >
+                      Cupom Vitalício (acesso permanente)
+                    </Checkbox>
+                    <FormHelperText>
+                      Se marcado, o cupom concede acesso permanente sem expiração
+                    </FormHelperText>
+                  </FormControl>
+
+                  <FormControl isInvalid={!!formErrors.durationDays} isDisabled={formData.isLifetime}>
+                    <FormLabel>Duração (dias) {formData.isLifetime ? '' : '*'}</FormLabel>
+                    <NumberInput
+                      value={formData.durationDays || ''}
+                      onChange={(_, val) => setFormData({ ...formData, durationDays: val || null })}
+                      min={1}
+                      max={60}
+                      isDisabled={formData.isLifetime}
+                    >
                     <NumberInputField placeholder="Ex: 7" />
                   </NumberInput>
                   <FormHelperText>
@@ -1330,6 +1366,7 @@ export const AdminCouponsPage: React.FC = () => {
                   </FormHelperText>
                   <FormErrorMessage>{formErrors.durationDays}</FormErrorMessage>
                 </FormControl>
+                </>
               )}
 
               <FormControl>

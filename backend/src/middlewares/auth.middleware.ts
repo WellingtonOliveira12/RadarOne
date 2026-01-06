@@ -120,8 +120,8 @@ export const checkTrialExpired = async (
       throw AppError.subscriptionRequired('Você precisa assinar um plano para acessar este recurso');
     }
 
-    // Se é trial e já expirou, bloquear acesso
-    if (subscription.status === 'TRIAL' && subscription.trialEndsAt) {
+    // Se é trial e já expirou, bloquear acesso (exceto se for vitalício)
+    if (subscription.status === 'TRIAL' && subscription.trialEndsAt && !subscription.isLifetime) {
       const now = new Date();
       if (subscription.trialEndsAt < now) {
         // Calcular quantos dias expirou
