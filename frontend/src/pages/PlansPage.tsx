@@ -516,13 +516,19 @@ export const PlansPage: React.FC = () => {
 
         {/* SEÇÕES DE CUPOM - Agora abaixo dos planos */}
         <div style={styles.couponsContainer}>
-          {/* Seção de Cupom de Trial Upgrade (só aparece se usuário logado e não aplicado) */}
-          {user && !couponSuccess && (
+          {/* Seção de Cupom de Trial Upgrade (sempre visível se não aplicado) */}
+          {!couponSuccess && (
             <div style={styles.couponSection}>
               <h3 style={styles.couponTitle}>{getABMessage('couponUpgradeTitle')}</h3>
               <p style={styles.couponSubtitle}>
                 {getABMessage('couponUpgradeSubtitle')}
               </p>
+              {!user && (
+                <div style={styles.loginWarning}>
+                  ℹ️ <strong>Atenção:</strong> Você precisa estar logado para aplicar este cupom.{' '}
+                  <a href="/login" style={styles.loginLink}>Fazer login</a>
+                </div>
+              )}
               <div style={styles.couponInputGroup}>
                 <input
                   type="text"
@@ -818,6 +824,21 @@ const styles = {
     fontSize: responsive.typography.small.fontSize,
     color: '#6b7280',
     marginBottom: responsive.spacing.md,
+  },
+  loginWarning: {
+    backgroundColor: '#e0f2fe',
+    border: '1px solid #7dd3fc',
+    borderRadius: '8px',
+    padding: responsive.spacing.sm,
+    marginBottom: responsive.spacing.md,
+    fontSize: responsive.typography.small.fontSize,
+    color: '#0369a1',
+    textAlign: 'center' as const,
+  },
+  loginLink: {
+    color: '#0369a1',
+    fontWeight: '600' as const,
+    textDecoration: 'underline',
   },
   couponInputGroup: {
     display: 'flex',
