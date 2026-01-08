@@ -5,6 +5,7 @@ import {
   Container,
   Flex,
   HStack,
+  VStack,
   Image,
   Heading,
   Link,
@@ -160,7 +161,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
         </Container>
       </Box>
 
-      {/* Footer */}
+      {/* Footer - Centralizado e consistente com AppLayout */}
       <Box
         as="footer"
         bg="white"
@@ -170,12 +171,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
         px={{ base: 4, md: 6 }}
       >
         <Container maxW="container.xl">
-          <Flex
-            direction={{ base: 'column', md: 'row' }}
-            justify="space-between"
-            align="center"
-            gap={3}
-          >
+          <VStack spacing={3}>
             <HStack spacing={3} flexWrap="wrap" justify="center">
               <Link as={RouterLink} to="/manual" fontSize="sm" color="gray.600">
                 Manual
@@ -192,7 +188,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
             <Text fontSize="xs" color="gray.400" textAlign="center">
               © 2025 RadarOne. v{APP_VERSION}
             </Text>
-          </Flex>
+          </VStack>
         </Container>
       </Box>
     </Box>

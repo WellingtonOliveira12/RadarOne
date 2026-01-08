@@ -603,8 +603,10 @@ export const PlansPage: React.FC = () => {
 
 const styles = {
   plansSection: {
-    ...responsive.container,
-    padding: `${responsive.spacing.xxl} ${responsive.spacing.md}`,
+    // Container e padding já são controlados pelo PublicLayout
+    // Apenas adiciona padding vertical para espaçamento interno
+    paddingTop: responsive.spacing.lg,
+    paddingBottom: responsive.spacing.lg,
     position: 'relative' as const,
     zIndex: 1,
   },
