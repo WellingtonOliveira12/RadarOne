@@ -186,7 +186,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
               </Link>
             </HStack>
             <Text fontSize="xs" color="gray.400" textAlign="center">
-              © 2025 RadarOne. v{APP_VERSION}
+              © 2025 RadarOne. Todos os direitos reservados. • v{APP_VERSION}
             </Text>
           </VStack>
         </Container>
