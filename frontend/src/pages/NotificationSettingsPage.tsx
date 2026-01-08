@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Container } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
@@ -139,6 +140,7 @@ export const NotificationSettingsPage: React.FC = () => {
 
   return (
     <AppLayout>
+      <Container maxW="container.xl" py={{ base: 6, md: 10 }}>
       <div style={styles.breadcrumb}>
         <Link to="/dashboard" style={styles.breadcrumbLink}>
           Dashboard
@@ -306,6 +308,7 @@ export const NotificationSettingsPage: React.FC = () => {
           </div>
         </div>
       )}
+      </Container>
     </AppLayout>
   );
 };

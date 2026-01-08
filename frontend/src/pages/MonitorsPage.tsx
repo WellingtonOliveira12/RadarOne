@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { Container } from '@chakra-ui/react';
 import { api } from '../services/api';
 import { getToken } from '../lib/auth';
 import { useAuth } from '../context/AuthContext';
@@ -284,6 +285,7 @@ export function MonitorsPage() {
 
   return (
     <AppLayout>
+      <Container maxW="container.xl" py={{ base: 6, md: 10 }}>
         <div style={styles.breadcrumb}>
           <Link to="/dashboard" style={styles.breadcrumbLink}>
             Dashboard
@@ -660,6 +662,7 @@ export function MonitorsPage() {
             </table>
           </div>
         )}
+      </Container>
     </AppLayout>
   );
 }
