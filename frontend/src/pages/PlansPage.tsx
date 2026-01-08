@@ -587,26 +587,14 @@ export const PlansPage: React.FC = () => {
           )}
         </div>
 
-        {/* Footer melhorado */}
-        <div style={styles.footerContainer}>
-          <div style={styles.footerLinks}>
-            <a href="/manual" style={styles.footerLink}>MANUAL</a>
-            <span style={styles.footerSeparator}>|</span>
-            <a href="/faq" style={styles.footerLink}>FAQ</a>
-            <span style={styles.footerSeparator}>|</span>
-            <a href="/contato" style={styles.footerLink}>CONTATO</a>
-          </div>
-          <div style={styles.footerCopyright}>
-            @2025 Radar One v. 1.0
-          </div>
-          <div style={styles.footerInfo}>
-            <p style={{margin: 0}}>
-              Todos os planos podem ser cancelados a qualquer momento.
-            </p>
-            <p style={{margin: 0}}>
-              Planos pagos contam com 7 dias de garantia.
-            </p>
-          </div>
+        {/* Informações sobre planos */}
+        <div style={styles.planInfoText}>
+          <p style={{margin: 0, marginBottom: '4px'}}>
+            Todos os planos podem ser cancelados a qualquer momento.
+          </p>
+          <p style={{margin: 0}}>
+            Planos pagos contam com 7 dias de garantia.
+          </p>
         </div>
       </section>
     </PublicLayout>
@@ -770,48 +758,14 @@ const styles = {
     flexDirection: 'column' as const,
     gap: responsive.spacing.lg,
   },
-  // Footer melhorado
-  footerContainer: {
-    marginTop: responsive.spacing.xxl,
-    paddingTop: responsive.spacing.xl,
+  // Texto informativo sobre planos (footer do layout cuida dos links)
+  planInfoText: {
+    textAlign: 'center' as const,
+    color: '#6b7280',
+    fontSize: responsive.typography.small.fontSize,
+    marginTop: responsive.spacing.xl,
+    paddingTop: responsive.spacing.lg,
     borderTop: '1px solid #e5e7eb',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center' as const,
-    gap: responsive.spacing.md,
-  },
-  footerLinks: {
-    display: 'flex',
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    gap: responsive.spacing.sm,
-    flexWrap: 'wrap' as const,
-  },
-  footerLink: {
-    color: '#3b82f6',
-    textDecoration: 'none',
-    fontSize: responsive.typography.body.fontSize,
-    fontWeight: '500' as const,
-    transition: 'color 0.2s',
-    cursor: 'pointer',
-  },
-  footerSeparator: {
-    color: '#cbd5e1',
-    fontSize: responsive.typography.body.fontSize,
-  },
-  footerCopyright: {
-    color: '#6b7280',
-    fontSize: responsive.typography.small.fontSize,
-    textAlign: 'center' as const,
-  },
-  footerInfo: {
-    textAlign: 'center' as const,
-    color: '#6b7280',
-    fontSize: responsive.typography.small.fontSize,
-    marginTop: responsive.spacing.sm,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '4px',
   },
   trialExpiredBanner: {
     backgroundColor: '#fef3c7',
