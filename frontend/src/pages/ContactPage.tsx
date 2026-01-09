@@ -81,7 +81,7 @@ export const ContactPage: React.FC = () => {
   }
 
   return (
-    <PublicLayout maxWidth="container.md">
+    <PublicLayout maxWidth="container.xl">
       <div style={styles.container}>
         <h1 style={styles.title}>Fale Conosco</h1>
         <p style={styles.subtitle}>

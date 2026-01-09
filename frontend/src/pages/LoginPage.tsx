@@ -75,7 +75,7 @@ export function LoginPage() {
   }
 
   return (
-    <PublicLayout maxWidth="md">
+    <PublicLayout maxWidth="container.xl">
       <VStack spacing={6} align="stretch">
         <Heading size="lg" textAlign="center">
           Login

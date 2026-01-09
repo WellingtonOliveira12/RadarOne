@@ -79,7 +79,7 @@ export function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <PublicLayout maxWidth="md">
+      <PublicLayout maxWidth="container.xl">
         <VStack spacing={6} align="stretch">
           <Heading size="lg" textAlign="center">
             Email Enviado!

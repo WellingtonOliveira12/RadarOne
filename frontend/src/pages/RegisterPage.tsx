@@ -145,7 +145,7 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <PublicLayout maxWidth="container.md">
+    <PublicLayout maxWidth="container.xl">
       {/* Container do Formulário */}
       <div style={styles.container}>
         <div style={styles.card}>

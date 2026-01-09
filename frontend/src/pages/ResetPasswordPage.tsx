@@ -90,7 +90,7 @@ export function ResetPasswordPage() {
   // Se não houver token, mostrar erro
   if (!token) {
     return (
-      <PublicLayout maxWidth="md">
+      <PublicLayout maxWidth="container.xl">
         <VStack spacing={6} align="stretch">
           <Heading size="lg" textAlign="center">
             Redefinir Senha
@@ -118,7 +118,7 @@ export function ResetPasswordPage() {
   // Se já redefiniu com sucesso
   if (success) {
     return (
-      <PublicLayout maxWidth="md">
+      <PublicLayout maxWidth="container.xl">
         <VStack spacing={6} align="stretch">
           <Heading size="lg" textAlign="center">
             Senha Redefinida!
