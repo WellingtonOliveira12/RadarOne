@@ -13,7 +13,7 @@ import {
   Button,
   Skeleton,
 } from '@chakra-ui/react';
-import { APP_VERSION } from '../constants/app';
+import { APP_VERSION, AUTH_LABELS } from '../constants/app';
 import { useAuth } from '../context/AuthContext';
 
 interface PublicLayoutProps {
@@ -131,7 +131,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
                     pb={currentPath === '/login' ? 0.5 : 0}
                     _hover={{ color: 'blue.600' }}
                   >
-                    Login
+                    {AUTH_LABELS.LOGIN_CTA}
                   </Link>
                   <Link
                     as={RouterLink}

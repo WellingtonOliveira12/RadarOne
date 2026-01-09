@@ -22,3 +22,13 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://radaro
 // Telegram Bot
 export const TELEGRAM_BOT_USERNAME = 'RadarOneAlertaBot';
 export const TELEGRAM_BOT_LINK = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
+
+/**
+ * Labels de autenticação
+ * Centralizados para manter consistência em toda a aplicação
+ */
+export const AUTH_LABELS = {
+  LOGIN_CTA: 'Entrar',
+  LOGIN_PAGE_TITLE: 'Entrar',
+  REGISTER_CTA: 'Criar conta',
+} as const;

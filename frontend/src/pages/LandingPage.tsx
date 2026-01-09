@@ -17,6 +17,7 @@ import {
   Skeleton,
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
+import { AUTH_LABELS } from '../constants/app';
 
 /**
  * Landing Page - Página inicial pública do RadarOne
@@ -107,7 +108,7 @@ export const LandingPage: React.FC = () => {
                   color="gray.600"
                   _hover={{ color: 'blue.600' }}
                 >
-                  Entrar
+                  {AUTH_LABELS.LOGIN_CTA}
                 </Link>
                 <Button
                   as={RouterLink}

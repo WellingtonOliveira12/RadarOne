@@ -19,6 +19,7 @@ import { showSuccess, showError } from '../lib/toast';
 import { trackLogin } from '../lib/analytics';
 import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 import { PublicLayout } from '../components/PublicLayout';
+import { AUTH_LABELS } from '../constants/app';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -78,7 +79,7 @@ export function LoginPage() {
     <PublicLayout maxWidth="container.xl">
       <VStack spacing={6} align="stretch">
         <Heading size="lg" textAlign="center">
-          Login
+          {AUTH_LABELS.LOGIN_PAGE_TITLE}
         </Heading>
 
         {/* Banner informando motivo do redirect (se houver) */}
@@ -132,7 +133,7 @@ export function LoginPage() {
               isLoading={loading}
               loadingText="Entrando..."
             >
-              Entrar
+              {AUTH_LABELS.LOGIN_CTA}
             </Button>
 
             <Text fontSize="sm" textAlign="center">

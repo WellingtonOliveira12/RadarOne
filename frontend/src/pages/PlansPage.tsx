@@ -17,7 +17,7 @@ import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 import { normalizeCouponCode } from '../utils/couponHelpers';
 import { PublicLayout } from '../components/PublicLayout';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { API_BASE_URL } from '../constants/app';
+import { API_BASE_URL, AUTH_LABELS } from '../constants/app';
 import * as responsive from '../styles/responsive';
 
 /**
@@ -526,7 +526,7 @@ export const PlansPage: React.FC = () => {
               {!user && (
                 <div style={styles.loginWarning}>
                   ℹ️ <strong>Atenção:</strong> Você precisa estar logado para aplicar este cupom.{' '}
-                  <a href="/login" style={styles.loginLink}>Fazer login</a>
+                  <a href="/login" style={styles.loginLink}>{AUTH_LABELS.LOGIN_CTA}</a>
                 </div>
               )}
               <div style={styles.couponInputGroup}>
