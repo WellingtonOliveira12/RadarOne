@@ -44,9 +44,17 @@ class Worker {
   private worker: any = null;
 
   async start() {
+    console.log('='.repeat(60));
     console.log('🚀 RadarOne Worker iniciado');
+    console.log('='.repeat(60));
     console.log(`⏰ Intervalo de verificação: ${this.getCheckIntervalMinutes()} minutos`);
     console.log(`🔧 Modo: ${USE_QUEUE ? 'QUEUE (BullMQ)' : 'LOOP (Sequencial)'}`);
+
+    // Log de configuração para diagnóstico
+    console.log('📋 Configuração:');
+    console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? '✅ Configurado' : '❌ NÃO CONFIGURADO'}`);
+    console.log(`   TELEGRAM_BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Configurado' : '❌ NÃO CONFIGURADO'}`);
+    console.log(`   RESEND_API_KEY: ${process.env.RESEND_API_KEY ? '✅ Configurado' : '⚠️  Não configurado (email desabilitado)'}`);
 
     if (USE_QUEUE) {
       console.log(`👷 Concurrency: ${CONCURRENCY} workers`);

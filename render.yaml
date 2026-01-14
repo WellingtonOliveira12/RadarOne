@@ -57,15 +57,19 @@ services:
     region: oregon
     plan: starter
     rootDir: worker
-    buildCommand: npm install && npm run playwright:install && npx prisma generate && npm run build
+    buildCommand: npm install && npx playwright install chromium --with-deps && npx prisma generate --schema=../backend/prisma/schema.prisma && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false  # Mesmo banco do backend
+        sync: false  # Mesmo banco do backend - CONFIGURAR MANUALMENTE
       - key: TELEGRAM_BOT_TOKEN
-        sync: false  # Mesmo token do backend
+        sync: false  # Mesmo token do backend - CONFIGURAR MANUALMENTE
+      - key: RESEND_API_KEY
+        sync: false  # Para envio de emails - CONFIGURAR MANUALMENTE
+      - key: EMAIL_FROM
+        value: RadarOne <noreply@radarone.com.br>
       - key: CHECK_INTERVAL_MINUTES
         value: "5"
       - key: MONITOR_DELAY_MS
@@ -80,16 +84,8 @@ services:
         value: info
       - key: SENTRY_DSN
         sync: false
-      # Opcional: REDIS (se usar BullMQ)
-      - fromService:
-          type: redis
-          name: radarone-redis
-          property: connectionString
-        key: REDIS_URL
-      # Opcional: Captcha Solver
-      # - key: CAPTCHA_SERVICE
-      #   value: 2captcha
-      # - key: CAPTCHA_API_KEY
+      # Opcional: REDIS (se usar BullMQ) - Descomente se criar Redis
+      # - key: REDIS_URL
       #   sync: false
 
 # ===========================================
