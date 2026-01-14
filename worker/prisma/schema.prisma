@@ -1,0 +1,642 @@
+// Schema do RadarOne - Worker
+// IMPORTANTE: Manter sincronizado com backend/prisma/schema.prisma
+// Este arquivo é versionado para funcionar no Render (sem acesso ao backend/)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// USUÁRIOS E AUTENTICAÇÃO
+// ============================================
+
+model User {
+  id           String  @id @default(cuid())
+  name         String
+  email        String  @unique
+  phone        String?
+  passwordHash String  @map("password_hash")
+
+  // LGPD e Segurança
+  cpfEncrypted String? @map("cpf_encrypted") // CPF criptografado (AES-256-GCM)
+  cpfLast4     String? @map("cpf_last4") // Últimos 4 dígitos para conferência
+  cpfHash      String? @map("cpf_hash") // SHA256 hash do CPF (para validação de duplicação) - NOTA: unique constraint comentada na migration, usar findFirst
+  blocked      Boolean @default(false) // Se true, usuário não pode acessar
+
+  // 2FA / MFA (FASE 4.4)
+  twoFactorSecret       String?   @map("two_factor_secret") // Secret TOTP (criptografado)
+  twoFactorEnabled      Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorBackupCodes  String[]  @default([]) @map("two_factor_backup_codes") // Códigos de backup (hashed)
+  lastPasswordValidated DateTime? @map("last_password_validated") // Para revalidação de senha
+
+  // Segurança Avançada Admin (FASE 4.4)
+  sessionTimeoutMinutes Int?      @map("session_timeout_minutes") // Timeout customizado (null = padrão)
+  allowedIps            String[]  @default([]) @map("allowed_ips") // Whitelist de IPs (foundation)
+  lastLoginAt           DateTime? @map("last_login_at")
+  lastLoginIp           String?   @map("last_login_ip")
+
+  // Controle
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  subscriptions        Subscription[]
+  monitors             Monitor[]
+  usageLogs            UsageLog[]
+  telegramAccounts     TelegramAccount[]
+  notificationLogs     NotificationLog[]
+  notificationSettings NotificationSettings?
+  userSessions         UserSession[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN // Mantido para compatibilidade (equivale a ADMIN_SUPER)
+  ADMIN_SUPER // Acesso total
+  ADMIN_SUPPORT // Suporte - visualização + ações básicas
+  ADMIN_FINANCE // Financeiro - gerenciar assinaturas e cupons
+  ADMIN_READ // Apenas leitura (auditoria, relatórios)
+}
+
+// ============================================
+// TELEGRAM
+// ============================================
+
+model TelegramAccount {
+  id       String   @id @default(cuid())
+  userId   String   @map("user_id")
+  chatId   String   @unique @map("chat_id") // chat_id numérico do Telegram
+  username String? // @username opcional
+  active   Boolean  @default(true)
+  linkedAt DateTime @default(now()) @map("linked_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("telegram_accounts")
+}
+
+// ============================================
+// CONFIGURAÇÕES DE NOTIFICAÇÕES
+// ============================================
+
+model NotificationSettings {
+  id     String @id @default(cuid())
+  userId String @unique @map("user_id")
+
+  // Email sempre ativo (obrigatório)
+  emailEnabled Boolean @default(true) @map("email_enabled")
+
+  // Telegram opcional (só ativo se usuario preencher)
+  telegramEnabled  Boolean @default(false) @map("telegram_enabled")
+  telegramUsername String? @map("telegram_username") // @username normalizado
+  telegramChatId   String? @map("telegram_chat_id") // chatId numérico (quando vincular)
+
+  // Link Code para vincular bot Telegram (temporário, expira em 30min)
+  telegramLinkCode      String?   @map("telegram_link_code")
+  telegramLinkExpiresAt DateTime? @map("telegram_link_expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
+}
+
+// ============================================
+// PLANOS E ASSINATURAS (SaaS)
+// ============================================
+
+model Plan {
+  id          String  @id @default(cuid())
+  name        String  @unique // FREE, STARTER, PRO, PREMIUM, ULTRA
+  slug        String  @unique // free, starter, pro, premium, ultra
+  description String?
+
+  // Preços e Períodos
+  priceCents    Int    @map("price_cents") // Preço em centavos (ex: 2900 = R$29,00)
+  billingPeriod String @map("billing_period") // MONTHLY, YEARLY, SEMIANNUAL
+  trialDays     Int    @default(7) @map("trial_days") // Duração do teste grátis
+
+  // Limites do Plano
+  maxMonitors     Int @map("max_monitors") // Quantidade máxima de monitores ativos
+  maxSites        Int @map("max_sites") // Quantidade de sites diferentes permitidos
+  maxAlertsPerDay Int @map("max_alerts_per_day") // Máximo de alertas por dia
+  checkInterval   Int @default(60) @map("check_interval") // Intervalo de verificação em minutos
+
+  // Marketing e Ordem
+  isRecommended Boolean @default(false) @map("is_recommended") // Destacar em upsell
+  priority      Int     @default(0) // Ordenação em listagens (maior = mais importante)
+
+  // Controle
+  isActive   Boolean @default(true) @map("is_active")
+  isLifetime Boolean @default(false) @map("is_lifetime")
+
+  // Integração Kiwify (futura)
+  kiwifyProductId String? @map("kiwify_product_id")
+  checkoutUrl     String? @map("checkout_url") // URL do checkout Kiwify/Stripe
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  subscriptions Subscription[]
+  coupons       Coupon[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+  planId String @map("plan_id")
+
+  // Status e Períodos
+  status      SubscriptionStatus @default(TRIAL)
+  startDate   DateTime           @default(now()) @map("start_date")
+  validUntil  DateTime?          @map("valid_until") // Fim do período pago ou trial
+  trialEndsAt DateTime?          @map("trial_ends_at") // Se estiver em período de teste
+
+  // Uso
+  queriesUsed  Int @default(0) @map("queries_used")
+  queriesLimit Int @map("queries_limit")
+
+  // Flags
+  isLifetime Boolean @default(false) @map("is_lifetime")
+  isTrial    Boolean @default(false) @map("is_trial")
+
+  // Integração com Provedor de Pagamento
+  externalProvider String? @map("external_provider") // STRIPE, KIWIFY, ASAAS
+  externalSubId    String? @map("external_sub_id") // ID da assinatura no provedor
+  kiwifyOrderId    String? @unique @map("kiwify_order_id")
+  kiwifyCustomerId String? @map("kiwify_customer_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([validUntil])
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  TRIAL // Período de teste
+  ACTIVE // Ativa e paga
+  PAST_DUE // Pagamento atrasado
+  CANCELLED // Cancelada pelo usuário
+  EXPIRED // Expirada por falta de pagamento
+  SUSPENDED // Suspensa por violação
+}
+
+// ============================================
+// CUPONS
+// ============================================
+
+model Coupon {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  description String?
+
+  // Tipo e Valor do Desconto (usado quando purpose=DISCOUNT ou null)
+  discountType  String @map("discount_type") // PERCENT, FIXED
+  discountValue Int    @map("discount_value") // Porcentagem (0-100) ou valor em centavos
+
+  // Finalidade do Cupom (FASE: CUPONS DE UPGRADE)
+  // null ou DISCOUNT = desconto financeiro (comportamento padrão/legado)
+  // TRIAL_UPGRADE = libera acesso premium temporário
+  purpose      String? @map("purpose") // DISCOUNT, TRIAL_UPGRADE
+  durationDays Int?    @map("duration_days") // Duração em dias (usado apenas se purpose=TRIAL_UPGRADE, 1-60 dias)
+  isLifetime   Boolean @default(false) @map("is_lifetime") // Se true, cria assinatura vitalícia (sem expiração)
+
+  // Restrições
+  appliesToPlanId String?   @map("applies_to_plan_id") // Se null, vale para qualquer plano
+  maxUses         Int?      @map("max_uses") // Máximo de usos (null = ilimitado)
+  usedCount       Int       @default(0) @map("used_count")
+  expiresAt       DateTime? @map("expires_at")
+
+  // Controle
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  plan      Plan?         @relation(fields: [appliesToPlanId], references: [id])
+  usageLogs CouponUsage[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id       String   @id @default(cuid())
+  couponId String   @map("coupon_id")
+  userId   String   @map("user_id")
+  usedAt   DateTime @default(now()) @map("used_at")
+
+  // Relações
+  coupon Coupon @relation(fields: [couponId], references: [id])
+
+  @@index([couponId])
+  @@index([userId])
+  @@map("coupon_usage")
+}
+
+// Rastreamento de cupons validados (para analytics e notificações de abandono)
+model CouponValidation {
+  id                   String    @id @default(cuid())
+  couponId             String    @map("coupon_id")
+  userId               String?   @map("user_id") // Nullable para usuários não logados
+  userEmail            String?   @map("user_email") // Email para envio de notificação
+  purpose              String    // DISCOUNT ou TRIAL_UPGRADE
+  location             String    // plans_page, checkout, etc
+  converted            Boolean   @default(false) // True se o cupom foi usado (checkout completado)
+  reminderSentAt       DateTime? @map("reminder_sent_at") // Quando 1º email foi enviado (24h)
+  secondReminderSentAt DateTime? @map("second_reminder_sent_at") // Quando 2º email foi enviado (48h)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@index([couponId])
+  @@index([userId])
+  @@index([converted])
+  @@index([createdAt])
+  @@index([reminderSentAt])
+  @@map("coupon_validations")
+}
+
+// Subscrições de Push Notification (Web Push API)
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  endpoint   String   @unique // URL do push service
+  p256dh     String   // Chave pública para criptografia
+  auth       String   // Chave de autenticação
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+// ============================================
+// MONITORES
+// ============================================
+
+enum MonitorSite {
+  MERCADO_LIVRE
+  OLX
+  FACEBOOK_MARKETPLACE // Mantido por compatibilidade - Scraper não disponível
+  WEBMOTORS // Portal de veículos
+  ICARROS // Portal de veículos
+  ZAP_IMOVEIS // Portal de imóveis
+  VIVA_REAL // Portal de imóveis
+  IMOVELWEB // Portal de imóveis
+  LEILAO // Sites de leilão (Superbid, VIP Leilões, Sodré Santoro, etc)
+  OUTRO // Outros sites
+}
+
+enum MonitorMode {
+  URL_ONLY // Apenas URL simples
+  STRUCTURED_FILTERS // Filtros estruturados (leilões, imóveis)
+}
+
+model Monitor {
+  id     String      @id @default(cuid())
+  userId String      @map("user_id")
+  name   String
+  site   MonitorSite
+
+  // Modos de Busca
+  mode        MonitorMode @default(URL_ONLY)
+  searchUrl   String?     @map("search_url") // Obrigatório se mode = URL_ONLY
+  filtersJson Json?       @map("filters_json") // Obrigatório se mode = STRUCTURED_FILTERS
+
+  // Filtros de Preço (comuns a todos)
+  priceMin Float? @map("price_min")
+  priceMax Float? @map("price_max")
+
+  // Campos adicionais (compatibilidade com worker)
+  keywords        String[] @default([])
+  excludeKeywords String[] @default([]) @map("exclude_keywords")
+  checkInterval   Int      @default(60) @map("check_interval")
+
+  // Controle de Estado
+  active         Boolean   @default(true)
+  lastCheckedAt  DateTime? @map("last_checked_at")
+  lastResultHash String?   @map("last_result_hash") // Hash para detectar mudanças
+  lastAlertAt    DateTime? @map("last_alert_at")
+  alertsEnabled  Boolean   @default(true) @map("alerts_enabled")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adsSeen AdSeen[]
+  logs    MonitorLog[]
+
+  @@index([userId])
+  @@index([active])
+  @@index([site])
+  @@map("monitors")
+}
+
+// ============================================
+// ANÚNCIOS VISTOS
+// ============================================
+
+model AdSeen {
+  id          String    @id @default(cuid())
+  monitorId   String    @map("monitor_id")
+  externalId  String    @map("external_id")
+  title       String
+  description String?
+  price       Float?
+  url         String
+  imageUrl    String?   @map("image_url")
+  location    String?
+  publishedAt DateTime? @map("published_at")
+  firstSeenAt DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+  alertSent   Boolean   @default(false) @map("alert_sent")
+  alertSentAt DateTime? @map("alert_sent_at")
+  metadata    Json?
+
+  // Relações
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@unique([monitorId, externalId])
+  @@index([monitorId])
+  @@map("ads_seen")
+}
+
+// ============================================
+// LOGS DE EXECUÇÃO
+// ============================================
+
+model MonitorLog {
+  id            String    @id @default(cuid())
+  monitorId     String    @map("monitor_id")
+  status        LogStatus
+  adsFound      Int       @default(0) @map("ads_found")
+  newAds        Int       @default(0) @map("new_ads")
+  alertsSent    Int       @default(0) @map("alerts_sent")
+  error         String?
+  executionTime Int?      @map("execution_time")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relações
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId])
+  @@index([createdAt])
+  @@map("monitor_logs")
+}
+
+enum LogStatus {
+  SUCCESS
+  ERROR
+  PARTIAL
+}
+
+// ============================================
+// SESSÕES DE LOGIN (Para sites que exigem autenticação)
+// ============================================
+
+model UserSession {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  site        String   // Ex: "superbid", "vipleiloes"
+  domain      String   // Ex: "superbid.net", "vipleiloes.com.br"
+  cookies     Json     // Cookies armazenados (encrypted)
+  localStorage Json?    @map("local_storage") // LocalStorage se necessário
+  metadata    Json?    // Dados adicionais (username, etc)
+  expiresAt   DateTime @map("expires_at")
+  lastUsedAt  DateTime @default(now()) @map("last_used_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, site, domain])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+// ============================================
+// HISTÓRICO DE USO
+// ============================================
+
+model UsageLog {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  action      String
+  details     Json?
+  queriesUsed Int      @default(1) @map("queries_used")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("usage_logs")
+}
+
+// ============================================
+// WEBHOOKS KIWIFY
+// ============================================
+
+model WebhookLog {
+  id        String   @id @default(cuid())
+  event     String
+  payload   Json
+  processed Boolean  @default(false)
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([event])
+  @@index([processed])
+  @@map("webhook_logs")
+}
+
+// ============================================
+// HISTÓRICO DE NOTIFICAÇÕES
+// ============================================
+
+enum NotificationChannel {
+  EMAIL
+  TELEGRAM
+}
+
+enum NotificationStatus {
+  SUCCESS
+  FAILED
+}
+
+model NotificationLog {
+  id        String              @id @default(cuid())
+  userId    String              @map("user_id")
+  channel   NotificationChannel
+  title     String
+  message   String              @db.Text // Texto resumido da notificação
+  target    String // Email ou chatId mascarado (ex: "w***@gmail.com" ou "***1234")
+  status    NotificationStatus
+  error     String?             @db.Text // Mensagem de erro, se houver
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([status])
+  @@map("notification_logs")
+}
+
+// ============================================
+// TOKENS DE CONEXÃO TELEGRAM
+// ============================================
+
+model TelegramConnectToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique // Token único para deep link
+  status    TokenStatus @default(PENDING)
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([token])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("telegram_connect_tokens")
+}
+
+enum TokenStatus {
+  PENDING
+  USED
+  EXPIRED
+}
+
+// ============================================
+// SUPORTE / FALE CONOSCO
+// ============================================
+
+model SupportTicket {
+  id            String   @id @default(cuid())
+  userId        String?  @map("user_id") // Nullable para usuários não logados
+  email         String
+  category      String
+  subject       String
+  message       String   @db.Text
+  attachmentUrl String?  @map("attachment_url")
+  status        TicketStatus @default(OPEN)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("support_tickets")
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// ============================================
+// AUDIT LOG (FASE 3.1)
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String   @map("admin_id")
+  adminEmail String   @map("admin_email")
+  action     String // USER_BLOCKED, USER_UNBLOCKED, SUBSCRIPTION_UPDATED, etc
+  targetType String   @map("target_type") // USER, SUBSCRIPTION, COUPON, MONITOR, SYSTEM
+  targetId   String?  @map("target_id") // ID da entidade afetada (nullable para ações globais)
+  beforeData Json?    @map("before_data") // Estado antes da mudança
+  afterData  Json?    @map("after_data") // Estado depois da mudança
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@index([action])
+  @@index([targetType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================
+// SYSTEM SETTINGS (FASE 3.5)
+// ============================================
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique // MAINTENANCE_MODE, MAX_MONITORS_GLOBAL, etc
+  value       String // Valor armazenado como string (parse conforme tipo)
+  type        String   @default("STRING") // STRING, NUMBER, BOOLEAN, JSON
+  description String? // Descrição do que essa configuração faz
+  category    String   @default("GENERAL") // GENERAL, LIMITS, FEATURES, MAINTENANCE
+  isPublic    Boolean  @default(false) @map("is_public") // Se pode ser exibido publicamente
+  updatedBy   String?  @map("updated_by") // ID do admin que atualizou
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([key])
+  @@index([category])
+  @@map("system_settings")
+}
+
+// ============================================
+// ADMIN ALERTS (FASE 3.6)
+// ============================================
+
+model AdminAlert {
+  id        String       @id @default(cuid())
+  type      String // JOB_FAILURE, WEBHOOK_ERROR, SPIKE_MONITORS, MASS_EXPIRATION
+  severity  AlertSeverity @default(INFO)
+  title     String
+  message   String       @db.Text
+  source    String? // Nome do job, webhook, etc que gerou o alerta
+  metadata  Json? // Dados adicionais (erro, contagem, etc)
+  isRead    Boolean      @default(false) @map("is_read")
+  readBy    String?      @map("read_by") // ID do admin que leu
+  readAt    DateTime?    @map("read_at")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@index([isRead])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("admin_alerts")
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}

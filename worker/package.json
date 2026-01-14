@@ -5,11 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "npm run prisma:generate:local && tsc",
+    "build": "npx prisma generate && tsc",
     "start": "node dist/index.js",
-    "prisma:generate": "prisma generate",
-    "prisma:generate:local": "node scripts/generate-prisma.js",
-    "playwright:install": "playwright install chromium"
+    "prisma:generate": "npx prisma generate",
+    "postinstall": "npx playwright install chromium || true"
   },
   "keywords": [],
   "author": "",
