@@ -12,9 +12,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
-    "paths": {
-      "@prisma/client": ["../backend/node_modules/@prisma/client"]
-    },
     "baseUrl": "."
   },
   "include": ["src/**/*"],
