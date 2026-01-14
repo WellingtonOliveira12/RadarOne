@@ -16,15 +16,13 @@ import { MonitorRunner } from './monitor-runner';
  */
 
 // Configuração do Redis
-const redisConfig = process.env.REDIS_URL
-  ? process.env.REDIS_URL
-  : {
+const connection = process.env.REDIS_URL
+  ? new Redis(process.env.REDIS_URL)
+  : new Redis({
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379'),
       maxRetriesPerRequest: null,
-    };
-
-const connection = new Redis(redisConfig);
+    });
 
 // Configuração da fila
 export const monitorQueue = new Queue('monitors', {

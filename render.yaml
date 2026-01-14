@@ -71,7 +71,7 @@ services:
       - key: EMAIL_FROM
         value: RadarOne <noreply@radarone.com.br>
       - key: CHECK_INTERVAL_MINUTES
-        value: "5"
+        value: "1"  # Tick a cada 1 min - monitores são filtrados pelo intervalo do plano
       - key: MONITOR_DELAY_MS
         value: "2000"
       - key: REQUEST_DELAY_MS

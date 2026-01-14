@@ -1,40 +1,64 @@
+/**
+ * Script para verificar planos e intervalos
+ */
+import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import dotenv from 'dotenv';
 
 dotenv.config();
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({ adapter, log: ['error'] });
 
 async function checkPlans() {
-  const plans = await prisma.plan.findMany({
-    orderBy: { priority: 'asc' },
-  });
+  console.log('📋 PLANOS E INTERVALOS DE VERIFICAÇÃO');
+  console.log('='.repeat(60));
 
-  console.log('\n📊 PLANOS NO BANCO DE DADOS:');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('SLUG       | NOME     | PREÇO         | MONITORS | SITES | ALERTS/DAY | GARANTIA | KIWIFY ID  | REC ⭐');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  try {
+    const plans = await prisma.plan.findMany({
+      where: { isActive: true },
+      orderBy: { priority: 'desc' },
+    });
 
-  plans.forEach(plan => {
-    const price = plan.priceCents === 0 ? 'GRÁTIS       ' : `R$ ${(plan.priceCents / 100).toFixed(2)}/mês`;
-    const kiwify = plan.kiwifyProductId || 'NULL';
-    const rec = plan.isRecommended ? 'SIM' : 'NÃO';
-    const garantia = plan.trialDays > 0 ? `${plan.trialDays} dias` : 'N/A';
-    console.log(
-      `${plan.slug.padEnd(10)} | ${plan.name.padEnd(8)} | ${price} | ${String(plan.maxMonitors).padStart(8)} | ${String(plan.maxSites).padStart(5)} | ${String(plan.maxAlertsPerDay).padStart(10)} | ${garantia.padEnd(8)} | ${kiwify.padEnd(10)} | ${rec}`
-    );
-  });
+    console.log(`\nEncontrados ${plans.length} planos ativos:\n`);
 
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log(`\n✅ Total: ${plans.length} planos cadastrados`);
-  console.log('✅ kiwifyProductId configurados para planos pagos\n');
+    for (const plan of plans) {
+      console.log(`  ${plan.name} (${plan.slug})`);
+      console.log(`    checkInterval: ${plan.checkInterval} minutos`);
+      console.log(`    maxMonitors: ${plan.maxMonitors}`);
+      console.log(`    maxAlertsPerDay: ${plan.maxAlertsPerDay}`);
+      console.log('');
+    }
 
-  await prisma.$disconnect();
-  await pool.end();
+    // Verificar subscriptions ativas
+    console.log('\n📊 SUBSCRIPTIONS ATIVAS COM PLANO');
+    console.log('-'.repeat(50));
+
+    const subscriptions = await prisma.subscription.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        plan: true,
+        user: {
+          select: { email: true },
+        },
+      },
+    });
+
+    for (const sub of subscriptions) {
+      console.log(`  ${sub.user.email}`);
+      console.log(`    Plano: ${sub.plan.name} (checkInterval: ${sub.plan.checkInterval} min)`);
+      console.log(`    isLifetime: ${sub.isLifetime}`);
+      console.log('');
+    }
+
+  } catch (error) {
+    console.error('Erro:', error);
+  } finally {
+    await prisma.$disconnect();
+    await pool.end();
+  }
 }
 
-checkPlans().catch(console.error);
+checkPlans();

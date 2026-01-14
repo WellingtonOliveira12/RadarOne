@@ -23,13 +23,6 @@ export function initSentry() {
     // Configurações do worker
     serverName: 'radarone-worker',
 
-    // Integrations padrão
-    integrations: [
-      // Captura informações do Node.js
-      new Sentry.Integrations.OnUncaughtException(),
-      new Sentry.Integrations.OnUnhandledRejection(),
-    ],
-
     // Beforehand filter
     beforeSend(event, hint) {
       // Ignora erros específicos conhecidos

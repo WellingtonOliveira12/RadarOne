@@ -21,15 +21,17 @@ initSentry();
 startHealthServer();
 
 /**
- * Worker de Scraping - RadarOne (COM FILA)
+ * Worker de Scraping - RadarOne
  *
- * Versão com BullMQ para processamento paralelo e escalável
+ * INTERVALO POR PLANO:
+ * - Free: 60 min
+ * - Starter: 30 min
+ * - Pro: 15 min
+ * - Premium: 10 min
+ * - Ultra: 5 min
  *
- * Responsável por:
- * - Buscar monitores ativos
- * - Adicionar à fila distribuída (BullMQ + Redis)
- * - Processar com workers concorrentes
- * - Garantir retry automático e DLQ
+ * Estratégia: Worker roda a cada 1 minuto (tick) e filtra monitores
+ * elegíveis baseado em lastCheckedAt + checkInterval do plano.
  */
 
 const prisma = new PrismaClient();
@@ -37,6 +39,9 @@ const prisma = new PrismaClient();
 // Modo de operação
 const USE_QUEUE = !!process.env.REDIS_URL || !!process.env.REDIS_HOST;
 const CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5');
+
+// Intervalo padrão para usuários sem plano (Free)
+const DEFAULT_CHECK_INTERVAL_MINUTES = 60;
 
 class Worker {
   private isRunning = false;
@@ -47,11 +52,12 @@ class Worker {
     console.log('='.repeat(60));
     console.log('🚀 RadarOne Worker iniciado');
     console.log('='.repeat(60));
-    console.log(`⏰ Intervalo de verificação: ${this.getCheckIntervalMinutes()} minutos`);
+    console.log(`⏰ Tick interval: ${this.getTickIntervalMinutes()} minuto(s)`);
     console.log(`🔧 Modo: ${USE_QUEUE ? 'QUEUE (BullMQ)' : 'LOOP (Sequencial)'}`);
+    console.log('📋 Intervalo por plano: Free=60min, Starter=30min, Pro=15min, Premium=10min, Ultra=5min');
 
     // Log de configuração para diagnóstico
-    console.log('📋 Configuração:');
+    console.log('\n📋 Configuração:');
     console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? '✅ Configurado' : '❌ NÃO CONFIGURADO'}`);
     console.log(`   TELEGRAM_BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Configurado' : '❌ NÃO CONFIGURADO'}`);
     console.log(`   RESEND_API_KEY: ${process.env.RESEND_API_KEY ? '✅ Configurado' : '⚠️  Não configurado (email desabilitado)'}`);
@@ -90,22 +96,28 @@ class Worker {
     // Executa imediatamente
     await this.runMonitors();
 
-    // Agenda execuções periódicas
-    const intervalMs = this.getCheckIntervalMinutes() * 60 * 1000;
+    // Agenda execuções periódicas (tick a cada X minutos)
+    const intervalMs = this.getTickIntervalMinutes() * 60 * 1000;
     this.checkInterval = setInterval(() => {
       this.runMonitors();
     }, intervalMs);
   }
 
+  /**
+   * Busca monitores elegíveis e executa
+   * Monitores são filtrados pelo intervalo do plano
+   */
   async runMonitors() {
     if (!this.isRunning) return;
 
-    console.log('\n📊 Iniciando ciclo de verificação...');
+    const now = new Date();
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`📊 [${now.toISOString()}] Iniciando ciclo de verificação...`);
     const startTime = Date.now();
 
     try {
-      // Busca monitores ativos
-      const monitors = await prisma.monitor.findMany({
+      // Busca monitores ativos com dados do plano
+      const allMonitors = await prisma.monitor.findMany({
         where: {
           active: true,
         },
@@ -114,12 +126,17 @@ class Worker {
             include: {
               subscriptions: {
                 where: {
-                  status: 'ACTIVE',
+                  OR: [
+                    { status: 'ACTIVE' },
+                    { status: 'TRIAL' },
+                  ],
                 },
+                include: {
+                  plan: true,  // Inclui o plano para pegar checkInterval
+                },
+                take: 1,  // Pega apenas a subscription ativa
               },
-              // FIX: Incluir notificationSettings para ter telegramChatId
               notificationSettings: true,
-              // FIX: Incluir telegramAccounts como fallback
               telegramAccounts: {
                 where: { active: true },
                 take: 1,
@@ -129,21 +146,63 @@ class Worker {
         },
       });
 
-      console.log(`📌 ${monitors.length} monitores ativos encontrados`);
+      console.log(`📌 ${allMonitors.length} monitores ativos no total`);
+
+      // Filtra monitores elegíveis baseado no intervalo do plano
+      const eligibleMonitors = allMonitors.filter((monitor) => {
+        const subscription = monitor.user.subscriptions[0];
+        const plan = subscription?.plan;
+        const checkIntervalMin = plan?.checkInterval || DEFAULT_CHECK_INTERVAL_MINUTES;
+
+        // Se nunca rodou, é elegível
+        if (!monitor.lastCheckedAt) {
+          console.log(`   ✅ ${monitor.name} - NUNCA RODOU (plano: ${plan?.name || 'Free'}, interval: ${checkIntervalMin}min)`);
+          return true;
+        }
+
+        // Calcula se está "due" (lastCheckedAt + interval <= agora)
+        const nextRunAt = new Date(monitor.lastCheckedAt.getTime() + checkIntervalMin * 60 * 1000);
+        const isDue = now >= nextRunAt;
+
+        if (isDue) {
+          const minSinceLastRun = Math.round((now.getTime() - monitor.lastCheckedAt.getTime()) / 60000);
+          console.log(`   ✅ ${monitor.name} - DUE (plano: ${plan?.name || 'Free'}, interval: ${checkIntervalMin}min, last: ${minSinceLastRun}min atrás)`);
+        } else {
+          const minUntilNext = Math.round((nextRunAt.getTime() - now.getTime()) / 60000);
+          console.log(`   ⏳ ${monitor.name} - SKIP (plano: ${plan?.name || 'Free'}, interval: ${checkIntervalMin}min, próximo em: ${minUntilNext}min)`);
+        }
+
+        return isDue;
+      });
+
+      console.log(`\n🎯 ${eligibleMonitors.length} monitores elegíveis para execução`);
+
+      if (eligibleMonitors.length === 0) {
+        console.log('   Nenhum monitor precisa rodar agora.');
+        const duration = Date.now() - startTime;
+        console.log(`✅ Ciclo concluído em ${(duration / 1000).toFixed(2)}s (0 executados)`);
+        return;
+      }
 
       if (USE_QUEUE) {
-        // Modo FILA: Adiciona todos à fila para processamento paralelo
-        await enqueueMonitors(monitors);
+        // Modo FILA: Adiciona apenas elegíveis à fila
+        await enqueueMonitors(eligibleMonitors);
 
-        // Mostra estatísticas
         const stats = await getQueueStats();
         console.log(`📊 Fila: ${stats.total} total (${stats.active} processando, ${stats.waiting} aguardando)`);
       } else {
-        // Modo LOOP: Processa sequencialmente (compatibilidade)
-        for (const monitor of monitors) {
-          await MonitorRunner.run(monitor);
+        // Modo LOOP: Processa sequencialmente
+        let processed = 0;
+        for (const monitor of eligibleMonitors) {
+          try {
+            await MonitorRunner.run(monitor);
+            processed++;
+          } catch (error: any) {
+            console.error(`❌ Erro ao executar monitor ${monitor.name}:`, error.message);
+          }
           await this.delay(2000); // 2 segundos entre monitores
         }
+        console.log(`📊 Processados: ${processed}/${eligibleMonitors.length}`);
       }
 
       const duration = Date.now() - startTime;
@@ -174,8 +233,8 @@ class Worker {
     console.log('✅ Worker encerrado');
   }
 
-  private getCheckIntervalMinutes(): number {
-    return parseInt(process.env.CHECK_INTERVAL_MINUTES || '5');
+  private getTickIntervalMinutes(): number {
+    return parseInt(process.env.CHECK_INTERVAL_MINUTES || '1');
   }
 
   private delay(ms: number): Promise<void> {

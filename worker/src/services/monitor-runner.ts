@@ -206,13 +206,13 @@ export class MonitorRunner {
     const hasEmail = !!monitor.user.email;
 
     // Log para debug
-    log.info({
+    log.info('📋 Canais de notificação do usuário', {
       monitorId: monitor.id,
       userId: monitor.user.id,
       hasTelegram,
       hasEmail,
       telegramChatId: telegramChatId ? '***' + telegramChatId.slice(-4) : null,
-    }, '📋 Canais de notificação do usuário');
+    });
 
     if (!hasTelegram && !hasEmail) {
       console.log('⚠️  Usuário sem canais de notificação configurados (Telegram ou Email)');
@@ -233,21 +233,21 @@ export class MonitorRunner {
           });
 
           alertSent = true;
-          log.info({
+          log.info('📱 Alerta enviado por Telegram', {
             monitorId: monitor.id,
             adId: ad.externalId,
             channel: 'telegram',
-          }, '📱 Alerta enviado por Telegram');
+          });
 
           // Delay entre alertas para evitar rate limit do Telegram
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (error: any) {
-          log.error({
+          log.warn('❌ Erro ao enviar alerta por Telegram', {
             monitorId: monitor.id,
             adId: ad.externalId,
             channel: 'telegram',
             error: error.message,
-          }, '❌ Erro ao enviar alerta por Telegram');
+          });
         }
       }
 
@@ -262,23 +262,23 @@ export class MonitorRunner {
 
           if (result.success) {
             alertSent = true;
-            log.info({
+            log.info('📧 Alerta enviado por Email', {
               monitorId: monitor.id,
               adId: ad.externalId,
               channel: 'email',
               messageId: result.messageId,
-            }, '📧 Alerta enviado por Email');
+            });
           }
 
           // Delay entre emails
           await new Promise((resolve) => setTimeout(resolve, 300));
         } catch (error: any) {
-          log.error({
+          log.warn('❌ Erro ao enviar alerta por Email', {
             monitorId: monitor.id,
             adId: ad.externalId,
             channel: 'email',
             error: error.message,
-          }, '❌ Erro ao enviar alerta por Email');
+          });
         }
       }
 
