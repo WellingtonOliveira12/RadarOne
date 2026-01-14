@@ -195,8 +195,24 @@ export class MonitorRunner {
    * Envia alertas via Telegram e Email (multi-canal)
    */
   private static async sendAlerts(monitor: any, ads: Ad[]): Promise<number> {
-    const hasTelegram = !!monitor.user.telegramChatId;
+    // FIX: Buscar telegramChatId de notificationSettings ou telegramAccounts
+    const telegramChatId =
+      monitor.user.notificationSettings?.telegramChatId ||
+      monitor.user.telegramAccounts?.[0]?.chatId ||
+      null;
+
+    const telegramEnabled = monitor.user.notificationSettings?.telegramEnabled !== false;
+    const hasTelegram = !!(telegramChatId && telegramEnabled);
     const hasEmail = !!monitor.user.email;
+
+    // Log para debug
+    log.info({
+      monitorId: monitor.id,
+      userId: monitor.user.id,
+      hasTelegram,
+      hasEmail,
+      telegramChatId: telegramChatId ? '***' + telegramChatId.slice(-4) : null,
+    }, '📋 Canais de notificação do usuário');
 
     if (!hasTelegram && !hasEmail) {
       console.log('⚠️  Usuário sem canais de notificação configurados (Telegram ou Email)');
@@ -211,7 +227,7 @@ export class MonitorRunner {
       // Tenta enviar por Telegram
       if (hasTelegram) {
         try {
-          await TelegramService.sendAdAlert(monitor.user.telegramChatId, {
+          await TelegramService.sendAdAlert(telegramChatId, {
             monitorName: monitor.name,
             ad,
           });

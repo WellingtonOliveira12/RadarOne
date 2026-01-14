@@ -109,6 +109,13 @@ class Worker {
                   status: 'ACTIVE',
                 },
               },
+              // FIX: Incluir notificationSettings para ter telegramChatId
+              notificationSettings: true,
+              // FIX: Incluir telegramAccounts como fallback
+              telegramAccounts: {
+                where: { active: true },
+                take: 1,
+              },
             },
           },
         },
