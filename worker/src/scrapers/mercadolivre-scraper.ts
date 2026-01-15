@@ -5,6 +5,11 @@ import { retry, retryPresets } from '../utils/retry-helper';
 import { captchaSolver } from '../utils/captcha-solver';
 import { randomUA } from '../utils/user-agents';
 import { screenshotHelper } from '../utils/screenshot-helper';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+// Diretório para evidências forenses
+const FORENSIC_DIR = '/tmp/radarone-screenshots';
 
 /**
  * Mercado Livre Scraper - Implementação Real
@@ -89,12 +94,96 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
       }
     }
 
-    // Wait for results to load
+    // Wait for results to load (timeout aumentado para 15s)
     try {
-      await page.waitForSelector('.ui-search-result__content', { timeout: 5000 });
-    } catch (error) {
-      console.log('⚠️  No results found or page structure changed');
-      await browser.close();
+      await page.waitForSelector('.ui-search-result__content', { timeout: 15000 });
+    } catch (selectorError) {
+      // ========== DEBUG FORENSE ==========
+      console.log('⚠️  ML_DEBUG: Selector timeout - iniciando coleta forense');
+
+      try {
+        // Garantir que diretório existe
+        await fs.mkdir(FORENSIC_DIR, { recursive: true });
+
+        const timestamp = Date.now();
+        const safeMonitorId = monitor.id.replace(/[^a-zA-Z0-9-]/g, '');
+        const baseName = `ml-${safeMonitorId}-${timestamp}`;
+
+        // Coletar evidências
+        const finalUrl = page.url();
+        const title = await page.title();
+        const contentSnippet = await page.evaluate(() =>
+          document.body.innerText.slice(0, 1200).replace(/\n+/g, ' ').trim()
+        );
+
+        // Detectar captcha/bloqueio
+        const captchaDetection = await page.evaluate(() => {
+          const bodyText = document.body.innerText.toLowerCase();
+          const htmlContent = document.documentElement.innerHTML.toLowerCase();
+
+          // Strings suspeitas
+          const suspiciousStrings = [
+            'verificando', 'captcha', 'não sou um robô', 'nao sou um robo',
+            'challenge', 'acesso negado', 'access denied', 'blocked',
+            'security check', 'prove you are human', 'robot', 'bot detected'
+          ];
+
+          const foundStrings = suspiciousStrings.filter(s =>
+            bodyText.includes(s) || htmlContent.includes(s)
+          );
+
+          // Elementos de captcha/challenge
+          const captchaElements = {
+            recaptchaIframe: !!document.querySelector('iframe[src*="recaptcha"]'),
+            recaptchaDiv: !!document.querySelector('.g-recaptcha, #g-recaptcha'),
+            hcaptcha: !!document.querySelector('.h-captcha, iframe[src*="hcaptcha"]'),
+            challengeRunning: !!document.querySelector('#challenge-running'),
+            recaptchaInput: !!document.querySelector('input[name="g-recaptcha-response"]'),
+            cloudflare: !!document.querySelector('#cf-wrapper, .cf-browser-verification'),
+            datadome: !!document.querySelector('[data-datadome]'),
+          };
+
+          const hasElements = Object.values(captchaElements).some(v => v);
+
+          return {
+            hasCaptcha: foundStrings.length > 0 || hasElements,
+            foundStrings,
+            elements: captchaElements,
+          };
+        });
+
+        // Paths para arquivos
+        const screenshotPath = path.join(FORENSIC_DIR, `${baseName}.png`);
+        const htmlPath = path.join(FORENSIC_DIR, `${baseName}.html`);
+
+        // Salvar screenshot
+        await page.screenshot({
+          path: screenshotPath,
+          fullPage: true,
+          timeout: 10000,
+        });
+
+        // Salvar HTML completo
+        const htmlContent = await page.content();
+        await fs.writeFile(htmlPath, htmlContent, 'utf-8');
+
+        // Log forense único e claro
+        console.log(`ML_DEBUG_FAIL selector_timeout url=${finalUrl} title="${title.slice(0, 80)}" captcha=${captchaDetection.hasCaptcha} screenshot=${screenshotPath} html=${htmlPath}`);
+
+        // Log adicional com detalhes
+        if (captchaDetection.hasCaptcha) {
+          console.log(`ML_DEBUG_CAPTCHA strings=[${captchaDetection.foundStrings.join(',')}] elements=${JSON.stringify(captchaDetection.elements)}`);
+        }
+
+        // Log do snippet para análise
+        console.log(`ML_DEBUG_CONTENT: ${contentSnippet.slice(0, 300)}...`);
+
+      } catch (forensicError: any) {
+        // Não deixar falha forense crashar o sistema
+        console.error(`ML_DEBUG_ERROR: Falha ao coletar evidências: ${forensicError.message}`);
+      }
+      // ========== FIM DEBUG FORENSE ==========
+
       return [];
     }
 
@@ -106,7 +195,6 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
 
     console.log(`✅ Extracted ${ads.length} ads from Mercado Livre`);
 
-    await browser.close();
     return ads;
   } catch (error: any) {
     console.error(`❌ Error in Mercado Livre scraper: ${error.message}`);
@@ -125,11 +213,16 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
       }
     }
 
-    if (browser) {
-      await browser.close();
-    }
-
     throw error;
+  } finally {
+    // Garantir fechamento do browser em qualquer cenário
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error('ML_DEBUG: Erro ao fechar browser:', closeError);
+      }
+    }
   }
 }
 
