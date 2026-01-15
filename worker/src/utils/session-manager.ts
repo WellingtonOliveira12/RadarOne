@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { Page, Browser, BrowserContext } from 'playwright';
 import { logger } from './logger';
 import * as crypto from 'crypto';
@@ -23,8 +23,6 @@ import * as crypto from 'crypto';
  * await sessionManager.applySession(page, session);
  * ```
  */
-
-const prisma = new PrismaClient();
 
 export interface LoginCredentials {
   username: string;

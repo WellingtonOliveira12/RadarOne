@@ -1,4 +1,5 @@
-import { PrismaClient, Monitor, MonitorSite } from '@prisma/client';
+import { Monitor, MonitorSite } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { scrapeMercadoLivre } from '../scrapers/mercadolivre-scraper';
 import { scrapeOLX } from '../scrapers/olx-scraper';
 import { scrapeWebmotors } from '../scrapers/webmotors-scraper';
@@ -16,8 +17,6 @@ import { log } from '../utils/logger';
  * MonitorRunner
  * Orquestra a execução de um monitor específico
  */
-
-const prisma = new PrismaClient();
 
 interface Ad {
   externalId: string;

@@ -1,5 +1,5 @@
 import http from 'http';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './lib/prisma';
 import { isHealthy as isRedisHealthy } from './services/queue-manager';
 import { circuitBreaker } from './utils/circuit-breaker';
 
@@ -13,7 +13,6 @@ import { circuitBreaker } from './utils/circuit-breaker';
  * Resposta: { status: 'healthy' | 'unhealthy', checks: {...} }
  */
 
-const prisma = new PrismaClient();
 const PORT = parseInt(process.env.HEALTH_CHECK_PORT || '8080');
 
 interface HealthStatus {

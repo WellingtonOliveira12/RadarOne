@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './lib/prisma';
 import { MonitorRunner } from './services/monitor-runner';
 import {
   enqueueMonitors,
@@ -33,8 +33,6 @@ startHealthServer();
  * Estratégia: Worker roda a cada 1 minuto (tick) e filtra monitores
  * elegíveis baseado em lastCheckedAt + checkInterval do plano.
  */
-
-const prisma = new PrismaClient();
 
 // Modo de operação
 const USE_QUEUE = !!process.env.REDIS_URL || !!process.env.REDIS_HOST;
