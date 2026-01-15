@@ -61,20 +61,63 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
     page = await context.newPage();
 
     // Navigate to search URL
-    console.log(`📄 Navigating to: ${monitor.searchUrl}`);
-    await page.goto(monitor.searchUrl, {
+    const urlInicial = monitor.searchUrl;
+    console.log(`📄 Navigating to: ${urlInicial}`);
+    await page.goto(urlInicial, {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
 
-    // Detectar e resolver captcha (se presente)
-    const hasCaptcha = await page.evaluate(() => {
-      return !!(
-        document.querySelector('.g-recaptcha') ||
-        document.querySelector('#g-recaptcha') ||
-        document.querySelector('[data-sitekey]')
-      );
+    // ========== PROBE RÁPIDO APÓS GOTO ==========
+    const probeResult = await page.evaluate(() => {
+      const bodyText = document.body.innerText.toLowerCase();
+      const html = document.documentElement.innerHTML.toLowerCase();
+
+      return {
+        // Sinais de resultado
+        hasResultContent: !!document.querySelector('.ui-search-result__content'),
+        hasResultItem: !!document.querySelector('.ui-search-result'),
+        hasSearchLayout: !!document.querySelector('.ui-search-layout'),
+
+        // Sinais de "sem resultados"
+        hasNoResults: bodyText.includes('não encontramos') ||
+                      bodyText.includes('nao encontramos') ||
+                      bodyText.includes('sem resultados') ||
+                      bodyText.includes('no results'),
+
+        // Sinais de challenge/anti-bot
+        hasRecaptcha: !!document.querySelector('.g-recaptcha, #g-recaptcha, iframe[src*="recaptcha"]'),
+        hasHcaptcha: !!document.querySelector('.h-captcha, iframe[src*="hcaptcha"]'),
+        hasCloudflare: !!document.querySelector('#cf-wrapper, .cf-browser-verification, #challenge-running'),
+        hasDatadome: !!document.querySelector('[data-datadome], iframe[src*="datadome"]'),
+
+        // Sinais de texto suspeito
+        textSignals: {
+          verificando: bodyText.includes('verificando'),
+          captcha: bodyText.includes('captcha'),
+          blocked: bodyText.includes('blocked') || bodyText.includes('bloqueado'),
+          denied: bodyText.includes('access denied') || bodyText.includes('acesso negado'),
+          robot: bodyText.includes('robot') || bodyText.includes('robô'),
+        }
+      };
     });
+
+    // Log do probe
+    const probeBlockingSignal =
+      probeResult.hasRecaptcha || probeResult.hasHcaptcha ||
+      probeResult.hasCloudflare || probeResult.hasDatadome ||
+      Object.values(probeResult.textSignals).some(v => v);
+
+    if (probeBlockingSignal) {
+      console.log(`ML_PROBE_WARNING blocking_detected hasRecaptcha=${probeResult.hasRecaptcha} hasCloudflare=${probeResult.hasCloudflare} hasDatadome=${probeResult.hasDatadome}`);
+    }
+
+    if (probeResult.hasNoResults) {
+      console.log('ML_PROBE_INFO no_results_message_detected');
+    }
+
+    // Detectar e resolver captcha (se presente)
+    const hasCaptcha = probeResult.hasRecaptcha || probeResult.hasHcaptcha;
 
     if (hasCaptcha) {
       console.log('🔐 Captcha detectado na página');
@@ -98,8 +141,8 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
     try {
       await page.waitForSelector('.ui-search-result__content', { timeout: 15000 });
     } catch (selectorError) {
-      // ========== DEBUG FORENSE ==========
-      console.log('⚠️  ML_DEBUG: Selector timeout - iniciando coleta forense');
+      // ========== DEBUG FORENSE COMPLETO ==========
+      console.log('⚠️  ML_FORENSIC: Selector timeout - coletando evidências');
 
       try {
         // Garantir que diretório existe
@@ -110,47 +153,40 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
         const baseName = `ml-${safeMonitorId}-${timestamp}`;
 
         // Coletar evidências
-        const finalUrl = page.url();
+        const urlFinal = page.url();
         const title = await page.title();
-        const contentSnippet = await page.evaluate(() =>
+        const bodySnippet = await page.evaluate(() =>
           document.body.innerText.slice(0, 1200).replace(/\n+/g, ' ').trim()
         );
 
-        // Detectar captcha/bloqueio
-        const captchaDetection = await page.evaluate(() => {
+        // Detectar captcha/bloqueio detalhado
+        const forensicHints = await page.evaluate(() => {
           const bodyText = document.body.innerText.toLowerCase();
-          const htmlContent = document.documentElement.innerHTML.toLowerCase();
 
-          // Strings suspeitas
+          // Strings suspeitas encontradas
           const suspiciousStrings = [
             'verificando', 'captcha', 'não sou um robô', 'nao sou um robo',
             'challenge', 'acesso negado', 'access denied', 'blocked',
-            'security check', 'prove you are human', 'robot', 'bot detected'
+            'security check', 'prove you are human', 'robot', 'bot detected',
+            'cloudflare', 'ddos', 'rate limit', 'too many requests'
           ];
 
-          const foundStrings = suspiciousStrings.filter(s =>
-            bodyText.includes(s) || htmlContent.includes(s)
-          );
-
-          // Elementos de captcha/challenge
-          const captchaElements = {
-            recaptchaIframe: !!document.querySelector('iframe[src*="recaptcha"]'),
-            recaptchaDiv: !!document.querySelector('.g-recaptcha, #g-recaptcha'),
-            hcaptcha: !!document.querySelector('.h-captcha, iframe[src*="hcaptcha"]'),
-            challengeRunning: !!document.querySelector('#challenge-running'),
-            recaptchaInput: !!document.querySelector('input[name="g-recaptcha-response"]'),
-            cloudflare: !!document.querySelector('#cf-wrapper, .cf-browser-verification'),
-            datadome: !!document.querySelector('[data-datadome]'),
-          };
-
-          const hasElements = Object.values(captchaElements).some(v => v);
+          const textSignals = suspiciousStrings.filter(s => bodyText.includes(s));
 
           return {
-            hasCaptcha: foundStrings.length > 0 || hasElements,
-            foundStrings,
-            elements: captchaElements,
+            hasRecaptcha: !!document.querySelector('.g-recaptcha, #g-recaptcha, iframe[src*="recaptcha"]'),
+            hasHcaptcha: !!document.querySelector('.h-captcha, iframe[src*="hcaptcha"]'),
+            hasCloudflare: !!document.querySelector('#cf-wrapper, .cf-browser-verification, #challenge-running'),
+            hasDatadome: !!document.querySelector('[data-datadome], iframe[src*="datadome"]'),
+            hasNoResultsMsg: bodyText.includes('não encontramos') || bodyText.includes('sem resultados'),
+            textSignals,
           };
         });
+
+        const isCaptchaBlocked =
+          forensicHints.hasRecaptcha || forensicHints.hasHcaptcha ||
+          forensicHints.hasCloudflare || forensicHints.hasDatadome ||
+          forensicHints.textSignals.length > 0;
 
         // Paths para arquivos
         const screenshotPath = path.join(FORENSIC_DIR, `${baseName}.png`);
@@ -167,20 +203,16 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
         const htmlContent = await page.content();
         await fs.writeFile(htmlPath, htmlContent, 'utf-8');
 
-        // Log forense único e claro
-        console.log(`ML_DEBUG_FAIL selector_timeout url=${finalUrl} title="${title.slice(0, 80)}" captcha=${captchaDetection.hasCaptcha} screenshot=${screenshotPath} html=${htmlPath}`);
+        // ===== LOGS FORENSES NO FORMATO ESPECIFICADO =====
+        console.log(`ML_FORENSIC_FAIL reason=selector_timeout url_inicial=${urlInicial} url_final=${urlFinal} title="${title.slice(0, 80)}" captcha=${isCaptchaBlocked} screenshot=${screenshotPath} html=${htmlPath}`);
 
-        // Log adicional com detalhes
-        if (captchaDetection.hasCaptcha) {
-          console.log(`ML_DEBUG_CAPTCHA strings=[${captchaDetection.foundStrings.join(',')}] elements=${JSON.stringify(captchaDetection.elements)}`);
-        }
+        console.log(`ML_FORENSIC_HINTS ${JSON.stringify(forensicHints)}`);
 
-        // Log do snippet para análise
-        console.log(`ML_DEBUG_CONTENT: ${contentSnippet.slice(0, 300)}...`);
+        console.log(`ML_FORENSIC_BODY_SNIPPET: ${bodySnippet.slice(0, 500)}...`);
 
       } catch (forensicError: any) {
         // Não deixar falha forense crashar o sistema
-        console.error(`ML_DEBUG_ERROR: Falha ao coletar evidências: ${forensicError.message}`);
+        console.error(`ML_FORENSIC_ERROR: Falha ao coletar evidências: ${forensicError.message}`);
       }
       // ========== FIM DEBUG FORENSE ==========
 
