@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only src/bootstrap.ts",
     "build": "npx prisma generate --schema=./prisma/schema.prisma && tsc && node scripts/setup-playwright.js",
-    "start": "node scripts/check-playwright.js && node dist/index.js",
+    "start": "node dist/bootstrap.js",
     "prisma:generate": "npx prisma generate --schema=./prisma/schema.prisma",
     "playwright:setup": "node scripts/setup-playwright.js",
     "playwright:check": "node scripts/check-playwright.js"
