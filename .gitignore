@@ -45,6 +45,10 @@ lerna-debug.log*
 prisma/*.db
 prisma/*.db-journal
 
+# Playwright browsers (instalados no build)
+pw-browsers/
+worker/pw-browsers/
+
 # Docker
 docker-compose.override.yml
 
