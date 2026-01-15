@@ -7,6 +7,7 @@ import {
   getQueueStats,
   shutdown as shutdownQueue,
   isHealthy as isQueueHealthy,
+  isRedisConfigured,
 } from './services/queue-manager';
 import { initSentry, captureException } from './monitoring/sentry';
 import { startHealthServer } from './health-server';
@@ -34,8 +35,8 @@ startHealthServer();
  * elegíveis baseado em lastCheckedAt + checkInterval do plano.
  */
 
-// Modo de operação
-const USE_QUEUE = !!process.env.REDIS_URL || !!process.env.REDIS_HOST;
+// Modo de operação - usa fila apenas se Redis estiver configurado
+const USE_QUEUE = isRedisConfigured();
 const CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5');
 
 // Intervalo padrão para usuários sem plano (Free)
@@ -57,11 +58,14 @@ class Worker {
     // Log de configuração para diagnóstico
     console.log('\n📋 Configuração:');
     console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? '✅ Configurado' : '❌ NÃO CONFIGURADO'}`);
+    console.log(`   REDIS_URL: ${process.env.REDIS_URL ? '✅ Configurado' : '⚠️  Não configurado (modo LOOP)'}`);
     console.log(`   TELEGRAM_BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Configurado' : '❌ NÃO CONFIGURADO'}`);
     console.log(`   RESEND_API_KEY: ${process.env.RESEND_API_KEY ? '✅ Configurado' : '⚠️  Não configurado (email desabilitado)'}`);
 
     if (USE_QUEUE) {
       console.log(`👷 Concurrency: ${CONCURRENCY} workers`);
+    } else {
+      console.log('ℹ️  Modo LOOP: processamento sequencial (sem Redis)');
     }
 
     // Testa conexão com o banco
