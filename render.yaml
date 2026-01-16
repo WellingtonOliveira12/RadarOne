@@ -57,11 +57,13 @@ services:
     region: oregon
     plan: starter
     rootDir: worker
-    buildCommand: npm install && npx playwright install chromium --with-deps && npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: ./pw-browsers
       - key: DATABASE_URL
         sync: false  # Mesmo banco do backend - CONFIGURAR MANUALMENTE
       - key: TELEGRAM_BOT_TOKEN
