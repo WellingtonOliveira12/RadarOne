@@ -5,15 +5,16 @@ import { retry, retryPresets } from '../utils/retry-helper';
 import { captchaSolver } from '../utils/captcha-solver';
 import { randomUA } from '../utils/user-agents';
 import { screenshotHelper } from '../utils/screenshot-helper';
-import { sessionManager, AuthenticatedContext, AccountStatus } from '../auth';
+import {
+  getMLAuthenticatedContext,
+  diagnosePageState,
+  MLAuthContextResult,
+} from '../utils/ml-auth-provider';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-// Site ID para autenticação
+// Site ID para autenticacao
 const SITE_ID = 'MERCADO_LIVRE';
-
-// Flag para usar autenticação escalável
-const USE_SESSION_MANAGER = process.env.USE_SESSION_MANAGER === 'true';
 
 // Diretório para evidências forenses
 const FORENSIC_DIR = '/tmp/radarone-screenshots';
@@ -363,91 +364,35 @@ export async function scrapeMercadoLivre(monitor: MonitorWithFilters): Promise<S
 }
 
 /**
- * Implementação interna do scraping (usada pelo retry)
+ * Implementacao interna do scraping (usada pelo retry)
  */
 async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<ScrapedAd[]> {
-  console.log('═'.repeat(80));
-  console.log(`🔍 ML_SCRAPER_START: ${monitor.name}`);
-  console.log(`📋 Monitor ID: ${monitor.id}`);
-  console.log('═'.repeat(80));
+  console.log('='.repeat(80));
+  console.log(`ML_SCRAPER_START: ${monitor.name}`);
+  console.log(`Monitor ID: ${monitor.id}`);
+  console.log('='.repeat(80));
 
-  let browser: Browser | null = null;
-  let context: BrowserContext | null = null;
-  let page: Page | null = null;
-  let isAuthenticatedContext = false;
-  let authContext: AuthenticatedContext | null = null;
+  let authResult: MLAuthContextResult | null = null;
 
   try {
-    // ========== TENTA OBTER CONTEXTO AUTENTICADO ==========
-    // Verifica se SessionManager tem conta disponível
-    const hasAccount = await sessionManager.hasAccountForSite(SITE_ID);
+    // ========== OBTEM CONTEXTO VIA ML AUTH PROVIDER ==========
+    // Usa o novo provider com cascata de prioridades:
+    // A) Secret File (ML_STORAGE_STATE_PATH)
+    // B) ENV base64 (ML_STORAGE_STATE_B64 ou SESSION_MERCADO_LIVRE)
+    // C) Session Manager (se USE_SESSION_MANAGER=true)
+    // D) Fallback anonimo
 
-    if (USE_SESSION_MANAGER && hasAccount) {
-      // Usa novo SessionManager (sessões persistentes)
-      try {
-        console.log(`ML_SESSION_MANAGER: Obtendo contexto autenticado...`);
-        authContext = await sessionManager.getContext(SITE_ID);
-        context = authContext.context;
-        isAuthenticatedContext = true;
+    authResult = await getMLAuthenticatedContext();
+    const { context, page, authState } = authResult;
 
-        console.log(`ML_AUTH_OK: Usando sessão persistente (account=${authContext.accountId.slice(0, 8)}...)`);
-
-        // Bloqueia recursos desnecessários
-        await context.route('**/*.{png,jpg,jpeg,gif,svg,ico,woff,woff2}', route => route.abort());
-
-        page = await context.newPage();
-      } catch (authError: any) {
-        console.warn(`ML_AUTH_ERROR: ${authError.message}`);
-        // Marca para retry ou intervenção
-        if (authError.message.includes('NEEDS_REAUTH') || authError.message.includes('BLOCKED')) {
-          throw authError; // Propaga para tratamento externo
-        }
-        // Fallback para contexto não autenticado
-        isAuthenticatedContext = false;
-      }
-    } else if (hasAccount) {
-      console.log(`ML_SESSION_MANAGER: Disponível mas USE_SESSION_MANAGER=false. Set USE_SESSION_MANAGER=true para usar.`);
-    }
-
-    // Se não conseguiu contexto autenticado, cria normal
-    if (!context || !page) {
-      console.log(`ML_AUTH_FALLBACK: Usando contexto sem autenticação`);
-
-      const browsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
-      console.log(`ML_BROWSER_PATH: ${browsersPath || 'default'}`);
-
-      browser = await chromium.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
-        ],
-      });
-
-      const userAgent = randomUA();
-      console.log(`ML_USER_AGENT: ${userAgent.slice(0, 60)}...`);
-
-      context = await browser.newContext({
-        userAgent,
-        locale: 'pt-BR',
-        viewport: { width: 1920, height: 1080 },
-        deviceScaleFactor: 1,
-      });
-
-      // Bloqueia recursos desnecessários para acelerar
-      await context.route('**/*.{png,jpg,jpeg,gif,svg,ico,woff,woff2}', route => route.abort());
-
-      page = await context.newPage();
+    const isAuthenticatedContext = authState.loaded;
+    if (isAuthenticatedContext) {
+      console.log(`ML_AUTH_OK: Usando sessao de ${authState.source}`);
     }
 
     // Navigate to search URL
     const urlInicial = monitor.searchUrl;
-    console.log(`📄 ML_NAVIGATE: ${urlInicial}`);
+    console.log(`ML_NAVIGATE: ${urlInicial}`);
 
     const navigationStart = Date.now();
     await page.goto(urlInicial, {
@@ -459,64 +404,55 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
     // Aguarda um pouco para JavaScript renderizar
     await page.waitForTimeout(2000);
 
-    // ========== PROBE INICIAL ==========
+    // ========== DIAGNOSTICO DE PAGINA ==========
+    const diagnostics = await diagnosePageState(page, urlInicial);
+
+    // Probe adicional para resultados
     const probeResult = await page.evaluate(() => {
       const bodyText = document.body?.innerText?.toLowerCase() || '';
 
       return {
-        bodyLength: bodyText.length,
-        hasSearchLayout: !!document.querySelector('.ui-search-layout, [class*="search-layout"]'),
-        hasResults: !!document.querySelector('[class*="search-result"], [class*="search-layout__item"]'),
-        hasNoResults: bodyText.includes('não encontramos') || bodyText.includes('sem resultados'),
-        hasBlocking: bodyText.includes('captcha') || bodyText.includes('verificando') || bodyText.includes('blocked'),
-        hasLoginRequired: bodyText.includes('para continuar, acesse sua conta') ||
-                          bodyText.includes('acesse sua conta') ||
-                          bodyText.includes('faça login') ||
-                          bodyText.includes('entre na sua conta') ||
-                          !!document.querySelector('form[action*="login"], input[name="user_id"], #login_user_id'),
+        hasNoResults: bodyText.includes('nao encontramos') ||
+                      bodyText.includes('sem resultados') ||
+                      bodyText.includes('no results'),
       };
     });
 
-    console.log(`ML_PROBE: bodyLength=${probeResult.bodyLength} hasLayout=${probeResult.hasSearchLayout} hasResults=${probeResult.hasResults} noResults=${probeResult.hasNoResults} blocked=${probeResult.hasBlocking} loginRequired=${probeResult.hasLoginRequired}`);
+    // Se detectou pagina de login obrigatorio
+    if (diagnostics.isLoginRequired) {
+      console.log('ML_LOGIN_REQUIRED: Mercado Livre exigindo login para esta busca');
 
-    // Se detectou página de login obrigatório
-    if (probeResult.hasLoginRequired) {
-      console.log('❌ ML_LOGIN_REQUIRED: Mercado Livre exigindo login para esta busca');
-
-      // Verifica se estava usando sessão autenticada
-      if (isAuthenticatedContext && authContext) {
-        // Sessão expirou - invalida no SessionManager
-        await authContext.invalidate('LOGIN_REQUIRED_DETECTED');
-        console.log('ML_AUTH_EXPIRED: Sessão autenticada expirou, marcada como inválida');
+      // Verifica se estava usando sessao autenticada
+      if (isAuthenticatedContext) {
+        // Sessao expirou
+        console.log('ML_AUTH_EXPIRED: Sessao autenticada expirou');
         await collectForensicEvidence(page, monitor, 'AUTH_SESSION_EXPIRED');
         throw new Error(
-          'ML_AUTH_SESSION_EXPIRED: Sessão do Mercado Livre expirou. ' +
-          'O sistema tentará renovar automaticamente na próxima execução. ' +
-          'Se persistir, verifique o status da conta com: npx ts-node scripts/auth/manage-accounts.ts status'
+          'ML_AUTH_SESSION_EXPIRED: Sessao do Mercado Livre expirou. ' +
+          'Gere uma nova sessao localmente com: npm run ml:login'
         );
       }
 
-      // Não tinha sessão - precisa configurar
+      // Nao tinha sessao - precisa configurar
       await collectForensicEvidence(page, monitor, 'LOGIN_REQUIRED_NO_SESSION');
       throw new Error(
-        'ML_LOGIN_REQUIRED: Esta busca requer autenticação no Mercado Livre. ' +
-        'Configure uma conta: npx ts-node scripts/auth/manage-accounts.ts add ' +
-        'e habilite USE_SESSION_MANAGER=true no Render.'
+        'ML_LOGIN_REQUIRED: Esta busca requer autenticacao no Mercado Livre. ' +
+        'Configure uma sessao: npm run ml:login (local) e depois configure ML_STORAGE_STATE_B64 no Render.'
       );
     }
 
-    // Se detectou bloqueio no probe, coleta evidência e aborta
-    if (probeResult.hasBlocking) {
-      console.log('❌ ML_BLOCKED_DETECTED: Página de bloqueio/captcha detectada');
-      await collectForensicEvidence(page, monitor, 'BLOCKING_PAGE_DETECTED');
-      throw new Error('ML_BLOCKED: Página de captcha/bloqueio detectada');
+    // Se detectou challenge/captcha
+    if (diagnostics.isChallengeDetected && !diagnostics.isContentPage) {
+      console.log('ML_CHALLENGE_DETECTED: Pagina de bloqueio/captcha detectada');
+      await collectForensicEvidence(page, monitor, 'CHALLENGE_DETECTED');
+      throw new Error('ML_CHALLENGE: Pagina de captcha/bloqueio detectada');
     }
 
-    // Se é página "sem resultados" legítima
-    if (probeResult.hasNoResults && !probeResult.hasResults) {
-      console.log('ℹ️  ML_NO_RESULTS: Busca não retornou resultados (página legítima)');
+    // Se e pagina "sem resultados" legitima
+    if (probeResult.hasNoResults && !diagnostics.signals.hasSearchResults) {
+      console.log('ML_NO_RESULTS: Busca nao retornou resultados (pagina legitima)');
       await collectForensicEvidence(page, monitor, 'LEGITIMATE_NO_RESULTS');
-      return []; // Retorno vazio legítimo
+      return []; // Retorno vazio legitimo
     }
 
     // Detectar e resolver captcha (se presente)
@@ -595,21 +531,21 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
       // Não lança erro, pode ser filtro de preço etc.
     }
 
-    console.log('═'.repeat(80));
-    console.log(`✅ ML_SCRAPER_SUCCESS: ${ads.length} anúncios extraídos`);
+    console.log('='.repeat(80));
+    console.log(`ML_SCRAPER_SUCCESS: ${ads.length} anuncios extraidos`);
     if (isAuthenticatedContext) {
-      console.log(`✅ ML_AUTH_SUCCESS: Scraping com sessão autenticada funcionou`);
+      console.log(`ML_AUTH_SUCCESS: Scraping com sessao autenticada funcionou (source=${authState.source})`);
     }
-    console.log('═'.repeat(80));
+    console.log('='.repeat(80));
 
     return ads;
   } catch (error: any) {
-    console.error(`❌ ML_SCRAPER_ERROR: ${error.message}`);
+    console.error(`ML_SCRAPER_ERROR: ${error.message}`);
 
     // Captura screenshot adicional em caso de erro
-    if (page && screenshotHelper.isEnabled()) {
+    if (authResult?.page && screenshotHelper.isEnabled()) {
       try {
-        await screenshotHelper.captureError(page, {
+        await screenshotHelper.captureError(authResult.page, {
           monitorId: monitor.id,
           monitorName: monitor.name,
           site: 'MERCADO_LIVRE',
@@ -622,20 +558,12 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
 
     throw error;
   } finally {
-    // Libera recursos
-    if (authContext) {
-      // Se usou SessionManager, libera o contexto
+    // Libera recursos via cleanup do auth provider
+    if (authResult) {
       try {
-        await authContext.release();
-      } catch (releaseError) {
-        console.error('ML_AUTH_RELEASE_ERROR:', releaseError);
-      }
-    } else if (browser) {
-      // Se criou browser próprio, fecha
-      try {
-        await browser.close();
-      } catch (closeError) {
-        console.error('ML_BROWSER_CLOSE_ERROR:', closeError);
+        await authResult.cleanup();
+      } catch (cleanupError) {
+        console.error('ML_CLEANUP_ERROR:', cleanupError);
       }
     }
   }
@@ -740,10 +668,36 @@ async function extractAdsRobust(
           }
 
           // Extract external ID from URL
+          // Formatos suportados:
+          // - /MLB-1234567890 (com hifen)
+          // - /MLB1234567890 (sem hifen)
+          // - MLB-1234567890 em qualquer parte da URL
           let externalId = '';
-          const urlMatch = url.match(/ML[A-Z]\d+/);
-          if (urlMatch) {
-            externalId = urlMatch[0];
+
+          // Regex robusto para capturar ID do ML
+          // Captura: MLB-123456789, MLB123456789, MLA-123, etc
+          const idPatterns = [
+            /\/ML[A-Z]-?(\d+)/i,           // /MLB-123 ou /MLB123
+            /[?&]id=ML[A-Z]-?(\d+)/i,      // ?id=MLB-123
+            /ML[A-Z]-?(\d+)/i,             // MLB-123 em qualquer lugar
+          ];
+
+          for (const pattern of idPatterns) {
+            const match = url.match(pattern);
+            if (match) {
+              // Normaliza para formato MLB1234567890 (sem hifen)
+              const fullMatch = match[0].replace(/\//g, '');
+              externalId = fullMatch.replace(/-/g, '');
+              break;
+            }
+          }
+
+          // Fallback: tenta extrair qualquer sequencia numerica grande da URL
+          if (!externalId) {
+            const numericMatch = url.match(/(\d{8,})/);
+            if (numericMatch) {
+              externalId = `MLB${numericMatch[1]}`;
+            }
           }
 
           return {
