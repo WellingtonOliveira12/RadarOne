@@ -22,7 +22,8 @@
     "auth:accounts:list": "npx ts-node scripts/auth/manage-accounts.ts list",
     "auth:accounts:add": "npx ts-node scripts/auth/manage-accounts.ts add",
     "ml:login": "npx ts-node scripts/ml-login.ts",
-    "ml:state:encode": "npx ts-node scripts/ml-state-encode.ts"
+    "ml:state:encode": "npx ts-node scripts/ml-state-encode.ts",
+    "test:email": "npx ts-node scripts/test-email.ts"
   },
   "keywords": [],
   "author": "",

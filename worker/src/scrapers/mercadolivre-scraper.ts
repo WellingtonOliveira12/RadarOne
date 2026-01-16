@@ -10,11 +10,12 @@ import {
   diagnosePageState,
   MLAuthContextResult,
 } from '../utils/ml-auth-provider';
+import { siteSessionManager, detectAuthError } from '../utils/site-session-manager';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 // Site ID para autenticacao
-const SITE_ID = 'MERCADO_LIVRE';
+const SITE_ID = 'MERCADO_LIVRE' as const;
 
 // Diretório para evidências forenses
 const FORENSIC_DIR = '/tmp/radarone-screenshots';
@@ -353,14 +354,34 @@ async function collectForensicEvidence(
  * Executa scraping no Mercado Livre com rate limiting e retry
  */
 export async function scrapeMercadoLivre(monitor: MonitorWithFilters): Promise<ScrapedAd[]> {
+  // Verifica se o site pode ser usado (nao esta em backoff)
+  const canUse = siteSessionManager.canUseSite(SITE_ID);
+  if (!canUse.canUse) {
+    console.log(`ML_BACKOFF: Site em backoff por ${canUse.backoffMinutes} minutos. Razao: ${canUse.reason}`);
+    throw new Error(`ML_SITE_BACKOFF: ${canUse.reason}. Tente novamente em ${canUse.backoffMinutes} minutos.`);
+  }
+
   // Aplica rate limiting
   await rateLimiter.acquire('MERCADO_LIVRE');
 
-  // Executa scraping com retry
-  return retry(
-    () => scrapeMercadoLivreInternal(monitor),
-    retryPresets.scraping
-  );
+  try {
+    // Executa scraping com retry
+    const result = await retry(
+      () => scrapeMercadoLivreInternal(monitor),
+      retryPresets.scraping
+    );
+
+    // Marca sucesso se conseguiu extrair algo
+    siteSessionManager.markSuccess(SITE_ID);
+
+    return result;
+  } catch (error: any) {
+    // Detecta tipo de erro e marca no session manager
+    const authError = detectAuthError(error);
+    siteSessionManager.markError(SITE_ID, authError.type, authError.reason);
+
+    throw error;
+  }
 }
 
 /**

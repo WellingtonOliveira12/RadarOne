@@ -6,16 +6,8 @@ import { logger } from '../utils/logger';
  * Integrado com Resend (https://resend.com)
  * Tier gratuito: 100 emails/dia, 3.000 emails/mês
  *
- * Alternativas:
- * - SendGrid
- * - Mailgun
- * - AWS SES
- *
- * Features:
- * - Templates HTML responsivos
- * - Fallback para texto simples
- * - Rate limiting interno
- * - Retry automático
+ * IMPORTANTE: Para usar dominio customizado, o dominio deve estar verificado no Resend.
+ * Alternativa: use 'onboarding@resend.dev' como EMAIL_FROM para testes.
  */
 
 export interface EmailAlert {
@@ -35,41 +27,100 @@ export interface EmailResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  errorType?: 'INVALID_API_KEY' | 'DOMAIN_NOT_VERIFIED' | 'RATE_LIMITED' | 'NETWORK' | 'UNKNOWN';
 }
+
+// Status do servico de email
+type EmailServiceStatus = 'ENABLED' | 'DISABLED_NO_KEY' | 'DISABLED_INVALID_KEY' | 'DISABLED_DOMAIN_ERROR';
 
 class EmailService {
   private apiKey: string | null;
   private fromEmail: string;
-  private enabled: boolean;
+  private status: EmailServiceStatus;
+  private lastErrorAt: Date | null = null;
+  private consecutiveErrors = 0;
+  private errorBackoffUntil: Date | null = null;
+
+  // Se tiver mais de 3 erros consecutivos, entra em backoff
+  private readonly MAX_CONSECUTIVE_ERRORS = 3;
+  private readonly BACKOFF_MINUTES = 30;
 
   constructor() {
     this.apiKey = process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY || null;
-    this.fromEmail = process.env.EMAIL_FROM || 'RadarOne <noreply@radarone.app>';
-    this.enabled = !!this.apiKey;
+    this.fromEmail = process.env.EMAIL_FROM || 'RadarOne <onboarding@resend.dev>';
 
-    if (this.enabled) {
-      logger.info('📧 Email service habilitado (Resend)');
+    if (!this.apiKey) {
+      this.status = 'DISABLED_NO_KEY';
+      logger.warn('EMAIL_SERVICE: Desabilitado (RESEND_API_KEY nao configurado)');
     } else {
-      logger.warn('⚠️  Email service desabilitado (RESEND_API_KEY não configurado)');
+      this.status = 'ENABLED';
+      logger.info(`EMAIL_SERVICE: Habilitado (from=${this.fromEmail})`);
     }
   }
 
   /**
-   * Verifica se o serviço de email está habilitado
+   * Status detalhado do servico
    */
-  isEnabled(): boolean {
-    return this.enabled;
+  getStatus(): { status: EmailServiceStatus; reason: string; backoffUntil?: Date } {
+    const reasons: Record<EmailServiceStatus, string> = {
+      'ENABLED': 'Servico habilitado e funcionando',
+      'DISABLED_NO_KEY': 'RESEND_API_KEY nao configurado',
+      'DISABLED_INVALID_KEY': 'API key invalida - verifique no painel do Resend',
+      'DISABLED_DOMAIN_ERROR': 'Dominio do EMAIL_FROM nao verificado no Resend',
+    };
+
+    return {
+      status: this.status,
+      reason: reasons[this.status],
+      backoffUntil: this.errorBackoffUntil || undefined,
+    };
   }
 
   /**
-   * Envia alerta de novo anúncio por email
+   * Verifica se o servico de email esta habilitado e funcionando
+   */
+  isEnabled(): boolean {
+    // Desabilitado por falta de key ou key invalida
+    if (this.status !== 'ENABLED') {
+      return false;
+    }
+
+    // Em backoff por erros consecutivos
+    if (this.errorBackoffUntil && new Date() < this.errorBackoffUntil) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Verifica se esta em backoff (muitos erros)
+   */
+  isInBackoff(): boolean {
+    return !!(this.errorBackoffUntil && new Date() < this.errorBackoffUntil);
+  }
+
+  /**
+   * Envia alerta de novo anuncio por email
    */
   async sendAdAlert(data: EmailAlert): Promise<EmailResult> {
-    if (!this.enabled) {
-      return {
-        success: false,
-        error: 'Email service não está habilitado',
-      };
+    // Verifica se servico esta habilitado
+    if (this.status === 'DISABLED_NO_KEY') {
+      return { success: false, error: 'Email desabilitado: RESEND_API_KEY nao configurado', errorType: 'INVALID_API_KEY' };
+    }
+
+    if (this.status === 'DISABLED_INVALID_KEY') {
+      return { success: false, error: 'Email desabilitado: API key invalida', errorType: 'INVALID_API_KEY' };
+    }
+
+    if (this.status === 'DISABLED_DOMAIN_ERROR') {
+      return { success: false, error: 'Email desabilitado: dominio nao verificado', errorType: 'DOMAIN_NOT_VERIFIED' };
+    }
+
+    // Verifica backoff
+    if (this.isInBackoff()) {
+      const minutesLeft = Math.ceil((this.errorBackoffUntil!.getTime() - Date.now()) / 60000);
+      return { success: false, error: `Email em backoff por ${minutesLeft} minutos`, errorType: 'RATE_LIMITED' };
     }
 
     try {
@@ -78,35 +129,55 @@ class EmailService {
 
       const response = await this.sendEmail({
         to: data.to,
-        subject: `🔔 Novo anúncio: ${data.monitorName}`,
+        subject: `Novo anuncio: ${data.monitorName}`,
         html: htmlBody,
         text: textBody,
       });
 
       if (response.success) {
+        // Reset contadores de erro
+        this.consecutiveErrors = 0;
+        this.errorBackoffUntil = null;
+
         logger.info({
           to: data.to,
           monitor: data.monitorName,
           messageId: response.messageId,
-        }, '📧 Email enviado com sucesso');
+        }, 'EMAIL_SENT: Email enviado com sucesso');
       }
 
       return response;
     } catch (error: any) {
+      // Incrementa contador de erros
+      this.consecutiveErrors++;
+      this.lastErrorAt = new Date();
+
+      // Entra em backoff se muitos erros
+      if (this.consecutiveErrors >= this.MAX_CONSECUTIVE_ERRORS) {
+        this.errorBackoffUntil = new Date(Date.now() + this.BACKOFF_MINUTES * 60 * 1000);
+        logger.warn({
+          consecutiveErrors: this.consecutiveErrors,
+          backoffUntil: this.errorBackoffUntil,
+        }, `EMAIL_BACKOFF: Entrando em backoff por ${this.BACKOFF_MINUTES} minutos`);
+      }
+
+      // Log apenas uma vez por tipo de erro
       logger.error({
         to: data.to,
         error: error.message,
-      }, '❌ Erro ao enviar email');
+        consecutiveErrors: this.consecutiveErrors,
+      }, 'EMAIL_ERROR: Falha ao enviar email');
 
       return {
         success: false,
         error: error.message,
+        errorType: 'UNKNOWN',
       };
     }
   }
 
   /**
-   * Envia email genérico via Resend API
+   * Envia email generico via Resend API
    */
   private async sendEmail(data: {
     to: string;
@@ -131,8 +202,47 @@ class EmailService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        const errorMessage = errorData.message || `HTTP ${response.status}`;
+
+        // Detecta erros fatais que devem desabilitar o servico
+        if (errorMessage.toLowerCase().includes('api key is invalid') ||
+            errorMessage.toLowerCase().includes('invalid api key') ||
+            response.status === 401) {
+          this.status = 'DISABLED_INVALID_KEY';
+          logger.error('EMAIL_FATAL: API key invalida - servico desabilitado. Verifique RESEND_API_KEY no Render.');
+          return {
+            success: false,
+            error: 'API key invalida - email desabilitado',
+            errorType: 'INVALID_API_KEY',
+          };
+        }
+
+        // Erro de dominio nao verificado
+        if (errorMessage.toLowerCase().includes('not verified') ||
+            errorMessage.toLowerCase().includes('domain') ||
+            response.status === 403) {
+          this.status = 'DISABLED_DOMAIN_ERROR';
+          logger.error({
+            from: this.fromEmail,
+          }, 'EMAIL_FATAL: Dominio nao verificado no Resend. Use EMAIL_FROM=onboarding@resend.dev para teste.');
+          return {
+            success: false,
+            error: 'Dominio nao verificado no Resend',
+            errorType: 'DOMAIN_NOT_VERIFIED',
+          };
+        }
+
+        // Rate limit
+        if (response.status === 429) {
+          return {
+            success: false,
+            error: 'Rate limit do Resend atingido',
+            errorType: 'RATE_LIMITED',
+          };
+        }
+
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -142,6 +252,14 @@ class EmailService {
         messageId: result.id,
       };
     } catch (error: any) {
+      // Erro de rede
+      if (error.message?.includes('fetch') || error.code === 'ENOTFOUND') {
+        return {
+          success: false,
+          error: 'Erro de rede ao conectar com Resend',
+          errorType: 'NETWORK',
+        };
+      }
       throw error;
     }
   }
@@ -299,13 +417,14 @@ class EmailService {
   }
 
   /**
-   * Testa configuração enviando email de teste
+   * Testa configuracao enviando email de teste
    */
   async sendTestEmail(to: string): Promise<EmailResult> {
-    if (!this.enabled) {
+    if (!this.isEnabled()) {
       return {
         success: false,
-        error: 'Email service não está habilitado',
+        error: 'Email service nao esta habilitado',
+        errorType: this.status === 'DISABLED_NO_KEY' ? 'INVALID_API_KEY' : 'UNKNOWN',
       };
     }
 
