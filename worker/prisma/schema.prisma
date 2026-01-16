@@ -640,3 +640,137 @@ enum AlertSeverity {
   ERROR
   CRITICAL
 }
+
+// ============================================
+// AUTENTICAÇÃO DE SCRAPERS (Pool de Contas)
+// ============================================
+
+/**
+ * Conta de autenticação para scrapers
+ * Pool de contas por site para distribuição de carga
+ */
+model ScraperAccount {
+  id       String @id @default(cuid())
+  site     String // MERCADO_LIVRE, SUPERBID, etc
+  label    String // Nome amigável (ex: "ML Account 1")
+
+  // Credenciais (criptografadas)
+  username       String // Email ou username
+  passwordEnc    String @map("password_enc") // Senha criptografada (AES-256)
+  totpSecretEnc  String? @map("totp_secret_enc") // Segredo TOTP criptografado
+  otpEmail       String? @map("otp_email") // Email para receber OTP (se diferente)
+  otpEmailPwdEnc String? @map("otp_email_pwd_enc") // Senha do email OTP
+
+  // Tipo de MFA configurado
+  mfaType ScraperMFAType @default(NONE) @map("mfa_type")
+
+  // Status operacional
+  status        ScraperAccountStatus @default(OK)
+  statusMessage String?              @map("status_message")
+
+  // Controle de uso
+  priority            Int       @default(0) // Maior = mais preferido
+  lastSuccessAt       DateTime? @map("last_success_at")
+  lastFailureAt       DateTime? @map("last_failure_at")
+  consecutiveFailures Int       @default(0) @map("consecutive_failures")
+
+  // Limites e Rate Limiting
+  maxRequestsPerHour Int @default(100) @map("max_requests_per_hour")
+  requestsThisHour   Int @default(0) @map("requests_this_hour")
+  hourResetAt        DateTime? @map("hour_reset_at")
+
+  // Controle
+  isActive  Boolean  @default(true) @map("is_active")
+  metadata  Json? // Dados adicionais
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  sessions  ScraperSession[]
+  authLogs  ScraperAuthLog[]
+
+  @@unique([site, username])
+  @@index([site])
+  @@index([status])
+  @@index([isActive])
+  @@map("scraper_accounts")
+}
+
+enum ScraperMFAType {
+  NONE
+  TOTP
+  EMAIL_OTP
+  SMS_OTP
+  APP_APPROVAL
+}
+
+enum ScraperAccountStatus {
+  OK // Funcionando normalmente
+  DEGRADED // Com problemas intermitentes
+  NEEDS_REAUTH // Requer intervenção humana
+  BLOCKED // Bloqueada pelo site
+  SITE_CHANGED // Site mudou, fluxo precisa update
+  DISABLED // Desabilitada manualmente
+}
+
+/**
+ * Estado de sessão de um scraper account
+ */
+model ScraperSession {
+  id        String @id @default(cuid())
+  accountId String @map("account_id")
+
+  // Estado da sessão
+  isAuthenticated   Boolean   @default(false) @map("is_authenticated")
+  lastValidatedAt   DateTime? @map("last_validated_at")
+  expiresAt         DateTime? @map("expires_at")
+
+  // Caminho do userDataDir (persistente)
+  userDataDir String @map("user_data_dir")
+
+  // Metadata
+  userAgent   String? @map("user_agent")
+  lastUrl     String? @map("last_url")
+  cookieCount Int     @default(0) @map("cookie_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  account ScraperAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId])
+  @@index([isAuthenticated])
+  @@map("scraper_sessions")
+}
+
+/**
+ * Log de eventos de autenticação de scrapers
+ */
+model ScraperAuthLog {
+  id        String @id @default(cuid())
+  accountId String @map("account_id")
+
+  // Evento
+  event   String // AUTH_OK, AUTH_FAILED, AUTH_RENEW, MFA_REQUIRED, etc
+  success Boolean
+  message String?
+
+  // Contexto
+  url       String?
+  pageType  String? @map("page_type") // LOGIN_PAGE, MFA_PAGE, CONTENT, etc
+  duration  Int? // Duração em ms
+
+  // Não logar credenciais - apenas metadados seguros
+  metadata Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relações
+  account ScraperAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([event])
+  @@index([createdAt])
+  @@map("scraper_auth_logs")
+}

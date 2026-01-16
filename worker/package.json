@@ -14,7 +14,13 @@
     "prisma:generate": "npx prisma generate --schema=./prisma/schema.prisma",
     "playwright:setup": "node scripts/setup-playwright.js",
     "playwright:check": "node scripts/check-playwright.js",
-    "test:notifications": "node dist/scripts/test-notifications.js"
+    "test:notifications": "node dist/scripts/test-notifications.js",
+    "auth:mercadolivre": "npx ts-node scripts/auth/mercadolivre-session.ts",
+    "auth:mercadolivre:validate": "npx ts-node scripts/auth/mercadolivre-session.ts --validate",
+    "auth:generate": "npx ts-node scripts/auth/generate-session.ts",
+    "auth:accounts": "npx ts-node scripts/auth/manage-accounts.ts",
+    "auth:accounts:list": "npx ts-node scripts/auth/manage-accounts.ts list",
+    "auth:accounts:add": "npx ts-node scripts/auth/manage-accounts.ts add"
   },
   "keywords": [],
   "author": "",

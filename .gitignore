@@ -55,3 +55,9 @@ docker-compose.override.yml
 # OS
 .DS_Store
 Thumbs.db
+
+# Auth Sessions (NEVER commit - contains cookies)
+sessions/
+worker/sessions/
+*.base64.txt
+*storageState*.json
