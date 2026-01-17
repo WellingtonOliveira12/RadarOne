@@ -199,12 +199,46 @@ export const retryPresets = {
 };
 
 /**
+ * Verifica se um erro é de autenticação (NÃO deve fazer retry)
+ */
+export function isAuthenticationError(error: any): boolean {
+  const message = (error.message || '').toLowerCase();
+
+  const authPatterns = [
+    'login_required',
+    'needs_reauth',
+    'session_required',
+    'session_expired',
+    'auth_session_expired',
+    'account-verification',
+    'acesse sua conta',
+    'faça login',
+    'faca login',
+    'identifique-se',
+    'entre na sua conta',
+    'auth_error',
+    'authentication',
+  ];
+
+  return authPatterns.some((p) => message.includes(p));
+}
+
+/**
  * Verifica se um erro é recuperável (deve fazer retry)
  *
  * Erros de rede, timeouts, etc são recuperáveis
- * Erros de validação, 404, etc não são
+ * Erros de validação, 404, autenticação, etc não são
  */
 export function isRetriableError(error: any): boolean {
+  // ═══════════════════════════════════════════════════════════════
+  // ERROS DE AUTENTICAÇÃO NUNCA FAZEM RETRY
+  // ═══════════════════════════════════════════════════════════════
+  if (isAuthenticationError(error)) {
+    console.log(`🔐 AUTH_ERROR detectado - NÃO fazendo retry: ${error.message?.slice(0, 100)}`);
+    return false;
+  }
+  // ═══════════════════════════════════════════════════════════════
+
   // Erros de rede do Playwright/fetch
   if (error.message?.includes('net::')) return true;
   if (error.message?.includes('timeout')) return true;

@@ -412,30 +412,55 @@ enum LogStatus {
   SUCCESS
   ERROR
   PARTIAL
+  SKIPPED  // Monitor pulado por falta de sessão ou needs_reauth (NÃO é erro)
 }
 
 // ============================================
-// SESSÕES DE LOGIN (Para sites que exigem autenticação)
+// SESSÕES DE LOGIN POR USUÁRIO (Para sites que exigem autenticação)
 // ============================================
+
+enum UserSessionStatus {
+  ACTIVE      // Sessão válida e funcionando
+  EXPIRED     // Expirou por tempo
+  NEEDS_REAUTH // Site pediu login novamente
+  INVALID     // Arquivo inválido/corrompido
+}
 
 model UserSession {
   id          String   @id @default(cuid())
   userId      String   @map("user_id")
-  site        String   // Ex: "superbid", "vipleiloes"
-  domain      String   // Ex: "superbid.net", "vipleiloes.com.br"
-  cookies     Json     // Cookies armazenados (encrypted)
-  localStorage Json?    @map("local_storage") // LocalStorage se necessário
-  metadata    Json?    // Dados adicionais (username, etc)
-  expiresAt   DateTime @map("expires_at")
-  lastUsedAt  DateTime @default(now()) @map("last_used_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  site        String   // Ex: "MERCADO_LIVRE", "SUPERBID"
+  domain      String   // Ex: "mercadolivre.com.br"
+  accountLabel String? @map("account_label") // Rótulo para múltiplas contas (futuro)
+
+  // Status da sessão
+  status      UserSessionStatus @default(ACTIVE)
+
+  // Dados criptografados (AES-256-GCM)
+  // Formato: storageState completo do Playwright { cookies: [], origins: [] }
+  encryptedStorageState String @map("encrypted_storage_state") @db.Text
+
+  // Campos legados mantidos para compatibilidade (serão removidos)
+  cookies     Json?    // @deprecated - usar encryptedStorageState
+  localStorage Json?   @map("local_storage") // @deprecated
+
+  // Metadados
+  metadata    Json?    // cookieCount, uploadedAt, lastErrorReason, cooldownNotifiedAt, etc.
+
+  // Controle de tempo
+  expiresAt   DateTime? @map("expires_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  lastErrorAt DateTime? @map("last_error_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relações
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, site, domain])
+  // Índice único: um usuário pode ter uma sessão por site+accountLabel
+  @@unique([userId, site, accountLabel])
   @@index([userId])
+  @@index([site, status])
   @@index([expiresAt])
   @@map("user_sessions")
 }

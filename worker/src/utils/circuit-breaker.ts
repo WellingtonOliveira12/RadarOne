@@ -13,7 +13,13 @@
  * - Threshold configurável de falhas consecutivas
  * - Timeout de cooldown antes de retentar
  * - Estatísticas por domínio
+ *
+ * IMPORTANTE: Erros de autenticação NÃO abrem o circuit breaker!
+ * - LOGIN_REQUIRED, NEEDS_REAUTH, etc são tratados separadamente
+ * - Apenas falhas reais (timeout, crash, blocked) incrementam contador
  */
+
+import { isAuthenticationError } from './retry-helper';
 
 interface CircuitState {
   failures: number; // Contador de falhas consecutivas
@@ -78,8 +84,17 @@ class CircuitBreaker {
       this.onSuccess(domain);
 
       return result;
-    } catch (error) {
-      // Falha → Incrementa contador
+    } catch (error: any) {
+      // ═══════════════════════════════════════════════════════════════
+      // ERROS DE AUTENTICAÇÃO NÃO INCREMENTAM O CIRCUIT BREAKER
+      // ═══════════════════════════════════════════════════════════════
+      if (isAuthenticationError(error)) {
+        console.log(`🔐 Circuit breaker ${domain}: Ignorando erro de autenticação (não incrementa falhas)`);
+        throw error; // Propaga erro mas não conta como falha
+      }
+      // ═══════════════════════════════════════════════════════════════
+
+      // Falha real → Incrementa contador
       this.onFailure(domain);
 
       throw error;
