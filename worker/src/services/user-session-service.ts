@@ -288,13 +288,13 @@ class UserSessionService {
         source: 'user_upload',
       };
 
-      // 7. Upsert no banco
+      // 7. Upsert no banco (usando índice legado userId_site_domain)
       const session = await prisma.userSession.upsert({
         where: {
-          userId_site_accountLabel: {
+          userId_site_domain: {
             userId,
             site,
-            accountLabel: accountLabel || null,
+            domain: config.domain,
           },
         },
         create: {
@@ -310,6 +310,7 @@ class UserSessionService {
         update: {
           status: UserSessionStatus.ACTIVE,
           encryptedStorageState,
+          accountLabel: accountLabel || null,
           metadata,
           expiresAt,
           lastUsedAt: new Date(),
@@ -342,19 +343,19 @@ class UserSessionService {
     site: string,
     accountLabel?: string
   ): Promise<UserContextResult> {
-    const config = this.getSiteConfig(site);
-    const domain = config?.domain || site.toLowerCase();
+    const siteConfig = this.getSiteConfig(site);
+    const domain = siteConfig?.domain || site.toLowerCase();
 
     // Função de cleanup padrão
     const noopCleanup = async () => {};
 
-    // 1. Busca sessão do usuário
+    // 1. Busca sessão do usuário (usando índice legado userId_site_domain)
     const session = await prisma.userSession.findUnique({
       where: {
-        userId_site_accountLabel: {
+        userId_site_domain: {
           userId,
           site,
-          accountLabel: accountLabel || null,
+          domain,
         },
       },
     });
@@ -503,12 +504,13 @@ class UserSessionService {
     reason: string,
     accountLabel?: string
   ): Promise<{ notified: boolean }> {
+    const config = this.getSiteConfig(site);
     const session = await prisma.userSession.findUnique({
       where: {
-        userId_site_accountLabel: {
+        userId_site_domain: {
           userId,
           site,
-          accountLabel: accountLabel || null,
+          domain: config?.domain || site.toLowerCase(),
         },
       },
     });
@@ -586,12 +588,13 @@ class UserSessionService {
    * Verifica se usuário tem sessão válida para um site
    */
   async hasValidSession(userId: string, site: string, accountLabel?: string): Promise<boolean> {
+    const config = this.getSiteConfig(site);
     const session = await prisma.userSession.findUnique({
       where: {
-        userId_site_accountLabel: {
+        userId_site_domain: {
           userId,
           site,
-          accountLabel: accountLabel || null,
+          domain: config?.domain || site.toLowerCase(),
         },
       },
       select: { status: true, expiresAt: true },
@@ -669,12 +672,13 @@ class UserSessionService {
     expiresAt?: Date | null;
     needsAction?: boolean;
   }> {
+    const config = this.getSiteConfig(site);
     const session = await prisma.userSession.findUnique({
       where: {
-        userId_site_accountLabel: {
+        userId_site_domain: {
           userId,
           site,
-          accountLabel: accountLabel || null,
+          domain: config?.domain || site.toLowerCase(),
         },
       },
       select: {
