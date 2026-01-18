@@ -22,6 +22,7 @@ import { NotificationSettingsPage } from './pages/NotificationSettingsPage';
 import { NotificationHistoryPage } from './pages/NotificationHistoryPage';
 import { SubscriptionSettingsPage } from './pages/SubscriptionSettingsPage';
 import { TelegramConnectionPage } from './pages/TelegramConnectionPage';
+import ConnectionsPage from './pages/ConnectionsPage';
 
 // Páginas de ajuda (públicas)
 import { ManualPage } from './pages/ManualPage';
@@ -152,6 +153,14 @@ export function AppRouter() {
             element={
               <RequireSubscriptionRoute>
                 <TelegramConnectionPage />
+              </RequireSubscriptionRoute>
+            }
+          />
+          <Route
+            path="/settings/connections"
+            element={
+              <RequireSubscriptionRoute>
+                <ConnectionsPage />
               </RequireSubscriptionRoute>
             }
           />

@@ -36,6 +36,7 @@ import notificationRoutes from './routes/notification.routes';
 import telegramRoutes from './routes/telegram.routes';
 import supportRoutes from './routes/support.routes';
 import pushRoutes from './routes/push.routes';
+import sessionRoutes from './routes/session.routes';
 
 // Importa controller do Telegram (para handler de debug explícito)
 import { TelegramController } from './controllers/telegram.controller';
@@ -251,6 +252,7 @@ app.use('/api/coupons', couponRoutes); // Cupons (validate público, apply prote
 app.use('/api/notifications', authenticateToken, notificationRoutes); // Configurações de notificações (protegido)
 app.use('/api/push', pushRoutes); // Push notifications (protegido)
 app.use('/api/support', supportRoutes); // Tickets de suporte (criar ticket é público)
+app.use('/api/sessions', sessionRoutes); // Sessões de autenticação de sites (ML, etc)
 
 // Rota de teste
 app.get('/api/test', (req: Request, res: Response) => {

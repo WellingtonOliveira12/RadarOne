@@ -1,8 +1,15 @@
 /**
  * Circuit Breaker - Padrão para proteção contra falhas em cascata
  *
- * Implementa circuit breaker por domínio para evitar sobrecarga
- * quando um site está bloqueando ou instável
+ * Implementa circuit breaker por domínio OU por userId+site para evitar
+ * sobrecarga quando um site está bloqueando ou instável.
+ *
+ * IMPORTANTE: Suporta dois modos de chaveamento:
+ * - Por site apenas: circuitBreaker.execute('MERCADO_LIVRE', fn)
+ * - Por userId+site: circuitBreaker.executeForUser('MERCADO_LIVRE', userId, fn)
+ *
+ * O modo por userId+site é RECOMENDADO para sites que requerem autenticação,
+ * assim um usuário com sessão inválida não afeta outros usuários.
  *
  * Estados:
  * - CLOSED: Normal, requisições passam
@@ -12,7 +19,7 @@
  * Features:
  * - Threshold configurável de falhas consecutivas
  * - Timeout de cooldown antes de retentar
- * - Estatísticas por domínio
+ * - Estatísticas por domínio ou por usuário+domínio
  *
  * IMPORTANTE: Erros de autenticação NÃO abrem o circuit breaker!
  * - LOGIN_REQUIRED, NEEDS_REAUTH, etc são tratados separadamente
@@ -47,6 +54,35 @@ class CircuitBreaker {
 
   constructor(config: Partial<CircuitBreakerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  /**
+   * Gera chave do circuit breaker para um usuário+site
+   */
+  private getCircuitKey(domain: string, userId?: string): string {
+    if (userId) {
+      // Usa hash curto do userId para evitar chaves muito longas
+      const userHash = userId.slice(0, 8);
+      return `${domain}:${userHash}`;
+    }
+    return domain;
+  }
+
+  /**
+   * Executa função com proteção de circuit breaker POR USUÁRIO
+   *
+   * RECOMENDADO para sites que requerem autenticação!
+   * Assim um usuário com sessão inválida não afeta outros usuários.
+   *
+   * @param domain Domínio/site (ex: MERCADO_LIVRE, OLX)
+   * @param userId ID do usuário
+   * @param fn Função a ser executada
+   * @returns Resultado da função
+   * @throws Error se circuit estiver OPEN
+   */
+  async executeForUser<T>(domain: string, userId: string, fn: () => Promise<T>): Promise<T> {
+    const key = this.getCircuitKey(domain, userId);
+    return this.execute(key, fn);
   }
 
   /**
@@ -187,6 +223,15 @@ class CircuitBreaker {
   reset(domain: string): void {
     this.circuits.delete(domain);
     console.log(`🔄 Circuit breaker resetado: ${domain}`);
+  }
+
+  /**
+   * Reseta um circuito para um usuário específico
+   */
+  resetForUser(domain: string, userId: string): void {
+    const key = this.getCircuitKey(domain, userId);
+    this.circuits.delete(key);
+    console.log(`🔄 Circuit breaker resetado para usuário: ${key}`);
   }
 
   /**

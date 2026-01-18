@@ -6,6 +6,7 @@
  * Centraliza a logica de carregamento de sessao do Mercado Livre
  * com fallback em cascata:
  *
+ * Prioridade 0: Sessao do banco de dados (UserSession por userId)
  * Prioridade A: Secret File path via ML_STORAGE_STATE_PATH
  * Prioridade B: ENV base64 via ML_STORAGE_STATE_B64 ou SESSION_MERCADO_LIVRE
  * Prioridade C: Session manager existente (userDataDir se USE_SESSION_MANAGER=true)
@@ -16,6 +17,7 @@ import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUA } from './user-agents';
+import { userSessionService } from '../services/user-session-service';
 
 // ============================================================
 // CONFIGURACOES
@@ -40,8 +42,11 @@ const SECRET_FILE_PATHS = [
 export interface MLAuthState {
   loaded: boolean;
   path: string | null;
-  source: 'secret_file' | 'env_base64' | 'session_manager' | 'none';
+  source: 'database' | 'secret_file' | 'env_base64' | 'session_manager' | 'none';
   error: string | null;
+  userId?: string;
+  sessionId?: string;
+  storageStateJson?: string; // Para quando vem do banco
 }
 
 export interface MLAuthContextResult {
@@ -82,6 +87,80 @@ function isValidStorageState(content: string): boolean {
     );
   } catch {
     return false;
+  }
+}
+
+// ============================================================
+// PRIORIDADE 0: Database (UserSession por userId)
+// ============================================================
+
+async function tryLoadFromDatabase(userId?: string): Promise<MLAuthState> {
+  if (!userId) {
+    return { loaded: false, path: null, source: 'none', error: null };
+  }
+
+  console.log(`ML_AUTH_PROVIDER: Verificando sessão no banco para userId=${userId.slice(0, 8)}...`);
+
+  try {
+    const result = await userSessionService.getUserContext(userId, SITE_ID);
+
+    if (result.success && result.context) {
+      console.log(`ML_AUTH_PROVIDER: [PRIORITY 0] Sessão encontrada no banco para userId`);
+
+      // Precisamos do storageState raw para usar no contexto
+      // Busca direto do banco para extrair o JSON
+      const { prisma } = await import('../lib/prisma');
+      const { cryptoManager } = await import('../auth/crypto-manager');
+
+      const session = await prisma.userSession.findFirst({
+        where: {
+          userId,
+          site: SITE_ID,
+          status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          encryptedStorageState: true,
+        },
+      });
+
+      if (session?.encryptedStorageState) {
+        const storageStateJson = cryptoManager.decrypt(session.encryptedStorageState);
+
+        // Cleanup do contexto criado pelo userSessionService (vamos criar um novo)
+        await result.cleanup();
+
+        return {
+          loaded: true,
+          path: 'DATABASE',
+          source: 'database',
+          error: null,
+          userId,
+          sessionId: session.id,
+          storageStateJson,
+        };
+      }
+
+      await result.cleanup();
+    }
+
+    // Se não deu certo, tenta marcar como needs_reauth se existe
+    if (result.needsUserAction && result.status === 'NEEDS_REAUTH') {
+      console.log(`ML_AUTH_PROVIDER: Sessão do banco precisa de reautenticação`);
+      return {
+        loaded: false,
+        path: null,
+        source: 'none',
+        error: `Sessão do usuário precisa de reautenticação: ${result.error}`,
+        userId,
+        sessionId: result.sessionId,
+      };
+    }
+
+    return { loaded: false, path: null, source: 'none', error: null };
+  } catch (e: any) {
+    console.log(`ML_AUTH_PROVIDER: Erro ao buscar sessão do banco: ${e.message}`);
+    return { loaded: false, path: null, source: 'none', error: null };
   }
 }
 
@@ -242,9 +321,25 @@ async function tryLoadFromSessionManager(): Promise<MLAuthState> {
 
 /**
  * Obtem o estado de autenticacao do ML seguindo a cascata de prioridades
+ * @param userId - ID do usuário (opcional). Se fornecido, tenta primeiro buscar sessão do banco.
  */
-export async function getMLAuthState(): Promise<MLAuthState> {
+export async function getMLAuthState(userId?: string): Promise<MLAuthState> {
   console.log('ML_AUTH_PROVIDER: Verificando fontes de autenticacao...');
+  if (userId) {
+    console.log(`ML_AUTH_PROVIDER: userId fornecido: ${userId.slice(0, 8)}...`);
+  }
+
+  // Prioridade 0: Database (se userId fornecido)
+  if (userId) {
+    const databaseState = await tryLoadFromDatabase(userId);
+    if (databaseState.loaded) {
+      return databaseState;
+    }
+    // Se não encontrou mas tem erro específico de NEEDS_REAUTH, propaga
+    if (databaseState.error?.includes('reautenticação')) {
+      return databaseState;
+    }
+  }
 
   // Prioridade A: Secret File
   const secretFileState = await tryLoadFromSecretFile();
@@ -267,6 +362,7 @@ export async function getMLAuthState(): Promise<MLAuthState> {
   // Nenhuma fonte disponivel
   console.log('ML_AUTH_PROVIDER: Nenhuma sessao de autenticacao encontrada');
   console.log('ML_AUTH_PROVIDER: Opcoes para configurar:');
+  console.log('  0. Conectar conta via UI (sessão no banco por userId)');
   console.log('  1. ML_STORAGE_STATE_PATH: caminho para arquivo storageState.json');
   console.log('  2. ML_STORAGE_STATE_B64: storageState em base64');
   console.log('  3. SESSION_MERCADO_LIVRE: storageState em base64 (legado)');
@@ -276,7 +372,10 @@ export async function getMLAuthState(): Promise<MLAuthState> {
     loaded: false,
     path: null,
     source: 'none',
-    error: 'Nenhuma fonte de autenticacao configurada',
+    error: userId
+      ? 'ML_LOGIN_REQUIRED_NO_SESSION'
+      : 'Nenhuma fonte de autenticacao configurada',
+    userId,
   };
 }
 
@@ -289,9 +388,11 @@ export async function getMLAuthState(): Promise<MLAuthState> {
  *
  * Se houver sessao configurada, usa storageState
  * Caso contrario, retorna contexto anonimo
+ *
+ * @param userId - ID do usuário (opcional). Se fornecido, tenta primeiro buscar sessão do banco.
  */
-export async function getMLAuthenticatedContext(): Promise<MLAuthContextResult> {
-  const authState = await getMLAuthState();
+export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuthContextResult> {
+  const authState = await getMLAuthState(userId);
 
   // Log do estado
   console.log(`ML_AUTH_STATE: loaded=${authState.loaded} source=${authState.source} path=${authState.path || 'none'}`);
@@ -347,8 +448,31 @@ export async function getMLAuthenticatedContext(): Promise<MLAuthContextResult> 
 
   let context: BrowserContext;
 
-  if (authState.loaded && authState.path && authState.path !== 'SESSION_MANAGER') {
-    // Cria contexto COM storageState
+  if (authState.loaded && authState.source === 'database' && authState.storageStateJson) {
+    // Cria contexto com storageState do banco (JSON direto)
+    try {
+      const storageState = JSON.parse(authState.storageStateJson);
+      context = await browser.newContext({
+        storageState,
+        userAgent,
+        locale: 'pt-BR',
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+      });
+      console.log(`ML_AUTH_CONTEXT: Contexto criado com storageState do banco (database)`);
+    } catch (e: any) {
+      console.log(`ML_AUTH_CONTEXT_ERROR: Falha ao carregar storageState do banco: ${e.message}`);
+      context = await browser.newContext({
+        userAgent,
+        locale: 'pt-BR',
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+      });
+      authState.loaded = false;
+      authState.error = e.message;
+    }
+  } else if (authState.loaded && authState.path && authState.path !== 'SESSION_MANAGER' && authState.path !== 'DATABASE') {
+    // Cria contexto COM storageState de arquivo
     try {
       context = await browser.newContext({
         storageState: authState.path,
@@ -403,6 +527,35 @@ export async function getMLAuthenticatedContext(): Promise<MLAuthContextResult> 
       } catch {}
     },
   };
+}
+
+// ============================================================
+// FUNCAO PARA MARCAR NEEDS_REAUTH
+// ============================================================
+
+/**
+ * Marca a sessão do usuário como NEEDS_REAUTH quando detectado login required
+ * @param userId - ID do usuário
+ * @param reason - Motivo da marcação
+ * @returns true se marcou com sucesso
+ */
+export async function markMLSessionNeedsReauth(
+  userId: string | undefined,
+  reason: string
+): Promise<boolean> {
+  if (!userId) {
+    console.log('ML_AUTH_PROVIDER: Não é possível marcar NEEDS_REAUTH sem userId');
+    return false;
+  }
+
+  try {
+    const result = await userSessionService.markNeedsReauth(userId, SITE_ID, reason);
+    console.log(`ML_AUTH_PROVIDER: Sessão marcada como NEEDS_REAUTH para userId=${userId.slice(0, 8)}... reason=${reason}`);
+    return result.notified;
+  } catch (e: any) {
+    console.error(`ML_AUTH_PROVIDER: Erro ao marcar NEEDS_REAUTH: ${e.message}`);
+    return false;
+  }
 }
 
 // ============================================================

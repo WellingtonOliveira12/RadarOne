@@ -109,7 +109,10 @@ export class MonitorRunner {
       // ═══════════════════════════════════════════════════════════════
 
       // Executa scraping com circuit breaker
-      const ads = await circuitBreaker.execute(monitor.site, () => this.scrape(monitor));
+      // Para sites que requerem auth, usa chave por userId+site para não afetar outros usuários
+      const ads = siteRequiresAuth
+        ? await circuitBreaker.executeForUser(monitor.site, monitor.userId, () => this.scrape(monitor))
+        : await circuitBreaker.execute(monitor.site, () => this.scrape(monitor));
 
       // Processa anúncios
       const newAds = await this.processAds(monitor.id, ads);

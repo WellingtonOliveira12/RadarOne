@@ -8,6 +8,7 @@ import { screenshotHelper } from '../utils/screenshot-helper';
 import {
   getMLAuthenticatedContext,
   diagnosePageState,
+  markMLSessionNeedsReauth,
   MLAuthContextResult,
 } from '../utils/ml-auth-provider';
 import { siteSessionManager, detectAuthError } from '../utils/site-session-manager';
@@ -398,12 +399,13 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
   try {
     // ========== OBTEM CONTEXTO VIA ML AUTH PROVIDER ==========
     // Usa o novo provider com cascata de prioridades:
+    // 0) Database (sessão do usuário no banco, se userId fornecido)
     // A) Secret File (ML_STORAGE_STATE_PATH)
     // B) ENV base64 (ML_STORAGE_STATE_B64 ou SESSION_MERCADO_LIVRE)
     // C) Session Manager (se USE_SESSION_MANAGER=true)
     // D) Fallback anonimo
 
-    authResult = await getMLAuthenticatedContext();
+    authResult = await getMLAuthenticatedContext(monitor.userId);
     const { context, page, authState } = authResult;
 
     const isAuthenticatedContext = authState.loaded;
@@ -443,6 +445,16 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
     if (diagnostics.isLoginRequired) {
       console.log('ML_LOGIN_REQUIRED: Mercado Livre exigindo login para esta busca');
 
+      // Marca sessão do usuário como NEEDS_REAUTH no banco
+      if (monitor.userId) {
+        await markMLSessionNeedsReauth(
+          monitor.userId,
+          isAuthenticatedContext
+            ? 'Sessão expirou - site pediu login novamente'
+            : 'Busca requer autenticação'
+        );
+      }
+
       // Verifica se estava usando sessao autenticada
       if (isAuthenticatedContext) {
         // Sessao expirou
@@ -450,15 +462,15 @@ async function scrapeMercadoLivreInternal(monitor: MonitorWithFilters): Promise<
         await collectForensicEvidence(page, monitor, 'AUTH_SESSION_EXPIRED');
         throw new Error(
           'ML_AUTH_SESSION_EXPIRED: Sessao do Mercado Livre expirou. ' +
-          'Gere uma nova sessao localmente com: npm run ml:login'
+          'Reconecte sua conta nas configurações do RadarOne.'
         );
       }
 
       // Nao tinha sessao - precisa configurar
       await collectForensicEvidence(page, monitor, 'LOGIN_REQUIRED_NO_SESSION');
       throw new Error(
-        'ML_LOGIN_REQUIRED: Esta busca requer autenticacao no Mercado Livre. ' +
-        'Configure uma sessao: npm run ml:login (local) e depois configure ML_STORAGE_STATE_B64 no Render.'
+        'ML_LOGIN_REQUIRED_NO_SESSION: Esta busca requer autenticacao no Mercado Livre. ' +
+        'Conecte sua conta nas configurações do RadarOne.'
       );
     }
 

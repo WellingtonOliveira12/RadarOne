@@ -15,6 +15,7 @@ export interface ScrapedAd {
 
 export interface MonitorWithFilters {
   id: string;
+  userId: string; // ID do usuário dono do monitor
   name: string;
   site: string;
   searchUrl: string;
