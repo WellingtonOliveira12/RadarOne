@@ -14,6 +14,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { TwoFactorVerifyPage } from './pages/TwoFactorVerifyPage';
 
 // Páginas protegidas
 import { DashboardPage } from './pages/DashboardPage';
@@ -100,6 +101,7 @@ export function AppRouter() {
           />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/2fa/verify" element={<TwoFactorVerifyPage />} />
           <Route path="/health" element={<HealthCheckPage />} />
 
           {/* Páginas de ajuda (públicas) */}

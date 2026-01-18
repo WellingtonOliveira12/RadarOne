@@ -10,8 +10,19 @@ import { logError, logInfo } from '../utils/loggerHelpers';
 
 /**
  * Controller de Autenticação
- * TODO: Implementar validações completas
+ *
+ * AUTH_STEP States:
+ * - NONE: Não autenticado
+ * - TWO_FACTOR_REQUIRED: Senha validada, aguardando 2FA
+ * - AUTHENTICATED: Totalmente autenticado
  */
+
+// Enum para estados de autenticação
+export enum AuthStep {
+  NONE = 'NONE',
+  TWO_FACTOR_REQUIRED = 'TWO_FACTOR_REQUIRED',
+  AUTHENTICATED = 'AUTHENTICATED'
+}
 
 /**
  * Sanitiza email para logs (oculta parte do email)
@@ -247,12 +258,30 @@ export class AuthController {
 
       // FASE 4.4: Verifica se usuário tem 2FA habilitado
       if (user.twoFactorEnabled) {
-        // Retorna resposta especial indicando que 2FA é necessário
-        // Frontend deve pedir código TOTP
+        // Gerar token temporário de 2FA (curta duração - 5 minutos)
+        const secret = process.env.JWT_SECRET;
+        if (!secret) {
+          throw new Error('JWT_SECRET não configurado');
+        }
+
+        const tempToken = jwt.sign(
+          {
+            userId: user.id,
+            type: 'two_factor_pending',
+            twoFactorVerified: false
+          },
+          secret,
+          { expiresIn: '5m' }
+        );
+
         logInfo('Login requires 2FA verification', { userId: user.id });
+
+        // Retorna resposta com authStep claro e token temporário
         res.json({
+          authStep: AuthStep.TWO_FACTOR_REQUIRED,
           requiresTwoFactor: true,
-          userId: user.id, // Temporário para verificação de 2FA
+          tempToken, // Token temporário para verificação 2FA
+          userId: user.id,
           message: 'Digite o código do seu aplicativo autenticador'
         });
         return;
@@ -281,6 +310,7 @@ export class AuthController {
       logInfo('User logged in successfully', { userId: user.id, email: sanitizeEmail(user.email) });
 
       res.json({
+        authStep: AuthStep.AUTHENTICATED,
         message: 'Login realizado com sucesso',
         token,
         user: userWithoutPassword
@@ -768,6 +798,7 @@ export class AuthController {
 
       if (result.isBackupCode) {
         res.json({
+          authStep: AuthStep.AUTHENTICATED,
           message: 'Login realizado com código de backup. Gere novos códigos em breve!',
           token,
           user: userWithoutPassword,
@@ -775,6 +806,7 @@ export class AuthController {
         });
       } else {
         res.json({
+          authStep: AuthStep.AUTHENTICATED,
           message: 'Login realizado com sucesso',
           token,
           user: userWithoutPassword
@@ -939,6 +971,163 @@ export class AuthController {
     } catch (error) {
       logError('Failed to revalidate password', { err: error, requestId: req.requestId });
       res.status(500).json({ error: 'Erro ao validar senha' });
+    }
+  }
+
+  // ============================================
+  // ENDPOINT /auth/status - Estado de Autenticação
+  // ============================================
+
+  /**
+   * Retorna o estado completo de autenticação do usuário
+   * GET /api/auth/status
+   *
+   * Resposta:
+   * - authStep: NONE | TWO_FACTOR_REQUIRED | AUTHENTICATED
+   * - isAuthenticated: boolean
+   * - twoFactorEnabled: boolean
+   * - twoFactorVerified: boolean (se 2FA foi completado nesta sessão)
+   * - user?: dados do usuário (se autenticado)
+   */
+  static async getAuthStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+
+      // Sem token = não autenticado
+      if (!token) {
+        res.json({
+          authStep: AuthStep.NONE,
+          isAuthenticated: false,
+          twoFactorEnabled: false,
+          twoFactorVerified: false,
+          requiredStep: null
+        });
+        return;
+      }
+
+      const secret = process.env.JWT_SECRET;
+      if (!secret) {
+        throw new Error('JWT_SECRET não configurado');
+      }
+
+      let decoded: any;
+      try {
+        decoded = jwt.verify(token, secret);
+      } catch (jwtError: any) {
+        // Token expirado ou inválido
+        res.json({
+          authStep: AuthStep.NONE,
+          isAuthenticated: false,
+          twoFactorEnabled: false,
+          twoFactorVerified: false,
+          requiredStep: null,
+          tokenError: jwtError.name === 'TokenExpiredError' ? 'expired' : 'invalid'
+        });
+        return;
+      }
+
+      const userId = decoded.userId;
+      if (!userId) {
+        res.json({
+          authStep: AuthStep.NONE,
+          isAuthenticated: false,
+          twoFactorEnabled: false,
+          twoFactorVerified: false,
+          requiredStep: null
+        });
+        return;
+      }
+
+      // Buscar usuário
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          blocked: true,
+          twoFactorEnabled: true,
+          subscriptions: {
+            where: { status: { in: ['ACTIVE', 'TRIAL'] } },
+            include: { plan: true }
+          }
+        }
+      });
+
+      if (!user) {
+        res.json({
+          authStep: AuthStep.NONE,
+          isAuthenticated: false,
+          twoFactorEnabled: false,
+          twoFactorVerified: false,
+          requiredStep: null
+        });
+        return;
+      }
+
+      // Verificar se usuário está bloqueado
+      if (user.blocked || !user.isActive) {
+        res.json({
+          authStep: AuthStep.NONE,
+          isAuthenticated: false,
+          twoFactorEnabled: user.twoFactorEnabled,
+          twoFactorVerified: false,
+          requiredStep: null,
+          blocked: true
+        });
+        return;
+      }
+
+      // Verificar se é token temporário de 2FA pendente
+      if (decoded.type === 'two_factor_pending' && !decoded.twoFactorVerified) {
+        res.json({
+          authStep: AuthStep.TWO_FACTOR_REQUIRED,
+          isAuthenticated: false,
+          twoFactorEnabled: true,
+          twoFactorVerified: false,
+          requiredStep: 'TWO_FACTOR_VERIFICATION',
+          userId: user.id
+        });
+        return;
+      }
+
+      // Se 2FA está habilitado, verificar se foi verificado nesta sessão
+      const twoFactorVerified = decoded.twoFactorVerified === true;
+
+      if (user.twoFactorEnabled && !twoFactorVerified) {
+        res.json({
+          authStep: AuthStep.TWO_FACTOR_REQUIRED,
+          isAuthenticated: false,
+          twoFactorEnabled: true,
+          twoFactorVerified: false,
+          requiredStep: 'TWO_FACTOR_VERIFICATION',
+          userId: user.id
+        });
+        return;
+      }
+
+      // Totalmente autenticado
+      const { twoFactorEnabled, ...userWithoutSensitive } = user;
+
+      // Prevent caching
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      res.json({
+        authStep: AuthStep.AUTHENTICATED,
+        isAuthenticated: true,
+        twoFactorEnabled: user.twoFactorEnabled,
+        twoFactorVerified: twoFactorVerified || !user.twoFactorEnabled,
+        requiredStep: null,
+        user: userWithoutSensitive
+      });
+    } catch (error) {
+      logError('Failed to get auth status', { err: error, requestId: req.requestId });
+      res.status(500).json({ error: 'Erro ao verificar status de autenticação' });
     }
   }
 }

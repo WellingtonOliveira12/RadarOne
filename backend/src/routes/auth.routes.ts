@@ -18,6 +18,10 @@ router.post('/login', authRateLimiter, AuthController.login);
 // GET /api/auth/me - Obter dados do usuário autenticado
 router.get('/me', authenticateToken, AuthController.me);
 
+// GET /api/auth/status - Obter estado de autenticação (inclui 2FA status)
+// Não requer authenticateToken pois precisa funcionar sem token válido
+router.get('/status', AuthController.getAuthStatus);
+
 // POST /api/auth/forgot-password - Solicitar reset de senha (5 req/hora)
 router.post('/forgot-password', strictRateLimiter, AuthController.requestPasswordReset);
 

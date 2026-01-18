@@ -4,13 +4,41 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'ADMIN' | 'ADMIN_SUPER' | 'ADMIN_SUPPORT' | 'ADMIN_FINANCE' | 'ADMIN_READ';
 }
 
-export interface LoginResponse {
+// Constantes para estados de autenticação (deve corresponder ao backend)
+export const AuthStep = {
+  NONE: 'NONE',
+  TWO_FACTOR_REQUIRED: 'TWO_FACTOR_REQUIRED',
+  AUTHENTICATED: 'AUTHENTICATED'
+} as const;
+
+export type AuthStep = typeof AuthStep[keyof typeof AuthStep];
+
+// Resposta quando login é bem sucedido (sem 2FA ou 2FA desabilitado)
+export interface LoginSuccessResponse {
+  authStep: typeof AuthStep.AUTHENTICATED;
   message: string;
   token: string;
   user: User;
+}
+
+// Resposta quando 2FA é necessário
+export interface LoginTwoFactorRequiredResponse {
+  authStep: typeof AuthStep.TWO_FACTOR_REQUIRED;
+  requiresTwoFactor: true;
+  tempToken: string;
+  userId: string;
+  message: string;
+}
+
+// União dos tipos de resposta
+export type LoginResponse = LoginSuccessResponse | LoginTwoFactorRequiredResponse;
+
+// Type guard para verificar se precisa de 2FA
+export function isTwoFactorRequired(response: LoginResponse): response is LoginTwoFactorRequiredResponse {
+  return response.authStep === AuthStep.TWO_FACTOR_REQUIRED;
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {

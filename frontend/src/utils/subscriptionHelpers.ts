@@ -21,7 +21,7 @@ export interface User {
   email: string;
   name: string;
   phone?: string;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'ADMIN' | 'ADMIN_SUPER' | 'ADMIN_SUPPORT' | 'ADMIN_FINANCE' | 'ADMIN_READ';
   subscriptions?: Subscription[];
 }
 

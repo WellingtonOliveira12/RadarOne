@@ -14,8 +14,8 @@ import {
   AlertIcon,
   AlertDescription,
 } from '@chakra-ui/react';
-import { useAuth } from '../context/AuthContext';
-import { showSuccess, showError } from '../lib/toast';
+import { useAuth, TwoFactorRequiredError } from '../context/AuthContext';
+import { showSuccess, showError, showInfo } from '../lib/toast';
 import { trackLogin } from '../lib/analytics';
 import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 import { PublicLayout } from '../components/PublicLayout';
@@ -67,6 +67,20 @@ export function LoginPage() {
         navigate('/dashboard', { replace: true });
       }
     } catch (err: any) {
+      // Verificar se é erro de 2FA necessário
+      if (err instanceof TwoFactorRequiredError) {
+        showInfo('Verificação em duas etapas necessária');
+        // Redirecionar para página de verificação 2FA com dados necessários
+        navigate('/2fa/verify', {
+          replace: true,
+          state: {
+            tempToken: err.tempToken,
+            userId: err.userId
+          }
+        });
+        return;
+      }
+
       const errorMessage = err.message || 'Erro ao fazer login';
       setError(errorMessage);
       showError(errorMessage);
