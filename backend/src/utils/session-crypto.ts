@@ -172,7 +172,9 @@ export function extractStorageStateMeta(storageStateJson: string): {
   const parsed = JSON.parse(storageStateJson);
 
   // Extrai domínios únicos dos cookies
-  const domains = [...new Set(parsed.cookies.map((c: any) => c.domain))];
+  const domains: string[] = [...new Set(
+    (parsed.cookies as Array<{ domain: string }>).map((c) => c.domain)
+  )];
 
   return {
     cookiesCount: parsed.cookies?.length || 0,
