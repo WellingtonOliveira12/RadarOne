@@ -1,4 +1,4 @@
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { MonitorSite } from '@prisma/client';
 import { canUserCreateMonitor, canUserUseSite } from './planService';
 

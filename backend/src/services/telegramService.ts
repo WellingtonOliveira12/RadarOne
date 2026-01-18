@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { TELEGRAM_BOT_USERNAME, TELEGRAM_BOT_LINK } from '../constants/telegram';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;

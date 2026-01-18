@@ -1,4 +1,4 @@
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { getUserTelegramAccount, sendTelegramMessage } from './telegramService';
 import { sendNewListingEmail } from './emailService';
 import { Monitor, NotificationChannel, NotificationStatus } from '@prisma/client';

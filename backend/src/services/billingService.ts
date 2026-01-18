@@ -1,4 +1,4 @@
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { Plan, Coupon, Subscription } from '@prisma/client';
 import { sendTrialStartedEmail } from './emailService';
 

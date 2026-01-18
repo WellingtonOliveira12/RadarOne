@@ -1,4 +1,4 @@
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { sendMonthlyQueriesResetReport } from '../services/emailService';
 import { captureJobException } from '../monitoring/sentry';
 import { retryAsync } from '../utils/retry';

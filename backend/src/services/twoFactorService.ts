@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import * as OTPAuth from 'otplib';
 import QRCode from 'qrcode';
 import bcrypt from 'bcrypt';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 
 // Configuração TOTP
 OTPAuth.authenticator.options = {

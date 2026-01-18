@@ -2,7 +2,7 @@ import { ErrorCodes } from '../constants/errorCodes';
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { validateCpf, encryptCpf } from '../utils/crypto';
 import { startTrialForUser } from '../services/billingService';
 import { sendWelcomeEmail } from '../services/emailService';

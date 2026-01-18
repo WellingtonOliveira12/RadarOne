@@ -10,7 +10,7 @@
  * - Cada plano deve ter um product_id único na Kiwify
  */
 
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 
 export interface CheckoutParams {
   userId: string;

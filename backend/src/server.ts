@@ -1,24 +1,19 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
 
-// Carrega variáveis de ambiente
+// Carrega variáveis de ambiente PRIMEIRO
 dotenv.config();
 
 // Inicializa Sentry para monitoramento de erros
 import { initSentry } from './monitoring/sentry';
 initSentry();
 
-// Inicializa o Prisma Client com adapter Postgres
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-export const prisma = new PrismaClient({
-  adapter,
-  log: ['error', 'warn'],
-});
+// Importa o Prisma Client do módulo centralizado
+import { prisma } from './lib/prisma';
+
+// Re-exporta para compatibilidade com código existente
+export { prisma };
 
 // Importa rotas
 import healthRoutes from './routes/health.routes';

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { generateLinkCode, sendTelegramMessage, getChatIdForUser } from '../services/telegramService';
 import { sendWelcomeEmail } from '../services/emailService';
 import { TELEGRAM_BOT_USERNAME } from '../constants/telegram';

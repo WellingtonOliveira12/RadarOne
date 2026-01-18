@@ -12,7 +12,7 @@
 import { AlertSeverity, AdminAlert } from '@prisma/client';
 import { CreateAlertParams, AlertTypeValue, getDefaultSeverity, getAlertMessage } from '../types/alerts';
 import { logInfo, logError } from '../utils/loggerHelpers';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 
 /**
  * Cria um alerta administrativo

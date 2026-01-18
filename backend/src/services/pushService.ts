@@ -8,7 +8,7 @@
  */
 
 import webPush from 'web-push';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 
 // Configurar VAPID keys
 // Gerar com: npx web-push generate-vapid-keys

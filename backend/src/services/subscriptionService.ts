@@ -1,4 +1,4 @@
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { Subscription, Plan } from '@prisma/client';
 
 /**

@@ -3,7 +3,7 @@ import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { RATE_LIMIT_CONFIG, DEFAULT_RATE_LIMITS, RATE_LIMIT_EXEMPT_PATHS } from '../config/rateLimitConfig';
 import { logWarning } from '../utils/loggerHelpers';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 
 /**
  * Rate Limiting Middleware

@@ -7,15 +7,14 @@
  * Permite salvar, carregar, validar e marcar sessões como needs_reauth.
  */
 
-import { PrismaClient, UserSessionStatus } from '@prisma/client';
+import { UserSessionStatus } from '@prisma/client';
 import {
   encryptStorageState,
   decryptStorageState,
   isValidStorageState,
   extractStorageStateMeta,
 } from '../utils/session-crypto';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 // ============================================================
 // TIPOS

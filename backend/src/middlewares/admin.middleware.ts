@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../errors/AppError';
 import { UserRole } from '@prisma/client';
 

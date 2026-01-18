@@ -1,4 +1,4 @@
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { sendAbandonedCouponEmail } from '../services/emailService';
 import { sendAbandonedCouponPush } from '../services/pushService';
 import { captureJobException } from '../monitoring/sentry';

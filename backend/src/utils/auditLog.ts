@@ -1,5 +1,5 @@
 import { logInfo, logError } from './loggerHelpers';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 
 /**
  * Tipos de ação para audit log

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { logAdminAction, AuditAction, AuditTargetType, getClientIp } from '../utils/auditLog';
 
 export class AdminController {

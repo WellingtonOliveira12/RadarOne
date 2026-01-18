@@ -1,4 +1,4 @@
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { sendTelegramMessage } from '../services/telegramService';
 import { sendEmail } from '../services/emailService';
 
