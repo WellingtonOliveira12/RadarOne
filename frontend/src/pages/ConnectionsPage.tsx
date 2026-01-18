@@ -45,8 +45,51 @@ import {
   ExternalLink,
   Trash2,
   Link as LinkIcon,
+  Clock,
+  Shield,
 } from 'lucide-react';
 import { api } from '../services/api';
+
+// Função para calcular dias restantes
+function getDaysUntilExpiration(expiresAt: string | null): number | null {
+  if (!expiresAt) return null;
+  const now = new Date();
+  const expires = new Date(expiresAt);
+  const diffTime = expires.getTime() - now.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+// Função para validar estrutura do storageState
+function validateStorageState(content: string): { valid: boolean; error?: string; cookiesCount?: number } {
+  try {
+    const data = JSON.parse(content);
+
+    if (!data.cookies || !Array.isArray(data.cookies)) {
+      return { valid: false, error: 'Arquivo inválido: campo "cookies" não encontrado.' };
+    }
+
+    if (!data.origins || !Array.isArray(data.origins)) {
+      return { valid: false, error: 'Arquivo inválido: campo "origins" não encontrado.' };
+    }
+
+    if (data.cookies.length === 0) {
+      return { valid: false, error: 'Arquivo inválido: nenhum cookie encontrado. Faça login no site primeiro.' };
+    }
+
+    // Verifica se tem cookies do Mercado Livre
+    const mlCookies = data.cookies.filter((c: any) =>
+      c.domain?.includes('mercadolivre') || c.domain?.includes('mercadolibre')
+    );
+
+    if (mlCookies.length === 0) {
+      return { valid: false, error: 'Arquivo inválido: nenhum cookie do Mercado Livre encontrado. Certifique-se de fazer login no site correto.' };
+    }
+
+    return { valid: true, cookiesCount: data.cookies.length };
+  } catch {
+    return { valid: false, error: 'Arquivo inválido: não é um JSON válido.' };
+  }
+}
 
 // Tipos
 interface SiteSession {
@@ -96,6 +139,46 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// Componente de Countdown de Expiração
+function ExpirationCountdown({ expiresAt }: { expiresAt: string | null }) {
+  const daysLeft = getDaysUntilExpiration(expiresAt);
+
+  if (daysLeft === null) return null;
+
+  if (daysLeft <= 0) {
+    return (
+      <Badge colorScheme="red" display="flex" alignItems="center" gap={1}>
+        <Icon as={Clock} boxSize={3} />
+        Expirado
+      </Badge>
+    );
+  }
+
+  if (daysLeft <= 3) {
+    return (
+      <Badge colorScheme="red" display="flex" alignItems="center" gap={1}>
+        <Icon as={Clock} boxSize={3} />
+        Expira em {daysLeft} dia{daysLeft > 1 ? 's' : ''}
+      </Badge>
+    );
+  }
+
+  if (daysLeft <= 7) {
+    return (
+      <Badge colorScheme="orange" display="flex" alignItems="center" gap={1}>
+        <Icon as={Clock} boxSize={3} />
+        Expira em {daysLeft} dias
+      </Badge>
+    );
+  }
+
+  return (
+    <Text fontSize="xs" color="gray.500">
+      Expira em {daysLeft} dias
+    </Text>
+  );
+}
+
 // Componente de Card de Site
 function SiteCard({
   site,
@@ -111,6 +194,7 @@ function SiteCard({
   isUploading: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const daysLeft = getDaysUntilExpiration(session?.expiresAt || null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,17 +205,36 @@ function SiteCard({
   };
 
   const needsAction = session && session.status !== 'ACTIVE';
+  const expirationWarning = session?.status === 'ACTIVE' && daysLeft !== null && daysLeft <= 7;
+
+  // Determina a borda e fundo do card
+  const getBorderColor = () => {
+    if (needsAction) return 'orange.300';
+    if (expirationWarning && daysLeft && daysLeft <= 3) return 'red.300';
+    if (expirationWarning) return 'yellow.400';
+    if (session?.status === 'ACTIVE') return 'green.300';
+    return 'gray.200';
+  };
+
+  const getBgColor = () => {
+    if (needsAction) return 'orange.50';
+    if (expirationWarning && daysLeft && daysLeft <= 3) return 'red.50';
+    if (expirationWarning) return 'yellow.50';
+    return undefined;
+  };
 
   return (
-    <Card
-      variant="outline"
-      borderColor={needsAction ? 'orange.300' : session?.status === 'ACTIVE' ? 'green.300' : 'gray.200'}
-      bg={needsAction ? 'orange.50' : undefined}
-    >
+    <Card variant="outline" borderColor={getBorderColor()} bg={getBgColor()}>
       <CardHeader pb={2}>
         <HStack justify="space-between">
           <VStack align="start" spacing={0}>
-            <Heading size="md">{site.name}</Heading>
+            <HStack>
+              <Heading size="md">{site.name}</Heading>
+              <Badge colorScheme="purple" fontSize="xs" display="flex" alignItems="center" gap={1}>
+                <Icon as={Shield} boxSize={3} />
+                Requer login
+              </Badge>
+            </HStack>
             <Text fontSize="sm" color="gray.500">{site.domains[0]}</Text>
           </VStack>
           <StatusBadge status={session?.status || 'NOT_CONNECTED'} />
@@ -139,11 +242,15 @@ function SiteCard({
       </CardHeader>
 
       <CardBody pt={2}>
+        {/* Sessão ativa - mostrar informações */}
         {session?.status === 'ACTIVE' && (
           <VStack align="start" spacing={2} mb={4}>
-            <HStack fontSize="sm" color="gray.600">
-              <Text>Cookies:</Text>
-              <Text fontWeight="medium">{session.cookiesCount}</Text>
+            <HStack fontSize="sm" color="gray.600" justify="space-between" width="100%">
+              <HStack>
+                <Text>Cookies:</Text>
+                <Text fontWeight="medium">{session.cookiesCount}</Text>
+              </HStack>
+              <ExpirationCountdown expiresAt={session.expiresAt} />
             </HStack>
             {session.lastUsedAt && (
               <HStack fontSize="sm" color="gray.600">
@@ -161,6 +268,24 @@ function SiteCard({
           </VStack>
         )}
 
+        {/* Alerta de expiração próxima */}
+        {expirationWarning && daysLeft && daysLeft <= 7 && (
+          <Alert status={daysLeft <= 3 ? 'error' : 'warning'} mb={4} borderRadius="md">
+            <AlertIcon />
+            <Box>
+              <AlertTitle fontSize="sm">
+                {daysLeft <= 3 ? 'Expira muito em breve!' : 'Expira em breve'}
+              </AlertTitle>
+              <AlertDescription fontSize="xs">
+                {daysLeft <= 1
+                  ? 'Sua sessão expira hoje ou amanhã. Recomendamos reconectar agora.'
+                  : `Sua sessão expira em ${daysLeft} dias. Recomendamos reconectar em breve para evitar interrupções.`}
+              </AlertDescription>
+            </Box>
+          </Alert>
+        )}
+
+        {/* Alerta de ação necessária */}
         {needsAction && (
           <Alert status="warning" mb={4} borderRadius="md">
             <AlertIcon />
@@ -168,8 +293,24 @@ function SiteCard({
               <AlertTitle fontSize="sm">Ação necessária</AlertTitle>
               <AlertDescription fontSize="xs">
                 {session.status === 'NEEDS_REAUTH'
-                  ? 'O site pediu login novamente. Faça upload de uma nova sessão.'
-                  : 'Sua sessão expirou. Faça upload de uma nova sessão.'}
+                  ? 'O site pediu login novamente. Faça upload de uma nova sessão para continuar monitorando.'
+                  : session.status === 'EXPIRED'
+                  ? 'Sua sessão expirou. Faça upload de uma nova sessão.'
+                  : 'Sessão inválida. Por favor, gere uma nova sessão.'}
+              </AlertDescription>
+            </Box>
+          </Alert>
+        )}
+
+        {/* Sem sessão - mostrar instrução */}
+        {!session && (
+          <Alert status="info" mb={4} borderRadius="md">
+            <AlertIcon />
+            <Box>
+              <AlertTitle fontSize="sm">Conecte sua conta</AlertTitle>
+              <AlertDescription fontSize="xs">
+                Para monitorar anúncios do {site.name}, você precisa conectar sua conta.
+                Nunca pedimos sua senha - usamos apenas os cookies de sessão.
               </AlertDescription>
             </Box>
           </Alert>
@@ -185,12 +326,18 @@ function SiteCard({
           />
           <Button
             leftIcon={<Upload size={16} />}
-            colorScheme={needsAction ? 'orange' : 'blue'}
+            colorScheme={needsAction || expirationWarning ? 'orange' : session ? 'green' : 'blue'}
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             isLoading={isUploading}
           >
-            {session ? 'Atualizar sessão' : 'Conectar conta'}
+            {needsAction
+              ? 'Reconectar agora'
+              : expirationWarning
+              ? 'Renovar sessão'
+              : session
+              ? 'Atualizar sessão'
+              : 'Conectar conta'}
           </Button>
           {session && (
             <Button
@@ -244,13 +391,17 @@ export default function ConnectionsPage() {
     try {
       setUploadingSite(siteId);
 
+      // Verifica tamanho do arquivo (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error('Arquivo muito grande. O tamanho máximo é 5MB.');
+      }
+
       const content = await file.text();
 
-      // Valida JSON
-      try {
-        JSON.parse(content);
-      } catch {
-        throw new Error('Arquivo inválido. Deve ser um JSON válido.');
+      // Valida estrutura do storageState
+      const validation = validateStorageState(content);
+      if (!validation.valid) {
+        throw new Error(validation.error);
       }
 
       await api.post(`/api/sessions/${siteId}/upload`, {
@@ -258,19 +409,20 @@ export default function ConnectionsPage() {
       });
 
       toast({
-        title: 'Sessão salva',
-        description: 'Sua conta foi conectada com sucesso.',
+        title: 'Conta conectada!',
+        description: `Sessão salva com ${validation.cookiesCount} cookies. Seus monitores agora funcionarão automaticamente.`,
         status: 'success',
-        duration: 3000,
+        duration: 5000,
       });
 
       fetchSessions();
     } catch (error: any) {
       toast({
-        title: 'Erro ao salvar sessão',
+        title: 'Erro ao conectar conta',
         description: error.message || 'Verifique se o arquivo é válido.',
         status: 'error',
-        duration: 5000,
+        duration: 7000,
+        isClosable: true,
       });
     } finally {
       setUploadingSite(null);

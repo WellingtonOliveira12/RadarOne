@@ -49,17 +49,20 @@ interface MonitorsResponse {
   count: number;
 }
 
-const SITE_OPTIONS: { value: MonitorSite; label: string }[] = [
-  { value: 'MERCADO_LIVRE', label: 'Mercado Livre' },
-  { value: 'OLX', label: 'OLX' },
-  { value: 'FACEBOOK_MARKETPLACE', label: 'Facebook Marketplace' },
-  { value: 'WEBMOTORS', label: 'Webmotors' },
-  { value: 'ICARROS', label: 'iCarros' },
-  { value: 'ZAP_IMOVEIS', label: 'ZAP Imóveis' },
-  { value: 'VIVA_REAL', label: 'VivaReal' },
-  { value: 'IMOVELWEB', label: 'ImovelWeb' },
-  { value: 'OUTRO', label: 'Outro' },
+const SITE_OPTIONS: { value: MonitorSite; label: string; requiresLogin: boolean }[] = [
+  { value: 'MERCADO_LIVRE', label: 'Mercado Livre', requiresLogin: true },
+  { value: 'OLX', label: 'OLX', requiresLogin: false },
+  { value: 'FACEBOOK_MARKETPLACE', label: 'Facebook Marketplace', requiresLogin: false },
+  { value: 'WEBMOTORS', label: 'Webmotors', requiresLogin: false },
+  { value: 'ICARROS', label: 'iCarros', requiresLogin: false },
+  { value: 'ZAP_IMOVEIS', label: 'ZAP Imóveis', requiresLogin: false },
+  { value: 'VIVA_REAL', label: 'VivaReal', requiresLogin: false },
+  { value: 'IMOVELWEB', label: 'ImovelWeb', requiresLogin: false },
+  { value: 'OUTRO', label: 'Outro', requiresLogin: false },
 ];
+
+// Sites que requerem login
+const SITES_REQUIRING_LOGIN = SITE_OPTIONS.filter(s => s.requiresLogin).map(s => s.value);
 
 function getSiteLabel(site: MonitorSite): string {
   return SITE_OPTIONS.find((opt) => opt.value === site)?.label ?? site;
@@ -73,6 +76,7 @@ export function MonitorsPage() {
   const [loadingLista, setLoadingLista] = useState(false);
   const [error, setError] = useState('');
   const [hasSubscription, setHasSubscription] = useState(true);
+  const [sessionStatus, setSessionStatus] = useState<Record<string, { connected: boolean; status?: string }>>({});
 
   // Formulário
   const [name, setName] = useState('');
@@ -97,7 +101,37 @@ export function MonitorsPage() {
 
   useEffect(() => {
     fetchMonitors();
+    fetchSessionStatus();
   }, []);
+
+  // Busca status das sessões para sites que requerem login
+  async function fetchSessionStatus() {
+    try {
+      const token = getToken();
+      if (!token) return;
+
+      const data = await api.get<{ sessions: Array<{ site: string; status: string }> }>('/api/sessions', token);
+      const statusMap: Record<string, { connected: boolean; status?: string }> = {};
+
+      // Inicializa todos os sites que requerem login como não conectados
+      SITES_REQUIRING_LOGIN.forEach(siteId => {
+        statusMap[siteId] = { connected: false };
+      });
+
+      // Atualiza com os dados reais
+      data.sessions?.forEach((session) => {
+        statusMap[session.site] = {
+          connected: session.status === 'ACTIVE',
+          status: session.status,
+        };
+      });
+
+      setSessionStatus(statusMap);
+    } catch (err) {
+      // Silently fail - não crítico
+      console.error('Erro ao buscar status de sessões:', err);
+    }
+  }
 
   async function fetchMonitors() {
     try {
@@ -361,11 +395,55 @@ export function MonitorsPage() {
             >
               {SITE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {opt.label}{opt.requiresLogin ? ' 🔒' : ''}
                 </option>
               ))}
             </select>
           </div>
+
+          {/* Aviso de sessão necessária */}
+          {SITES_REQUIRING_LOGIN.includes(site) && (
+            <div style={sessionStatus[site]?.connected ? styles.sessionConnected : styles.sessionWarning}>
+              {sessionStatus[site]?.connected ? (
+                <>
+                  <span style={styles.sessionIcon}>✅</span>
+                  <div style={styles.sessionContent}>
+                    <strong>Conta conectada</strong>
+                    <p style={styles.sessionText}>
+                      Sua conta do {getSiteLabel(site)} está conectada. O monitor funcionará automaticamente.
+                    </p>
+                  </div>
+                </>
+              ) : sessionStatus[site]?.status === 'NEEDS_REAUTH' ? (
+                <>
+                  <span style={styles.sessionIcon}>⚠️</span>
+                  <div style={styles.sessionContent}>
+                    <strong>Reconexão necessária</strong>
+                    <p style={styles.sessionText}>
+                      Sua sessão do {getSiteLabel(site)} precisa ser reconectada para o monitor funcionar.
+                    </p>
+                  </div>
+                  <Link to="/connections" style={styles.sessionButton}>
+                    Reconectar agora
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <span style={styles.sessionIcon}>🔒</span>
+                  <div style={styles.sessionContent}>
+                    <strong>Conexão necessária</strong>
+                    <p style={styles.sessionText}>
+                      O {getSiteLabel(site)} requer login para mostrar todos os anúncios.
+                      Conecte sua conta para que o monitor funcione corretamente.
+                    </p>
+                  </div>
+                  <Link to="/connections" style={styles.sessionButton}>
+                    Conectar conta
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
 
           <div style={styles.field}>
             <label style={styles.label}>Modo de monitoramento</label>
@@ -940,5 +1018,49 @@ const styles = {
     border: 'none',
     padding: 0,
     margin: 0,
+  },
+  sessionWarning: {
+    backgroundColor: '#fef3c7',
+    borderLeft: '4px solid #f59e0b',
+    padding: '16px',
+    marginBottom: '20px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap' as const,
+  },
+  sessionConnected: {
+    backgroundColor: '#d1fae5',
+    borderLeft: '4px solid #10b981',
+    padding: '16px',
+    marginBottom: '20px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap' as const,
+  },
+  sessionIcon: {
+    fontSize: '24px',
+  },
+  sessionContent: {
+    flex: '1',
+    minWidth: '200px',
+  },
+  sessionText: {
+    margin: '4px 0 0 0',
+    fontSize: '13px',
+    color: '#6b7280',
+  },
+  sessionButton: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    textDecoration: 'none',
+    fontSize: '13px',
+    fontWeight: '600' as const,
+    whiteSpace: 'nowrap' as const,
   },
 };

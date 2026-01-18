@@ -5,6 +5,7 @@ import { resetMonthlyQueries } from './resetMonthlyQueries';
 import { checkCouponAlerts } from './checkCouponAlerts';
 import { checkTrialUpgradeExpiring } from './checkTrialUpgradeExpiring'; // FASE: Cupons de Upgrade
 import { checkAbandonedCoupons } from './checkAbandonedCoupons'; // FASE: Notificações de Cupons Abandonados
+import { checkSessionExpiring } from './checkSessionExpiring'; // FASE: Sessões expirando
 
 /**
  * Scheduler de Jobs Automáticos
@@ -137,6 +138,25 @@ export function startScheduler() {
     timezone: 'America/Sao_Paulo'
   });
 
+  // ============================================
+  // JOB 7: Verificar sessões de login expirando
+  // ============================================
+  // Executa diariamente às 14h
+  // - Verifica sessões de login (Mercado Livre, etc.) que expiram em 3 dias
+  // - Notifica usuários via Telegram e Email
+  // - Evita interrupções no monitoramento
+  cron.schedule('0 14 * * *', async () => {
+    console.log('[SCHEDULER] ⏰ Executando checkSessionExpiring...');
+    try {
+      await checkSessionExpiring();
+      console.log('[SCHEDULER] ✅ checkSessionExpiring executado com sucesso');
+    } catch (error) {
+      console.error('[SCHEDULER] ❌ Erro ao executar checkSessionExpiring:', error);
+    }
+  }, {
+    timezone: 'America/Sao_Paulo'
+  });
+
   console.log('[SCHEDULER] ✅ Jobs agendados:');
   console.log('[SCHEDULER]    📧 checkTrialExpiring - Diariamente às 9h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    💳 checkSubscriptionExpired - Diariamente às 10h (America/Sao_Paulo)');
@@ -144,6 +164,7 @@ export function startScheduler() {
   console.log('[SCHEDULER]    🎟️  checkCouponAlerts - Diariamente às 11h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    ⏰ checkTrialUpgradeExpiring - Diariamente às 12h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    🎫 checkAbandonedCoupons - Diariamente às 13h (America/Sao_Paulo)');
+  console.log('[SCHEDULER]    🔒 checkSessionExpiring - Diariamente às 14h (America/Sao_Paulo)');
 }
 
 /**
