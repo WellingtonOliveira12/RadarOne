@@ -84,6 +84,78 @@ export const FAQPage: React.FC = () => {
         'No momento, cada conta RadarOne suporta apenas um Telegram conectado. Se você reconectar com outro chat, o anterior será desvinculado.',
     },
     {
+      category: 'Conexão de Conta',
+      question: 'O que é "Conectar Conta"?',
+      answer: (
+        <>
+          Alguns sites, como o Mercado Livre, exigem que você esteja logado para ver
+          certos anúncios. A funcionalidade "Conectar Conta" permite que o RadarOne
+          use uma sessão do seu navegador para acessar esses anúncios. Você exporta
+          os cookies do seu navegador e faz upload no RadarOne.{' '}
+          <Link to="/connections" style={styles.link}>
+            Conectar agora
+          </Link>
+        </>
+      ),
+    },
+    {
+      category: 'Conexão de Conta',
+      question: 'É seguro conectar minha conta?',
+      answer: (
+        <>
+          Sim! <strong>Nunca pedimos sua senha</strong>. O RadarOne armazena apenas
+          os cookies de sessão (como se você estivesse logado no navegador). Esses
+          dados são criptografados com <strong>AES-256-GCM</strong> antes de serem
+          salvos. Você pode revogar a conexão a qualquer momento em{' '}
+          <Link to="/connections" style={styles.link}>
+            Conexões
+          </Link>
+          .
+        </>
+      ),
+    },
+    {
+      category: 'Conexão de Conta',
+      question: 'Como exportar os cookies do navegador?',
+      answer: (
+        <>
+          <strong>Método mais fácil (Chrome):</strong>
+          <ol style={{ paddingLeft: '20px', marginTop: '8px' }}>
+            <li>
+              Instale a extensão{' '}
+              <a
+                href="https://chrome.google.com/webstore/detail/export-cookies/njklnbpdibmhcpfggcfhgcakklcjigfa"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={styles.link}
+              >
+                Export Cookies
+              </a>
+            </li>
+            <li>Faça login no site (ex: Mercado Livre)</li>
+            <li>Clique na extensão e exporte como JSON</li>
+            <li>Faça upload em <Link to="/connections" style={styles.link}>Conexões</Link></li>
+          </ol>
+        </>
+      ),
+    },
+    {
+      category: 'Conexão de Conta',
+      question: 'O RadarOne pediu para reconectar. O que fazer?',
+      answer:
+        'Isso acontece quando o site (ex: Mercado Livre) invalidou sua sessão, ' +
+        'geralmente por tempo ou mudança de senha. Basta repetir o processo: ' +
+        'faça login novamente no site, exporte os cookies e faça upload no RadarOne.',
+    },
+    {
+      category: 'Conexão de Conta',
+      question: 'Preciso conectar para todos os sites?',
+      answer:
+        'Não. Apenas sites que exigem login precisam de conexão. ' +
+        'OLX, WebMotors, iCarros e outros geralmente não precisam. ' +
+        'O Mercado Livre é o principal que exige login para ver todos os anúncios.',
+    },
+    {
       category: 'Monitores',
       question: 'Como criar um monitor?',
       answer: (

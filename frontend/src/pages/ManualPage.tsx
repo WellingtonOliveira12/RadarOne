@@ -70,9 +70,61 @@ export const ManualPage: React.FC = () => {
           </ul>
         </section>
 
+        {/* Conectar Conta (Sessões) */}
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>3. Conectar Conta (sites com login)</h2>
+          <p>
+            Alguns sites, como o <strong>Mercado Livre</strong>, exigem login para
+            mostrar certos anúncios. Para monitorá-los, você precisa "conectar" sua conta.
+          </p>
+
+          <div style={styles.infoBox}>
+            <strong>🔒 Segurança:</strong> Nunca pedimos sua senha. A conexão usa
+            apenas os cookies do navegador (sessão), que são criptografados com AES-256.
+          </div>
+
+          <h3 style={styles.subsectionTitle}>Passo a passo:</h3>
+          <ol style={styles.list}>
+            <li>
+              Acesse{' '}
+              <Link to="/connections" style={styles.link}>
+                Conexões
+              </Link>
+            </li>
+            <li>Escolha o site que deseja conectar (ex: Mercado Livre)</li>
+            <li>Faça login normalmente no site em uma nova aba</li>
+            <li>
+              Exporte os cookies usando uma extensão (veja abaixo) ou o Playwright CLI
+            </li>
+            <li>Faça upload do arquivo .json no RadarOne</li>
+            <li>Pronto! O RadarOne usará essa sessão nos monitores</li>
+          </ol>
+
+          <h3 style={styles.subsectionTitle}>Como exportar os cookies (mais fácil):</h3>
+          <ul style={styles.list}>
+            <li>
+              Instale a extensão{' '}
+              <a href="https://chrome.google.com/webstore/detail/export-cookies/njklnbpdibmhcpfggcfhgcakklcjigfa" target="_blank" rel="noopener noreferrer" style={styles.link}>
+                Export Cookies
+              </a>
+              {' '}no Chrome
+            </li>
+            <li>Faça login no site (ex: Mercado Livre)</li>
+            <li>Clique na extensão e exporte como JSON</li>
+            <li>Faça upload do arquivo no RadarOne</li>
+          </ul>
+
+          <h3 style={styles.subsectionTitle}>Quando reconectar?</h3>
+          <ul style={styles.list}>
+            <li>Se o RadarOne avisar que a sessão expirou ou precisa reautenticação</li>
+            <li>Se você trocar a senha do site</li>
+            <li>Normalmente a cada 7-30 dias (depende do site)</li>
+          </ul>
+        </section>
+
         {/* Criar Monitor */}
         <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>3. Criar Monitor</h2>
+          <h2 style={styles.sectionTitle}>4. Criar Monitor</h2>
           <p>
             Monitores são as buscas que o RadarOne faz automaticamente nos sites
             de anúncios.
@@ -104,7 +156,7 @@ export const ManualPage: React.FC = () => {
 
         {/* Como Chegam os Alertas */}
         <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>4. Como Chegam os Alertas</h2>
+          <h2 style={styles.sectionTitle}>5. Como Chegam os Alertas</h2>
           <p>Quando um novo anúncio é detectado, você recebe:</p>
           <ul style={styles.list}>
             <li>
@@ -125,7 +177,7 @@ export const ManualPage: React.FC = () => {
 
         {/* Problemas Comuns */}
         <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>5. Problemas Comuns</h2>
+          <h2 style={styles.sectionTitle}>6. Problemas Comuns</h2>
 
           <h3 style={styles.subsectionTitle}>Bot errado / não recebe alertas:</h3>
           <ol style={styles.list}>
@@ -154,7 +206,7 @@ export const ManualPage: React.FC = () => {
 
         {/* Boas Práticas */}
         <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>6. Boas Práticas</h2>
+          <h2 style={styles.sectionTitle}>7. Boas Práticas</h2>
           <ul style={styles.list}>
             <li>Use filtros de preço para reduzir alertas irrelevantes</li>
             <li>Crie monitores específicos (não genéricos demais)</li>
@@ -171,6 +223,11 @@ export const ManualPage: React.FC = () => {
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>Links Úteis</h2>
           <ul style={styles.linkList}>
+            <li>
+              <Link to="/connections" style={styles.link}>
+                Conectar Conta (Mercado Livre, etc.)
+              </Link>
+            </li>
             <li>
               <Link to="/telegram/connect" style={styles.link}>
                 Conectar Telegram
@@ -257,5 +314,13 @@ const styles = {
     padding: '16px',
     marginBottom: '16px',
     color: '#92400e',
+  },
+  infoBox: {
+    backgroundColor: '#e0f2fe',
+    border: '2px solid #0ea5e9',
+    borderRadius: '8px',
+    padding: '16px',
+    marginBottom: '16px',
+    color: '#0369a1',
   },
 };

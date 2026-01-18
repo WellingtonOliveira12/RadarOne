@@ -338,4 +338,88 @@ router.get('/errors', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/metrics/sessions
+ * Métricas de sessões (conexões de conta)
+ */
+router.get('/sessions', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const days = parseInt((req.query.days as string) || '7');
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Buscar sessões
+    const [
+      totalSessions,
+      sessionsByStatus,
+      monitorsBlockedBySession,
+      sessionsBySite,
+    ] = await Promise.all([
+      // Total de sessões
+      prisma.userSession.count(),
+
+      // Sessões por status
+      prisma.userSession.groupBy({
+        by: ['status'],
+        _count: true,
+      }),
+
+      // Monitores bloqueados por falta de sessão (SKIPPED com erro de sessão)
+      prisma.monitorLog.count({
+        where: {
+          status: 'SKIPPED',
+          createdAt: { gte: startDate },
+          error: { contains: 'SESSION' },
+        },
+      }),
+
+      // Sessões por site
+      prisma.userSession.groupBy({
+        by: ['site'],
+        _count: true,
+      }),
+    ]);
+
+    // Montar resposta
+    const statusLabels: Record<string, string> = {
+      ACTIVE: 'Conectado',
+      NEEDS_REAUTH: 'Precisa reconectar',
+      EXPIRED: 'Expirado',
+      INVALID: 'Inválido',
+    };
+
+    const sessionMetrics = {
+      total: totalSessions,
+      byStatus: sessionsByStatus.map((item) => ({
+        status: item.status,
+        label: statusLabels[item.status] || item.status,
+        count: item._count,
+      })),
+      bySite: sessionsBySite.map((item) => ({
+        site: item.site,
+        count: item._count,
+      })),
+      monitorsBlockedBySession,
+      activeRate: totalSessions > 0
+        ? (sessionsByStatus.find((s) => s.status === 'ACTIVE')?._count || 0) / totalSessions * 100
+        : 0,
+    };
+
+    res.json(sessionMetrics);
+  } catch (error: any) {
+    console.error('Error fetching session metrics:', error);
+    res.status(500).json({ error: 'Erro ao buscar métricas de sessões' });
+  }
+});
+
 export default router;
