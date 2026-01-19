@@ -11,7 +11,11 @@ export interface RequestOptions {
   method?: HttpMethod;
   body?: any;
   token?: string | null;
+  timeout?: number; // Timeout em ms (default: 15000)
 }
+
+// Timeout padrão de 15 segundos para evitar spinner infinito
+const DEFAULT_TIMEOUT = 15000;
 
 /**
  * Estrutura padronizada de erro da API
@@ -71,18 +75,66 @@ async function apiRequest<T = any>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, {
-    method: options.method || 'GET',
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  // Timeout configurável para evitar spinner infinito quando backend não responde
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: options.method || 'GET',
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (fetchError: any) {
+    clearTimeout(timeoutId);
+
+    // Tratar erros de rede/timeout de forma amigável
+    if (fetchError.name === 'AbortError') {
+      const error: any = new Error('O servidor não respondeu. Tente novamente em alguns instantes.');
+      error.status = 0;
+      error.errorCode = 'NETWORK_TIMEOUT';
+      error.isNetworkError = true;
+      throw error;
+    }
+
+    // Erro de rede genérico (sem internet, DNS, etc)
+    const error: any = new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+    error.status = 0;
+    error.errorCode = 'NETWORK_ERROR';
+    error.isNetworkError = true;
+    error.originalError = fetchError;
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const text = await res.text();
   let data: any;
 
+  // Detectar quando backend retorna HTML em vez de JSON (ex: SPA fallback incorreto)
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('text/html') && text.includes('<!doctype html')) {
+    const error: any = new Error('Serviço temporariamente indisponível. Tente novamente.');
+    error.status = 503;
+    error.errorCode = 'SERVICE_UNAVAILABLE';
+    error.isNetworkError = true;
+    throw error;
+  }
+
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
+    // Se não for JSON válido, pode ser erro de configuração
+    if (text.includes('<html') || text.includes('<!DOCTYPE')) {
+      const error: any = new Error('Serviço temporariamente indisponível.');
+      error.status = 503;
+      error.errorCode = 'SERVICE_UNAVAILABLE';
+      error.isNetworkError = true;
+      throw error;
+    }
     data = text;
   }
 

@@ -73,15 +73,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const token = getToken();
       if (token) {
+        // Timeout de 10s para evitar travamento se backend não responder
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
         // Usar endpoint /auth/status para obter estado completo
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com'}/api/auth/status`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }
-        );
+        let response: Response;
+        try {
+          response = await fetch(
+            `${import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com'}/api/auth/status`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+              signal: controller.signal,
+            }
+          );
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          // Timeout ou erro de rede - tratar graciosamente
+          console.warn('[AuthContext] Erro de rede ao verificar status:', fetchError.name);
+          clearAuth();
+          setUser(null);
+          setAuthStep(AuthStep.NONE);
+          return;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
+        // Verificar se resposta é HTML (indica problema de configuração)
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) {
+          console.warn('[AuthContext] Backend retornou HTML em vez de JSON');
+          clearAuth();
+          setUser(null);
+          setAuthStep(AuthStep.NONE);
+          return;
+        }
 
         if (response.ok) {
           const statusData = await response.json();
