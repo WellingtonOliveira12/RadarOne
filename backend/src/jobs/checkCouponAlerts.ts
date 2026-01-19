@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { logInfo, logWarning } from '../utils/loggerHelpers';
+import { JobRunResult } from './checkTrialExpiring';
 
 /**
  * Job: Verificar Cupons que Precisam de Alertas
@@ -9,9 +10,11 @@ import { logInfo, logWarning } from '../utils/loggerHelpers';
  * 2. Cupons próximos do limite de usos (>80% usado)
  *
  * Alertas são criados na tabela AdminAlert para visualização no painel /admin/alerts
+ *
+ * RETORNO: Agora retorna JobRunResult padronizado para compatibilidade com scheduler
  */
 
-export async function checkCouponAlerts() {
+export async function checkCouponAlerts(): Promise<JobRunResult> {
   logInfo('[JOB] Iniciando verificação de alertas de cupons...', {});
 
   try {
@@ -274,6 +277,7 @@ export async function checkCouponAlerts() {
     // RESUMO DO JOB
     // ============================================
     const totalAlerts = expiringCoupons.length + nearLimitCoupons.length + popularCoupons.length;
+    const alertsCreated = expiringCoupons.length + nearLimitCoupons.length + popularCoupons.length;
 
     logInfo(`[JOB] ✅ Verificação de cupons concluída`, {});
     logInfo(`[JOB]    📅 Cupons expirando: ${expiringCoupons.length}`, {});
@@ -281,15 +285,31 @@ export async function checkCouponAlerts() {
     logInfo(`[JOB]    🔥 Cupons populares: ${popularCoupons.length}`, {});
     logInfo(`[JOB]    🔔 Total de alertas verificados: ${totalAlerts}`, {});
 
+    // Retorna formato padronizado JobRunResult
     return {
-      success: true,
-      expiringCount: expiringCoupons.length,
-      nearLimitCount: nearLimitCoupons.length,
-      popularCount: popularCoupons.length,
-      totalAlerts,
+      processedCount: totalAlerts,
+      successCount: alertsCreated,
+      errorCount: 0,
+      summary: `Cupons verificados: ${expiringCoupons.length} expirando, ${nearLimitCoupons.length} próximos do limite, ${popularCoupons.length} populares`,
+      metadata: {
+        expiringCount: expiringCoupons.length,
+        nearLimitCount: nearLimitCoupons.length,
+        popularCount: popularCoupons.length,
+        totalAlerts,
+      },
     };
   } catch (error) {
     logWarning('[JOB] ❌ Erro ao verificar cupons para alertas:', error);
-    throw error;
+
+    // Retorna formato padronizado mesmo em caso de erro
+    return {
+      processedCount: 0,
+      successCount: 0,
+      errorCount: 1,
+      summary: `Erro ao verificar cupons: ${error instanceof Error ? error.message : String(error)}`,
+      metadata: {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    };
   }
 }

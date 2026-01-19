@@ -119,18 +119,9 @@ export function startScheduler() {
       JobNames.CHECK_COUPON_ALERTS,
       'SCHEDULER',
       async () => {
+        // checkCouponAlerts já retorna JobRunResult padronizado
         const result = await checkCouponAlerts();
-        return {
-          processedCount: result.totalAlerts,
-          successCount: result.expiringCount + result.nearLimitCount + result.popularCount,
-          errorCount: 0,
-          summary: `Verificados: ${result.expiringCount} expirando, ${result.nearLimitCount} próximos do limite, ${result.popularCount} populares`,
-          metadata: {
-            expiringCount: result.expiringCount,
-            nearLimitCount: result.nearLimitCount,
-            popularCount: result.popularCount,
-          },
-        };
+        return result;
       }
     );
   }, {

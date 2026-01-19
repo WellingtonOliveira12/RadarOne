@@ -406,7 +406,7 @@ interface JobRowProps {
   job: JobRun;
   formatDate: (date: string) => string;
   formatDuration: (ms: number | null) => string;
-  getStatusBadge: (status: string) => JSX.Element;
+  getStatusBadge: (status: string) => React.ReactElement;
 }
 
 const JobRow: React.FC<JobRowProps> = ({ job, formatDate, formatDuration, getStatusBadge }) => {
