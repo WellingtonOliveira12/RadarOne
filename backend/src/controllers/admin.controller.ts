@@ -2,6 +2,22 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { logAdminAction, AuditAction, AuditTargetType, getClientIp } from '../utils/auditLog';
 
+/**
+ * Retorna nome amigável do job
+ */
+function getJobDisplayName(jobName: string): string {
+  const names: Record<string, string> = {
+    checkTrialExpiring: 'Verificar Trials Expirando',
+    checkSubscriptionExpired: 'Verificar Assinaturas Expiradas',
+    resetMonthlyQueries: 'Reset Mensal de Queries',
+    checkCouponAlerts: 'Verificar Alertas de Cupons',
+    checkTrialUpgradeExpiring: 'Verificar Trial Upgrades Expirando',
+    checkAbandonedCoupons: 'Verificar Cupons Abandonados',
+    checkSessionExpiring: 'Verificar Sessões Expirando',
+  };
+  return names[jobName] || jobName;
+}
+
 export class AdminController {
   /**
    * 1. Listar todos os usuários com paginação e filtros
@@ -894,13 +910,15 @@ export class AdminController {
   /**
    * 10. Listar execuções de jobs (dashboard de monitoramento)
    * GET /api/admin/jobs
+   *
+   * ATUALIZADO: Agora usa a tabela JobRun para dados reais de execução
    */
   static async listJobRuns(req: Request, res: Response) {
     try {
       const {
         page = '1',
         pageSize = '20',
-        event,
+        jobName,
         status
       } = req.query;
 
@@ -908,75 +926,76 @@ export class AdminController {
       const pageSizeNum = parseInt(pageSize as string);
       const skip = (pageNum - 1) * pageSizeNum;
 
-      // Construir filtros
+      // Construir filtros para a nova tabela JobRun
       const where: any = {};
 
-      // Filtrar apenas eventos de jobs (começam com prefixos específicos ou são conhecidos)
-      const jobEvents = [
-        'MONTHLY_QUERIES_RESET',
-        'TRIAL_CHECK',
-        'SUBSCRIPTION_CHECK'
-      ];
-
-      if (event) {
-        where.event = event;
-      } else {
-        // Se não especificar event, mostrar apenas jobs conhecidos
-        where.event = {
-          in: jobEvents
-        };
+      // Filtrar por nome do job
+      if (jobName) {
+        where.jobName = jobName;
       }
 
-      // Filtrar por status se fornecido
-      // Status é derivado do campo 'error' e do payload
-      if (status === 'ERROR') {
-        where.error = {
-          not: null
-        };
-      } else if (status === 'SUCCESS') {
-        where.error = null;
+      // Filtrar por status
+      if (status) {
+        where.status = status;
       }
 
-      // Buscar logs de jobs
-      const [logs, total] = await Promise.all([
-        prisma.webhookLog.findMany({
+      // Buscar execuções de jobs da nova tabela JobRun
+      const [jobRuns, total] = await Promise.all([
+        prisma.jobRun.findMany({
           where,
           skip,
           take: pageSizeNum,
-          orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            event: true,
-            createdAt: true,
-            processed: true,
-            error: true,
-            payload: true
-          }
+          orderBy: { startedAt: 'desc' },
         }),
-        prisma.webhookLog.count({ where })
+        prisma.jobRun.count({ where })
       ]);
 
-      // Transformar logs para formato mais amigável
-      const data = logs.map(log => {
-        const payload = typeof log.payload === 'object' ? log.payload : {};
-        const hasError = log.error !== null && log.error !== undefined;
+      // Transformar dados para formato amigável
+      const data = jobRuns.map(run => ({
+        id: run.id,
+        jobName: run.jobName,
+        displayName: getJobDisplayName(run.jobName),
+        status: run.status,
+        startedAt: run.startedAt,
+        completedAt: run.completedAt,
+        durationMs: run.durationMs,
+        processedCount: run.processedCount,
+        successCount: run.successCount,
+        errorCount: run.errorCount,
+        summary: run.summary,
+        errorMessage: run.errorMessage,
+        triggeredBy: run.triggeredBy,
+        metadata: run.metadata,
+      }));
 
-        return {
-          id: log.id,
-          event: log.event,
-          createdAt: log.createdAt,
-          status: hasError ? 'ERROR' : (payload as any)?.status || 'SUCCESS',
-          updatedCount: (payload as any)?.updatedCount,
-          executedAt: (payload as any)?.executedAt,
-          error: log.error,
-          processed: log.processed
-        };
+      // Calcular estatísticas
+      const stats = await prisma.jobRun.groupBy({
+        by: ['status'],
+        _count: true,
+        where: {
+          startedAt: {
+            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Últimos 7 dias
+          }
+        }
       });
+
+      const statsMap = stats.reduce((acc, curr) => {
+        acc[curr.status] = curr._count;
+        return acc;
+      }, {} as Record<string, number>);
 
       const totalPages = Math.ceil(total / pageSizeNum);
 
       return res.json({
         data,
+        stats: {
+          last7Days: {
+            success: statsMap['SUCCESS'] || 0,
+            partial: statsMap['PARTIAL'] || 0,
+            failed: statsMap['FAILED'] || 0,
+            running: statsMap['RUNNING'] || 0,
+          }
+        },
         pagination: {
           page: pageNum,
           pageSize: pageSizeNum,

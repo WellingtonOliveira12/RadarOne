@@ -665,6 +665,54 @@ enum AlertSeverity {
 }
 
 // ============================================
+// JOB RUNS (Histórico de Execução de Jobs)
+// ============================================
+
+/**
+ * Registro de execução de jobs agendados
+ * Cada execução de job cria um registro nesta tabela
+ */
+model JobRun {
+  id            String       @id @default(cuid())
+  jobName       String       @map("job_name") // checkTrialExpiring, resetMonthlyQueries, etc
+  status        JobRunStatus @default(RUNNING)
+
+  // Timing
+  startedAt     DateTime     @default(now()) @map("started_at")
+  completedAt   DateTime?    @map("completed_at")
+  durationMs    Int?         @map("duration_ms") // Duração em milissegundos
+
+  // Resultados
+  processedCount Int         @default(0) @map("processed_count") // Registros processados
+  successCount   Int         @default(0) @map("success_count") // Operações bem-sucedidas
+  errorCount     Int         @default(0) @map("error_count") // Erros encontrados
+
+  // Detalhes
+  summary       String?      @db.Text // Resumo da execução
+  errorMessage  String?      @map("error_message") @db.Text // Mensagem de erro se falhou
+  metadata      Json?        // Dados adicionais (emails enviados, etc)
+
+  // Controle
+  triggeredBy   String?      @map("triggered_by") // SCHEDULER, MANUAL, API
+
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  @@index([jobName])
+  @@index([status])
+  @@index([startedAt])
+  @@index([createdAt])
+  @@map("job_runs")
+}
+
+enum JobRunStatus {
+  RUNNING   // Em execução
+  SUCCESS   // Concluído com sucesso
+  PARTIAL   // Concluído com alguns erros
+  FAILED    // Falhou completamente
+  TIMEOUT   // Timeout
+}
+
+// ============================================
 // AUTENTICAÇÃO DE SCRAPERS (Pool de Contas)
 // ============================================
 

@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { sendTelegramMessage } from '../services/telegramService';
 import { sendEmail } from '../services/emailService';
+import { JobRunResult } from './checkTrialExpiring';
 
 /**
  * Job: Verificar Sessões Expirando
@@ -12,6 +13,8 @@ import { sendEmail } from '../services/emailService';
  * Notifica via:
  * - Telegram (se configurado)
  * - Email (se Resend configurado)
+ *
+ * RETORNO: Agora retorna um objeto padronizado para logging
  */
 
 interface ExpiringSession {
@@ -29,8 +32,14 @@ interface ExpiringSession {
   };
 }
 
-export async function checkSessionExpiring(): Promise<void> {
+export async function checkSessionExpiring(): Promise<JobRunResult> {
   console.log('[checkSessionExpiring] Iniciando verificação de sessões expirando...');
+
+  let processedCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
+  let telegramsSent = 0;
+  let emailsSent = 0;
 
   try {
     // Data limite: 3 dias a partir de agora
@@ -77,8 +86,7 @@ export async function checkSessionExpiring(): Promise<void> {
     });
 
     console.log(`[checkSessionExpiring] Encontradas ${expiringSessions.length} sessões expirando, ${sessionsToNotify.length} a notificar`);
-
-    let notifiedCount = 0;
+    processedCount = sessionsToNotify.length;
 
     for (const session of sessionsToNotify) {
       try {
@@ -88,6 +96,8 @@ export async function checkSessionExpiring(): Promise<void> {
 
         const siteName = getSiteName(session.site);
         const urgency = daysLeft <= 1 ? 'URGENTE' : daysLeft <= 2 ? 'Atenção' : 'Aviso';
+
+        let sessionNotified = false;
 
         // Tentar notificar por Telegram
         const telegramChatId =
@@ -106,7 +116,8 @@ export async function checkSessionExpiring(): Promise<void> {
               `_Dica: Reconecte antes de expirar para evitar interrupções._`;
 
             await sendTelegramMessage({ chatId: telegramChatId, text: message, parseMode: 'Markdown' });
-            notifiedCount++;
+            telegramsSent++;
+            sessionNotified = true;
 
             console.log(
               `[checkSessionExpiring] Telegram enviado para user ${session.user.id} (${session.site})`
@@ -165,8 +176,9 @@ export async function checkSessionExpiring(): Promise<void> {
               `,
             });
 
-            if (!telegramChatId || !telegramEnabled) {
-              notifiedCount++; // Só conta se não notificou por Telegram
+            emailsSent++;
+            if (!sessionNotified) {
+              sessionNotified = true;
             }
 
             console.log(
@@ -178,6 +190,10 @@ export async function checkSessionExpiring(): Promise<void> {
               emailError
             );
           }
+        }
+
+        if (sessionNotified) {
+          successCount++;
         }
 
         // Atualizar metadata com data da última notificação para evitar spam
@@ -196,15 +212,40 @@ export async function checkSessionExpiring(): Promise<void> {
           `[checkSessionExpiring] Erro ao processar sessão ${session.id}:`,
           sessionError
         );
+        errorCount++;
       }
     }
 
     console.log(
-      `[checkSessionExpiring] Concluído. ${notifiedCount} notificações enviadas de ${sessionsToNotify.length} sessões`
+      `[checkSessionExpiring] Concluído. ${successCount} sessões notificadas de ${sessionsToNotify.length}`
     );
+
+    return {
+      processedCount,
+      successCount,
+      errorCount,
+      summary: `Sessões verificadas: ${processedCount}, Notificadas: ${successCount} (${telegramsSent} Telegram, ${emailsSent} Email), Erros: ${errorCount}`,
+      metadata: {
+        telegramsSent,
+        emailsSent,
+        totalExpiring: expiringSessions.length,
+      }
+    };
+
   } catch (error) {
     console.error('[checkSessionExpiring] Erro geral:', error);
-    throw error;
+
+    return {
+      processedCount,
+      successCount,
+      errorCount: errorCount + 1,
+      summary: `Erro ao verificar sessões: ${error instanceof Error ? error.message : String(error)}`,
+      metadata: {
+        telegramsSent,
+        emailsSent,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    };
   }
 }
 

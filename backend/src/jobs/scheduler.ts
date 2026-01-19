@@ -3,9 +3,10 @@ import { checkTrialExpiring } from './checkTrialExpiring';
 import { checkSubscriptionExpired } from './checkSubscriptionExpired';
 import { resetMonthlyQueries } from './resetMonthlyQueries';
 import { checkCouponAlerts } from './checkCouponAlerts';
-import { checkTrialUpgradeExpiring } from './checkTrialUpgradeExpiring'; // FASE: Cupons de Upgrade
-import { checkAbandonedCoupons } from './checkAbandonedCoupons'; // FASE: Notificações de Cupons Abandonados
-import { checkSessionExpiring } from './checkSessionExpiring'; // FASE: Sessões expirando
+import { checkTrialUpgradeExpiring } from './checkTrialUpgradeExpiring';
+import { checkAbandonedCoupons } from './checkAbandonedCoupons';
+import { checkSessionExpiring } from './checkSessionExpiring';
+import { withJobLogging, JobNames } from '../utils/jobLogger';
 
 /**
  * Scheduler de Jobs Automáticos
@@ -14,8 +15,12 @@ import { checkSessionExpiring } from './checkSessionExpiring'; // FASE: Sessões
  * - Verificação de trials expirando/expirados
  * - Verificação de assinaturas expiradas
  * - Notificações automáticas
+ * - Alertas de cupons
  *
  * IMPORTANTE: Este scheduler é iniciado automaticamente no server.ts
+ *
+ * NOVIDADE: Todos os jobs agora registram suas execuções na tabela JobRun
+ * para visualização no painel administrativo /admin/jobs
  */
 
 /**
@@ -33,13 +38,20 @@ export function startScheduler() {
   // - Expira trials que já passaram da data de expiração
   // - Envia email de trial expirado
   cron.schedule('0 9 * * *', async () => {
-    console.log('[SCHEDULER] ⏰ Executando checkTrialExpiring...');
-    try {
-      await checkTrialExpiring();
-      console.log('[SCHEDULER] ✅ checkTrialExpiring executado com sucesso');
-    } catch (error) {
-      console.error('[SCHEDULER] ❌ Erro ao executar checkTrialExpiring:', error);
-    }
+    await withJobLogging(
+      JobNames.CHECK_TRIAL_EXPIRING,
+      'SCHEDULER',
+      async () => {
+        const result = await checkTrialExpiring();
+        return {
+          processedCount: result.processedCount,
+          successCount: result.successCount,
+          errorCount: result.errorCount,
+          summary: result.summary,
+          metadata: result.metadata,
+        };
+      }
+    );
   }, {
     timezone: 'America/Sao_Paulo'
   });
@@ -52,13 +64,20 @@ export function startScheduler() {
   // - Atualiza status para EXPIRED
   // - Envia email de renovação
   cron.schedule('0 10 * * *', async () => {
-    console.log('[SCHEDULER] ⏰ Executando checkSubscriptionExpired...');
-    try {
-      await checkSubscriptionExpired();
-      console.log('[SCHEDULER] ✅ checkSubscriptionExpired executado com sucesso');
-    } catch (error) {
-      console.error('[SCHEDULER] ❌ Erro ao executar checkSubscriptionExpired:', error);
-    }
+    await withJobLogging(
+      JobNames.CHECK_SUBSCRIPTION_EXPIRED,
+      'SCHEDULER',
+      async () => {
+        const result = await checkSubscriptionExpired();
+        return {
+          processedCount: result.processedCount,
+          successCount: result.successCount,
+          errorCount: result.errorCount,
+          summary: result.summary,
+          metadata: result.metadata,
+        };
+      }
+    );
   }, {
     timezone: 'America/Sao_Paulo'
   });
@@ -70,13 +89,20 @@ export function startScheduler() {
   // - Reseta o contador queriesUsed para 0
   // - Apenas para assinaturas com status ACTIVE
   cron.schedule('0 3 1 * *', async () => {
-    console.log('[SCHEDULER] ⏰ Executando resetMonthlyQueries...');
-    try {
-      await resetMonthlyQueries();
-      console.log('[SCHEDULER] ✅ resetMonthlyQueries executado com sucesso');
-    } catch (error) {
-      console.error('[SCHEDULER] ❌ Erro ao executar resetMonthlyQueries:', error);
-    }
+    await withJobLogging(
+      JobNames.RESET_MONTHLY_QUERIES,
+      'SCHEDULER',
+      async () => {
+        const result = await resetMonthlyQueries();
+        return {
+          processedCount: result.processedCount,
+          successCount: result.successCount,
+          errorCount: result.errorCount,
+          summary: result.summary,
+          metadata: result.metadata,
+        };
+      }
+    );
   }, {
     timezone: 'America/Sao_Paulo'
   });
@@ -89,51 +115,76 @@ export function startScheduler() {
   // - Verifica cupons próximos do limite de usos (>80%)
   // - Cria alertas automáticos no painel admin
   cron.schedule('0 11 * * *', async () => {
-    console.log('[SCHEDULER] ⏰ Executando checkCouponAlerts...');
-    try {
-      await checkCouponAlerts();
-      console.log('[SCHEDULER] ✅ checkCouponAlerts executado com sucesso');
-    } catch (error) {
-      console.error('[SCHEDULER] ❌ Erro ao executar checkCouponAlerts:', error);
-    }
+    await withJobLogging(
+      JobNames.CHECK_COUPON_ALERTS,
+      'SCHEDULER',
+      async () => {
+        const result = await checkCouponAlerts();
+        return {
+          processedCount: result.totalAlerts,
+          successCount: result.expiringCount + result.nearLimitCount + result.popularCount,
+          errorCount: 0,
+          summary: `Verificados: ${result.expiringCount} expirando, ${result.nearLimitCount} próximos do limite, ${result.popularCount} populares`,
+          metadata: {
+            expiringCount: result.expiringCount,
+            nearLimitCount: result.nearLimitCount,
+            popularCount: result.popularCount,
+          },
+        };
+      }
+    );
   }, {
     timezone: 'America/Sao_Paulo'
   });
 
   // ============================================
-  // JOB 5: FASE - Verificar trial upgrades expirando
+  // JOB 5: Verificar trial upgrades expirando
   // ============================================
   // Executa diariamente às 12h
   // - Verifica subscriptions TRIAL criadas por cupons
   // - Notifica usuários que têm trial upgrade expirando em 1, 3 ou 7 dias
   // - Envia emails de lembrete para incentivar assinatura
   cron.schedule('0 12 * * *', async () => {
-    console.log('[SCHEDULER] ⏰ Executando checkTrialUpgradeExpiring...');
-    try {
-      await checkTrialUpgradeExpiring();
-      console.log('[SCHEDULER] ✅ checkTrialUpgradeExpiring executado com sucesso');
-    } catch (error) {
-      console.error('[SCHEDULER] ❌ Erro ao executar checkTrialUpgradeExpiring:', error);
-    }
+    await withJobLogging(
+      JobNames.CHECK_TRIAL_UPGRADE_EXPIRING,
+      'SCHEDULER',
+      async () => {
+        const result = await checkTrialUpgradeExpiring();
+        return {
+          processedCount: result.processedCount,
+          successCount: result.successCount,
+          errorCount: result.errorCount,
+          summary: result.summary,
+          metadata: result.metadata,
+        };
+      }
+    );
   }, {
     timezone: 'America/Sao_Paulo'
   });
 
   // ============================================
-  // JOB 6: FASE - Verificar cupons abandonados
+  // JOB 6: Verificar cupons abandonados
   // ============================================
   // Executa diariamente às 13h
   // - Verifica cupons DISCOUNT validados há 24h que não foram usados
   // - Envia email de lembrete com link para checkout
   // - Ajuda a recuperar vendas abandonadas
   cron.schedule('0 13 * * *', async () => {
-    console.log('[SCHEDULER] ⏰ Executando checkAbandonedCoupons...');
-    try {
-      await checkAbandonedCoupons();
-      console.log('[SCHEDULER] ✅ checkAbandonedCoupons executado com sucesso');
-    } catch (error) {
-      console.error('[SCHEDULER] ❌ Erro ao executar checkAbandonedCoupons:', error);
-    }
+    await withJobLogging(
+      JobNames.CHECK_ABANDONED_COUPONS,
+      'SCHEDULER',
+      async () => {
+        const result = await checkAbandonedCoupons();
+        return {
+          processedCount: result.processedCount,
+          successCount: result.successCount,
+          errorCount: result.errorCount,
+          summary: result.summary,
+          metadata: result.metadata,
+        };
+      }
+    );
   }, {
     timezone: 'America/Sao_Paulo'
   });
@@ -146,13 +197,20 @@ export function startScheduler() {
   // - Notifica usuários via Telegram e Email
   // - Evita interrupções no monitoramento
   cron.schedule('0 14 * * *', async () => {
-    console.log('[SCHEDULER] ⏰ Executando checkSessionExpiring...');
-    try {
-      await checkSessionExpiring();
-      console.log('[SCHEDULER] ✅ checkSessionExpiring executado com sucesso');
-    } catch (error) {
-      console.error('[SCHEDULER] ❌ Erro ao executar checkSessionExpiring:', error);
-    }
+    await withJobLogging(
+      JobNames.CHECK_SESSION_EXPIRING,
+      'SCHEDULER',
+      async () => {
+        const result = await checkSessionExpiring();
+        return {
+          processedCount: result.processedCount,
+          successCount: result.successCount,
+          errorCount: result.errorCount,
+          summary: result.summary,
+          metadata: result.metadata,
+        };
+      }
+    );
   }, {
     timezone: 'America/Sao_Paulo'
   });
@@ -165,6 +223,7 @@ export function startScheduler() {
   console.log('[SCHEDULER]    ⏰ checkTrialUpgradeExpiring - Diariamente às 12h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    🎫 checkAbandonedCoupons - Diariamente às 13h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    🔒 checkSessionExpiring - Diariamente às 14h (America/Sao_Paulo)');
+  console.log('[SCHEDULER]    📊 Todas as execuções serão registradas na tabela JobRun');
 }
 
 /**
@@ -184,52 +243,33 @@ export function stopScheduler() {
 export async function runJobsNow() {
   console.log('[SCHEDULER] 🔥 Executando todos os jobs AGORA (modo debug)...');
 
-  try {
-    console.log('[SCHEDULER] 1/3 Executando checkTrialExpiring...');
-    await checkTrialExpiring();
-    console.log('[SCHEDULER] ✅ checkTrialExpiring OK');
-  } catch (error) {
-    console.error('[SCHEDULER] ❌ Erro checkTrialExpiring:', error);
-  }
+  const jobs = [
+    { name: JobNames.CHECK_TRIAL_EXPIRING, fn: checkTrialExpiring },
+    { name: JobNames.CHECK_SUBSCRIPTION_EXPIRED, fn: checkSubscriptionExpired },
+    { name: JobNames.RESET_MONTHLY_QUERIES, fn: resetMonthlyQueries },
+    { name: JobNames.CHECK_COUPON_ALERTS, fn: checkCouponAlerts },
+    { name: JobNames.CHECK_TRIAL_UPGRADE_EXPIRING, fn: checkTrialUpgradeExpiring },
+    { name: JobNames.CHECK_ABANDONED_COUPONS, fn: checkAbandonedCoupons },
+    { name: JobNames.CHECK_SESSION_EXPIRING, fn: checkSessionExpiring },
+  ];
 
-  try {
-    console.log('[SCHEDULER] 2/3 Executando checkSubscriptionExpired...');
-    await checkSubscriptionExpired();
-    console.log('[SCHEDULER] ✅ checkSubscriptionExpired OK');
-  } catch (error) {
-    console.error('[SCHEDULER] ❌ Erro checkSubscriptionExpired:', error);
-  }
-
-  try {
-    console.log('[SCHEDULER] 3/4 Executando resetMonthlyQueries...');
-    await resetMonthlyQueries();
-    console.log('[SCHEDULER] ✅ resetMonthlyQueries OK');
-  } catch (error) {
-    console.error('[SCHEDULER] ❌ Erro resetMonthlyQueries:', error);
-  }
-
-  try {
-    console.log('[SCHEDULER] 4/5 Executando checkCouponAlerts...');
-    await checkCouponAlerts();
-    console.log('[SCHEDULER] ✅ checkCouponAlerts OK');
-  } catch (error) {
-    console.error('[SCHEDULER] ❌ Erro checkCouponAlerts:', error);
-  }
-
-  try {
-    console.log('[SCHEDULER] 5/6 Executando checkTrialUpgradeExpiring...');
-    await checkTrialUpgradeExpiring();
-    console.log('[SCHEDULER] ✅ checkTrialUpgradeExpiring OK');
-  } catch (error) {
-    console.error('[SCHEDULER] ❌ Erro checkTrialUpgradeExpiring:', error);
-  }
-
-  try {
-    console.log('[SCHEDULER] 6/6 Executando checkAbandonedCoupons...');
-    await checkAbandonedCoupons();
-    console.log('[SCHEDULER] ✅ checkAbandonedCoupons OK');
-  } catch (error) {
-    console.error('[SCHEDULER] ❌ Erro checkAbandonedCoupons:', error);
+  for (const job of jobs) {
+    try {
+      console.log(`[SCHEDULER] Executando ${job.name}...`);
+      await withJobLogging(job.name, 'MANUAL', async () => {
+        const result = await job.fn();
+        return {
+          processedCount: result.processedCount || 0,
+          successCount: result.successCount || 0,
+          errorCount: result.errorCount || 0,
+          summary: result.summary,
+          metadata: result.metadata,
+        };
+      });
+      console.log(`[SCHEDULER] ✅ ${job.name} OK`);
+    } catch (error) {
+      console.error(`[SCHEDULER] ❌ Erro ${job.name}:`, error);
+    }
   }
 
   console.log('[SCHEDULER] 🎉 Todos os jobs executados');

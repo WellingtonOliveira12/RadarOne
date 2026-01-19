@@ -3,6 +3,7 @@ import { sendAbandonedCouponEmail } from '../services/emailService';
 import { sendAbandonedCouponPush } from '../services/pushService';
 import { captureJobException } from '../monitoring/sentry';
 import { retryAsync } from '../utils/retry';
+import { JobRunResult } from './checkTrialExpiring';
 
 /**
  * Job: Verificar cupons validados mas não utilizados (abandono) - RETARGETING AVANÇADO
@@ -17,13 +18,21 @@ import { retryAsync } from '../utils/retry';
  * - 2º EMAIL: Busca cupons validados há 48h+ que receberam 1º email mas ainda não converteram
  * - Controle de envio via campos reminderSentAt e secondReminderSentAt
  * - Link direto para checkout com cupom pré-aplicado
+ *
+ * RETORNO: Agora retorna um objeto padronizado para logging
  */
 
 const HOURS_BEFORE_FIRST_REMINDER = 24; // 1º lembrete após 24h
 const HOURS_BEFORE_SECOND_REMINDER = 48; // 2º lembrete após 48h
 
-async function checkAbandonedCoupons() {
+async function checkAbandonedCoupons(): Promise<JobRunResult> {
   console.log('[JOB] 🎫 Verificando cupons abandonados (retargeting avançado)...');
+
+  let processedCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
+  let firstRemindersSent = 0;
+  let secondRemindersSent = 0;
 
   try {
     await retryAsync(async () => {
@@ -44,6 +53,7 @@ async function checkAbandonedCoupons() {
       });
 
       console.log(`[JOB] 📧 ${firstReminderCandidates.length} candidatos para 1º email (24h)`);
+      processedCount += firstReminderCandidates.length;
 
       for (const validation of firstReminderCandidates) {
         try {
@@ -110,8 +120,11 @@ async function checkAbandonedCoupons() {
           });
 
           console.log(`[JOB] ✅ 1º email enviado para ${recipientEmail} (cupom: ${coupon.code})`);
+          successCount++;
+          firstRemindersSent++;
         } catch (err) {
           console.error(`[JOB] ❌ Erro ao processar 1º email validação ${validation.id}:`, err);
+          errorCount++;
         }
       }
 
@@ -129,6 +142,7 @@ async function checkAbandonedCoupons() {
       });
 
       console.log(`[JOB] 📧 ${secondReminderCandidates.length} candidatos para 2º email (48h)`);
+      processedCount += secondReminderCandidates.length;
 
       for (const validation of secondReminderCandidates) {
         try {
@@ -195,8 +209,11 @@ async function checkAbandonedCoupons() {
           });
 
           console.log(`[JOB] ✅ 2º email enviado para ${recipientEmail} (cupom: ${coupon.code})`);
+          successCount++;
+          secondRemindersSent++;
         } catch (err) {
           console.error(`[JOB] ❌ Erro ao processar 2º email validação ${validation.id}:`, err);
+          errorCount++;
         }
       }
 
@@ -207,19 +224,42 @@ async function checkAbandonedCoupons() {
       factor: 2,
       jobName: 'checkAbandonedCoupons',
     });
+
+    return {
+      processedCount,
+      successCount,
+      errorCount,
+      summary: `Cupons abandonados: 1º lembrete=${firstRemindersSent}, 2º lembrete=${secondRemindersSent}, Erros=${errorCount}`,
+      metadata: {
+        firstRemindersSent,
+        secondRemindersSent,
+      }
+    };
+
   } catch (error) {
     console.error('[JOB] ❌ Erro ao verificar cupons abandonados:', error);
     captureJobException(error, { jobName: 'checkAbandonedCoupons' });
-    throw error;
+
+    return {
+      processedCount,
+      successCount,
+      errorCount: errorCount + 1,
+      summary: `Erro ao verificar cupons abandonados: ${error instanceof Error ? error.message : String(error)}`,
+      metadata: {
+        firstRemindersSent,
+        secondRemindersSent,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    };
   }
 }
 
 // Executar se chamado diretamente
 if (require.main === module) {
   checkAbandonedCoupons()
-    .then(() => {
-      console.log('[JOB] Job finalizado com sucesso');
-      process.exit(0);
+    .then((result) => {
+      console.log('[JOB] Job finalizado:', result);
+      process.exit(result.errorCount > 0 ? 1 : 0);
     })
     .catch((err) => {
       console.error('[JOB] Job falhou:', err);

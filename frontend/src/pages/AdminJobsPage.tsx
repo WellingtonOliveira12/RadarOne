@@ -20,6 +20,15 @@ import {
   Select,
   Button,
   Text,
+  SimpleGrid,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  Tooltip,
+  Code,
+  Collapse,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
 import { api } from '../services/api';
@@ -27,19 +36,33 @@ import { getToken } from '../lib/auth';
 
 /**
  * AdminJobsPage - Dashboard de monitoramento de execuções de jobs
- * Acessível apenas para usuários com role ADMIN
- * Migrado para usar AdminLayout consistente
+ * ATUALIZADO: Usa a nova tabela JobRun com histórico real de execuções
  */
 
 interface JobRun {
   id: string;
-  event: string;
-  createdAt: string;
-  status: string;
-  updatedCount?: number;
-  executedAt?: string;
-  error?: string | null;
-  processed: boolean;
+  jobName: string;
+  displayName: string;
+  status: 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'TIMEOUT';
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+  processedCount: number;
+  successCount: number;
+  errorCount: number;
+  summary: string | null;
+  errorMessage: string | null;
+  triggeredBy: string | null;
+  metadata: Record<string, any> | null;
+}
+
+interface JobStats {
+  last7Days: {
+    success: number;
+    partial: number;
+    failed: number;
+    running: number;
+  };
 }
 
 interface PaginationInfo {
@@ -51,11 +74,32 @@ interface PaginationInfo {
 
 interface JobsResponse {
   data: JobRun[];
+  stats: JobStats;
   pagination: PaginationInfo;
 }
 
+// Lista de jobs conhecidos para o filtro
+const JOB_NAMES = [
+  { value: 'checkTrialExpiring', label: 'Verificar Trials Expirando' },
+  { value: 'checkSubscriptionExpired', label: 'Verificar Assinaturas Expiradas' },
+  { value: 'resetMonthlyQueries', label: 'Reset Mensal de Queries' },
+  { value: 'checkCouponAlerts', label: 'Verificar Alertas de Cupons' },
+  { value: 'checkTrialUpgradeExpiring', label: 'Verificar Trial Upgrades' },
+  { value: 'checkAbandonedCoupons', label: 'Verificar Cupons Abandonados' },
+  { value: 'checkSessionExpiring', label: 'Verificar Sessões Expirando' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'SUCCESS', label: 'Sucesso', color: 'green' },
+  { value: 'PARTIAL', label: 'Parcial', color: 'orange' },
+  { value: 'FAILED', label: 'Falhou', color: 'red' },
+  { value: 'RUNNING', label: 'Executando', color: 'blue' },
+  { value: 'TIMEOUT', label: 'Timeout', color: 'purple' },
+];
+
 export const AdminJobsPage: React.FC = () => {
   const [jobs, setJobs] = useState<JobRun[]>([]);
+  const [stats, setStats] = useState<JobStats | null>(null);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
     pageSize: 20,
@@ -66,12 +110,12 @@ export const AdminJobsPage: React.FC = () => {
   const [error, setError] = useState('');
 
   // Filtros
-  const [selectedEvent, setSelectedEvent] = useState<string>('');
+  const [selectedJobName, setSelectedJobName] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
 
   useEffect(() => {
     loadJobs();
-  }, [pagination.page, selectedEvent, selectedStatus]);
+  }, [pagination.page, selectedJobName, selectedStatus]);
 
   const loadJobs = async () => {
     try {
@@ -83,8 +127,8 @@ export const AdminJobsPage: React.FC = () => {
         pageSize: pagination.pageSize.toString(),
       });
 
-      if (selectedEvent) {
-        queryParams.append('event', selectedEvent);
+      if (selectedJobName) {
+        queryParams.append('jobName', selectedJobName);
       }
 
       if (selectedStatus) {
@@ -97,6 +141,7 @@ export const AdminJobsPage: React.FC = () => {
       );
 
       setJobs(response.data);
+      setStats(response.stats);
       setPagination(response.pagination);
       setError('');
     } catch (err: any) {
@@ -115,13 +160,23 @@ export const AdminJobsPage: React.FC = () => {
     });
   };
 
-  const getEventLabel = (event: string) => {
-    const labels: Record<string, string> = {
-      MONTHLY_QUERIES_RESET: '🔄 Reset Mensal',
-      TRIAL_CHECK: '🎁 Verificação de Trial',
-      SUBSCRIPTION_CHECK: '💳 Verificação de Assinatura',
+  const formatDuration = (ms: number | null) => {
+    if (ms === null) return '-';
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 60000).toFixed(1)}min`;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = STATUS_OPTIONS.find((s) => s.value === status) || {
+      label: status,
+      color: 'gray',
     };
-    return labels[event] || event;
+    return (
+      <Badge colorScheme={statusConfig.color} fontSize="xs" px={2} py={1} borderRadius="md">
+        {statusConfig.label}
+      </Badge>
+    );
   };
 
   const handlePreviousPage = () => {
@@ -136,14 +191,14 @@ export const AdminJobsPage: React.FC = () => {
     }
   };
 
-  const handleEventFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedEvent(e.target.value);
-    setPagination((prev) => ({ ...prev, page: 1 })); // Reset para página 1
+  const handleJobNameFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedJobName(e.target.value);
+    setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   const handleStatusFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedStatus(e.target.value);
-    setPagination((prev) => ({ ...prev, page: 1 })); // Reset para página 1
+    setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   return (
@@ -166,24 +221,76 @@ export const AdminJobsPage: React.FC = () => {
           </Alert>
         )}
 
+        {/* Stats Cards */}
+        {stats && (
+          <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
+            <Card>
+              <CardBody>
+                <Stat>
+                  <StatLabel fontSize="sm" color="gray.600">
+                    Sucesso (7 dias)
+                  </StatLabel>
+                  <StatNumber color="green.600">{stats.last7Days.success}</StatNumber>
+                  <StatHelpText>Jobs bem-sucedidos</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+            <Card>
+              <CardBody>
+                <Stat>
+                  <StatLabel fontSize="sm" color="gray.600">
+                    Parcial (7 dias)
+                  </StatLabel>
+                  <StatNumber color="orange.600">{stats.last7Days.partial}</StatNumber>
+                  <StatHelpText>Jobs com alguns erros</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+            <Card>
+              <CardBody>
+                <Stat>
+                  <StatLabel fontSize="sm" color="gray.600">
+                    Falhou (7 dias)
+                  </StatLabel>
+                  <StatNumber color="red.600">{stats.last7Days.failed}</StatNumber>
+                  <StatHelpText>Jobs que falharam</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+            <Card>
+              <CardBody>
+                <Stat>
+                  <StatLabel fontSize="sm" color="gray.600">
+                    Em execucao
+                  </StatLabel>
+                  <StatNumber color="blue.600">{stats.last7Days.running}</StatNumber>
+                  <StatHelpText>Jobs executando agora</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+          </SimpleGrid>
+        )}
+
         {/* Filters */}
         <Card>
           <CardBody>
             <HStack spacing={4} flexWrap="wrap">
               <Box>
                 <Text fontSize="sm" fontWeight="semibold" mb={2}>
-                  Job / Evento:
+                  Job:
                 </Text>
                 <Select
-                  value={selectedEvent}
-                  onChange={handleEventFilterChange}
+                  value={selectedJobName}
+                  onChange={handleJobNameFilterChange}
                   size="sm"
-                  minW="200px"
+                  minW="250px"
                 >
-                  <option value="">Todos</option>
-                  <option value="MONTHLY_QUERIES_RESET">Reset Mensal</option>
-                  <option value="TRIAL_CHECK">Verificação de Trial</option>
-                  <option value="SUBSCRIPTION_CHECK">Verificação de Assinatura</option>
+                  <option value="">Todos os Jobs</option>
+                  {JOB_NAMES.map((job) => (
+                    <option key={job.value} value={job.value}>
+                      {job.label}
+                    </option>
+                  ))}
                 </Select>
               </Box>
 
@@ -198,9 +305,23 @@ export const AdminJobsPage: React.FC = () => {
                   minW="150px"
                 >
                   <option value="">Todos</option>
-                  <option value="SUCCESS">Sucesso</option>
-                  <option value="ERROR">Erro</option>
+                  {STATUS_OPTIONS.map((status) => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
                 </Select>
+              </Box>
+
+              <Box alignSelf="flex-end">
+                <Button
+                  onClick={() => loadJobs()}
+                  size="sm"
+                  colorScheme="blue"
+                  variant="outline"
+                >
+                  Atualizar
+                </Button>
               </Box>
             </HStack>
           </CardBody>
@@ -218,53 +339,25 @@ export const AdminJobsPage: React.FC = () => {
                 <Table variant="simple" size="sm">
                   <Thead>
                     <Tr>
-                      <Th>Job / Evento</Th>
+                      <Th>Job</Th>
                       <Th>Status</Th>
-                      <Th>Executado em</Th>
-                      <Th>Registros Atualizados</Th>
-                      <Th>Erro</Th>
+                      <Th>Inicio</Th>
+                      <Th>Duracao</Th>
+                      <Th>Processados</Th>
+                      <Th>Sucesso/Erro</Th>
+                      <Th>Resumo</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
                     {jobs.length === 0 ? (
                       <Tr>
-                        <Td colSpan={5} textAlign="center" py={8} color="gray.500">
-                          Nenhuma execução de job encontrada
+                        <Td colSpan={7} textAlign="center" py={8} color="gray.500">
+                          Nenhuma execucao de job encontrada. Os jobs serao registrados automaticamente a partir de agora.
                         </Td>
                       </Tr>
                     ) : (
                       jobs.map((job) => (
-                        <Tr key={job.id}>
-                          <Td>{getEventLabel(job.event)}</Td>
-                          <Td>
-                            <Badge
-                              colorScheme={job.status === 'SUCCESS' ? 'green' : 'red'}
-                              fontSize="xs"
-                              px={2}
-                              py={1}
-                              borderRadius="md"
-                            >
-                              {job.status}
-                            </Badge>
-                          </Td>
-                          <Td fontSize="sm">{formatDate(job.createdAt)}</Td>
-                          <Td>{job.updatedCount !== undefined ? job.updatedCount : '-'}</Td>
-                          <Td>
-                            {job.error ? (
-                              <Text
-                                fontSize="xs"
-                                color="red.600"
-                                title={job.error}
-                                noOfLines={1}
-                                maxW="200px"
-                              >
-                                {job.error}
-                              </Text>
-                            ) : (
-                              '-'
-                            )}
-                          </Td>
-                        </Tr>
+                        <JobRow key={job.id} job={job} formatDate={formatDate} formatDuration={formatDuration} getStatusBadge={getStatusBadge} />
                       ))
                     )}
                   </Tbody>
@@ -280,11 +373,11 @@ export const AdminJobsPage: React.FC = () => {
                       colorScheme="blue"
                       variant="outline"
                     >
-                      ← Anterior
+                      Anterior
                     </Button>
 
                     <Text fontSize="sm" color="gray.600">
-                      Página {pagination.page} de {pagination.totalPages} (Total:{' '}
+                      Pagina {pagination.page} de {pagination.totalPages} (Total:{' '}
                       {pagination.total})
                     </Text>
 
@@ -295,7 +388,7 @@ export const AdminJobsPage: React.FC = () => {
                       colorScheme="blue"
                       variant="outline"
                     >
-                      Próximo →
+                      Proximo
                     </Button>
                   </HStack>
                 )}
@@ -305,5 +398,93 @@ export const AdminJobsPage: React.FC = () => {
         </Card>
       </VStack>
     </AdminLayout>
+  );
+};
+
+// Componente separado para linha da tabela com detalhes expandíveis
+interface JobRowProps {
+  job: JobRun;
+  formatDate: (date: string) => string;
+  formatDuration: (ms: number | null) => string;
+  getStatusBadge: (status: string) => JSX.Element;
+}
+
+const JobRow: React.FC<JobRowProps> = ({ job, formatDate, formatDuration, getStatusBadge }) => {
+  const { isOpen, onToggle } = useDisclosure();
+
+  return (
+    <>
+      <Tr
+        _hover={{ bg: 'gray.50', cursor: 'pointer' }}
+        onClick={onToggle}
+      >
+        <Td>
+          <VStack align="start" spacing={0}>
+            <Text fontWeight="medium">{job.displayName}</Text>
+            <Text fontSize="xs" color="gray.500">
+              {job.triggeredBy === 'SCHEDULER' ? 'Automatico' : job.triggeredBy === 'MANUAL' ? 'Manual' : job.triggeredBy || '-'}
+            </Text>
+          </VStack>
+        </Td>
+        <Td>{getStatusBadge(job.status)}</Td>
+        <Td fontSize="sm">{formatDate(job.startedAt)}</Td>
+        <Td fontSize="sm">{formatDuration(job.durationMs)}</Td>
+        <Td>{job.processedCount}</Td>
+        <Td>
+          <HStack spacing={1}>
+            <Badge colorScheme="green" fontSize="xs">{job.successCount}</Badge>
+            <Text>/</Text>
+            <Badge colorScheme="red" fontSize="xs">{job.errorCount}</Badge>
+          </HStack>
+        </Td>
+        <Td>
+          <Tooltip label={job.summary || '-'} placement="top" hasArrow>
+            <Text fontSize="xs" noOfLines={1} maxW="200px">
+              {job.summary || '-'}
+            </Text>
+          </Tooltip>
+        </Td>
+      </Tr>
+      <Tr>
+        <Td colSpan={7} p={0}>
+          <Collapse in={isOpen} animateOpacity>
+            <Box p={4} bg="gray.50" borderTopWidth="1px">
+              <VStack align="stretch" spacing={2}>
+                {job.errorMessage && (
+                  <Box>
+                    <Text fontSize="sm" fontWeight="bold" color="red.600">
+                      Erro:
+                    </Text>
+                    <Code colorScheme="red" p={2} display="block" whiteSpace="pre-wrap" fontSize="xs">
+                      {job.errorMessage}
+                    </Code>
+                  </Box>
+                )}
+                {job.summary && (
+                  <Box>
+                    <Text fontSize="sm" fontWeight="bold">
+                      Resumo completo:
+                    </Text>
+                    <Text fontSize="sm" color="gray.700">
+                      {job.summary}
+                    </Text>
+                  </Box>
+                )}
+                {job.metadata && Object.keys(job.metadata).length > 0 && (
+                  <Box>
+                    <Text fontSize="sm" fontWeight="bold">
+                      Detalhes:
+                    </Text>
+                    <Code p={2} display="block" whiteSpace="pre" fontSize="xs" bg="white">
+                      {JSON.stringify(job.metadata, null, 2)}
+                    </Code>
+                  </Box>
+                )}
+              </VStack>
+            </Box>
+          </Collapse>
+        </Td>
+      </Tr>
+    </>
   );
 };
