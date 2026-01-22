@@ -158,5 +158,49 @@ Após ativar o backend, validar:
 ## PRÓXIMOS PASSOS
 
 1. **IMEDIATO**: Acessar Render Dashboard e verificar status do backend
-2. **CURTO PRAZO**: Adicionar timeout de 15s nas requisições
+2. **CURTO PRAZO**: Adicionar timeout de 15s nas requisições ✅ FEITO
 3. **MÉDIO PRAZO**: Configurar health check externo (UptimeRobot) para alertar quando backend cair
+
+---
+
+## CORREÇÃO ADICIONAL: Logout Indevido ao Acessar Monitores
+
+**Data:** 2026-01-22
+
+### Problema
+
+Após login bem-sucedido, ao clicar em "Monitores", usuário era deslogado com "Sua sessão expirou por inatividade".
+
+### Causa Raiz
+
+A MonitorsPage chama `/api/sessions` em paralelo com `/api/monitors`. Se o endpoint `/api/sessions` retornasse 401, o `api.ts` fazia logout automático **ANTES** de lançar o erro, ignorando o `try/catch` que deveria silenciar o erro.
+
+```
+1. fetchSessionStatus() chama api.get('/api/sessions')
+2. Backend retorna 401
+3. api.ts detecta 401 → chama logout() → limpa token → redireciona
+4. O catch nunca consegue "ignorar" o erro
+```
+
+### Solução
+
+Adicionada opção `skipAutoLogout` no `api.ts` para chamadas não-críticas:
+
+```typescript
+// api.ts
+export interface RequestOptions {
+  // ...
+  skipAutoLogout?: boolean; // Desabilita logout automático em 401
+}
+
+// MonitorsPage.tsx - fetchSessionStatus()
+const data = await api.request('/api/sessions', {
+  method: 'GET',
+  token,
+  skipAutoLogout: true, // Não fazer logout se falhar
+});
+```
+
+### Commit
+
+`877df42` - fix(frontend): evitar logout indevido ao navegar para Monitores
