@@ -12,6 +12,7 @@ export interface RequestOptions {
   body?: any;
   token?: string | null;
   timeout?: number; // Timeout em ms (default: 15000)
+  skipAutoLogout?: boolean; // Desabilita logout automático em 401 (para chamadas não-críticas)
 }
 
 // Timeout padrão de 15 segundos para evitar spinner infinito
@@ -155,14 +156,14 @@ async function apiRequest<T = any>(
     // 1. Tratar erros de subscription/trial (403) - NÃO DESLOGA
     handleSubscriptionError(errorCode, res.status);
 
-    // 2. Tratar erros de autenticação (401) - DESLOGA
+    // 2. Tratar erros de autenticação (401) - DESLOGA (a menos que skipAutoLogout=true)
     // REGRA DETERMINÍSTICA: 401 E (!errorCode OU errorCode === 'INVALID_TOKEN')
     // Garante que logout só ocorre em erros 401 válidos
     const isAuthError =
       res.status === 401 &&
       (!errorCode || errorCode === 'INVALID_TOKEN');
 
-    if (isAuthError) {
+    if (isAuthError && !options.skipAutoLogout) {
       // Logout automático usando função global centralizada
       logout('session_expired');
     }
@@ -192,6 +193,10 @@ export const api = {
     apiRequest<T>(path, { method: 'PATCH', body, token }),
   delete: <T = any>(path: string, token?: string | null) =>
     apiRequest<T>(path, { method: 'DELETE', token }),
+
+  // Método com opções completas (para casos especiais)
+  request: <T = any>(path: string, options: RequestOptions) =>
+    apiRequest<T>(path, options),
 };
 
 export { BASE_URL };

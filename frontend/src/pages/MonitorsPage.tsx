@@ -105,12 +105,17 @@ export function MonitorsPage() {
   }, []);
 
   // Busca status das sessões para sites que requerem login
+  // NOTA: Usa skipAutoLogout pois é chamada não-crítica e não deve deslogar o usuário
   async function fetchSessionStatus() {
     try {
       const token = getToken();
       if (!token) return;
 
-      const data = await api.get<{ sessions: Array<{ site: string; status: string }> }>('/api/sessions', token);
+      const data = await api.request<{ sessions: Array<{ site: string; status: string }> }>('/api/sessions', {
+        method: 'GET',
+        token,
+        skipAutoLogout: true, // Não fazer logout se falhar - essa é uma chamada auxiliar
+      });
       const statusMap: Record<string, { connected: boolean; status?: string }> = {};
 
       // Inicializa todos os sites que requerem login como não conectados
