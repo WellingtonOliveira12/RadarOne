@@ -87,7 +87,7 @@ export const ManualPage: React.FC = () => {
           <ol style={styles.list}>
             <li>
               Acesse{' '}
-              <Link to="/connections" style={styles.link}>
+              <Link to="/settings/connections" style={styles.link}>
                 Conexões
               </Link>
             </li>
@@ -224,7 +224,7 @@ export const ManualPage: React.FC = () => {
           <h2 style={styles.sectionTitle}>Links Úteis</h2>
           <ul style={styles.linkList}>
             <li>
-              <Link to="/connections" style={styles.link}>
+              <Link to="/settings/connections" style={styles.link}>
                 Conectar Conta (Mercado Livre, etc.)
               </Link>
             </li>

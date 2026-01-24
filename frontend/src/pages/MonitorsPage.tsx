@@ -296,10 +296,13 @@ export function MonitorsPage() {
         return;
       }
 
-      await api.post(`/api/monitors/${id}`, {}, token);
+      // Usar DELETE (não POST) para excluir monitor
+      await api.delete(`/api/monitors/${id}`, token);
       await fetchMonitors();
     } catch (err: any) {
-      setError(err.message || 'Erro ao excluir monitor');
+      // Mensagem de erro mais específica
+      const errorMessage = err.data?.message || err.message || 'Erro ao excluir monitor';
+      setError(errorMessage);
     }
   }
 
@@ -428,7 +431,7 @@ export function MonitorsPage() {
                       Sua sessão do {getSiteLabel(site)} precisa ser reconectada para o monitor funcionar.
                     </p>
                   </div>
-                  <Link to="/connections" style={styles.sessionButton}>
+                  <Link to="/settings/connections" style={styles.sessionButton}>
                     Reconectar agora
                   </Link>
                 </>
@@ -442,7 +445,7 @@ export function MonitorsPage() {
                       Conecte sua conta para que o monitor funcione corretamente.
                     </p>
                   </div>
-                  <Link to="/connections" style={styles.sessionButton}>
+                  <Link to="/settings/connections" style={styles.sessionButton}>
                     Conectar conta
                   </Link>
                 </>

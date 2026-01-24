@@ -31,11 +31,13 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loadingText, setLoadingText] = useState('Entrando...');
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setLoadingText('Entrando...');
 
     // Validações básicas
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -53,8 +55,14 @@ export function LoginPage() {
       return;
     }
 
+    // Timer para mostrar mensagem de cold start se demorar mais de 5s
+    const coldStartTimer = setTimeout(() => {
+      setLoadingText('Aguarde, servidor iniciando...');
+    }, 5000);
+
     try {
       await loginAuth(email, password);
+      clearTimeout(coldStartTimer);
       showSuccess('Login realizado com sucesso!');
       trackLogin('email');
 
@@ -67,6 +75,8 @@ export function LoginPage() {
         navigate('/dashboard', { replace: true });
       }
     } catch (err: any) {
+      clearTimeout(coldStartTimer);
+
       // Verificar se é erro de 2FA necessário
       if (err instanceof TwoFactorRequiredError) {
         showInfo('Verificação em duas etapas necessária');
@@ -81,11 +91,17 @@ export function LoginPage() {
         return;
       }
 
-      const errorMessage = err.message || 'Erro ao fazer login';
+      // Verificar se é erro de cold start para mensagem mais amigável
+      const isColdStartError = err.isColdStart || err.errorCode === 'NETWORK_TIMEOUT';
+      const errorMessage = isColdStartError
+        ? 'O servidor está iniciando. Por favor, tente novamente em alguns segundos.'
+        : (err.message || 'Erro ao fazer login');
+
       setError(errorMessage);
       showError(errorMessage);
     } finally {
       setLoading(false);
+      setLoadingText('Entrando...');
     }
   }
 
@@ -145,7 +161,7 @@ export function LoginPage() {
               size="lg"
               width="full"
               isLoading={loading}
-              loadingText="Entrando..."
+              loadingText={loadingText}
             >
               {AUTH_LABELS.LOGIN_CTA}
             </Button>

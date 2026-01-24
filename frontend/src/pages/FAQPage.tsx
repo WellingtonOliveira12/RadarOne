@@ -92,7 +92,7 @@ export const FAQPage: React.FC = () => {
           certos anúncios. A funcionalidade "Conectar Conta" permite que o RadarOne
           use uma sessão do seu navegador para acessar esses anúncios. Você exporta
           os cookies do seu navegador e faz upload no RadarOne.{' '}
-          <Link to="/connections" style={styles.link}>
+          <Link to="/settings/connections" style={styles.link}>
             Conectar agora
           </Link>
         </>
@@ -107,7 +107,7 @@ export const FAQPage: React.FC = () => {
           os cookies de sessão (como se você estivesse logado no navegador). Esses
           dados são criptografados com <strong>AES-256-GCM</strong> antes de serem
           salvos. Você pode revogar a conexão a qualquer momento em{' '}
-          <Link to="/connections" style={styles.link}>
+          <Link to="/settings/connections" style={styles.link}>
             Conexões
           </Link>
           .
@@ -134,7 +134,7 @@ export const FAQPage: React.FC = () => {
             </li>
             <li>Faça login no site (ex: Mercado Livre)</li>
             <li>Clique na extensão e exporte como JSON</li>
-            <li>Faça upload em <Link to="/connections" style={styles.link}>Conexões</Link></li>
+            <li>Faça upload em <Link to="/settings/connections" style={styles.link}>Conexões</Link></li>
           </ol>
         </>
       ),

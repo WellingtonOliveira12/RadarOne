@@ -11,12 +11,17 @@ export interface RequestOptions {
   method?: HttpMethod;
   body?: any;
   token?: string | null;
-  timeout?: number; // Timeout em ms (default: 15000)
+  timeout?: number; // Timeout em ms (default: 30000)
   skipAutoLogout?: boolean; // Desabilita logout automático em 401 (para chamadas não-críticas)
+  retries?: number; // Número de retries em caso de erro de rede/timeout (default: 0)
+  retryDelay?: number; // Delay inicial entre retries em ms (default: 1000)
 }
 
-// Timeout padrão de 15 segundos para evitar spinner infinito
-const DEFAULT_TIMEOUT = 15000;
+// Timeout padrão de 30 segundos (aumentado para cold start do Render)
+const DEFAULT_TIMEOUT = 30000;
+// Configuração de retry para cold start
+const DEFAULT_RETRIES = 0;
+const DEFAULT_RETRY_DELAY = 1000;
 
 /**
  * Estrutura padronizada de erro da API
@@ -60,11 +65,20 @@ function getErrorCode(data: any): string | undefined {
   return undefined;
 }
 
+/**
+ * Aguarda um tempo antes de continuar (para retry com backoff)
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function apiRequest<T = any>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
+  const maxRetries = options.retries ?? DEFAULT_RETRIES;
+  const baseDelay = options.retryDelay ?? DEFAULT_RETRY_DELAY;
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -78,39 +92,79 @@ async function apiRequest<T = any>(
 
   // Timeout configurável para evitar spinner infinito quando backend não responde
   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: options.method || 'GET',
-      headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-      signal: controller.signal,
-    });
-  } catch (fetchError: any) {
-    clearTimeout(timeoutId);
+  let lastError: any = null;
 
-    // Tratar erros de rede/timeout de forma amigável
-    if (fetchError.name === 'AbortError') {
-      const error: any = new Error('O servidor não respondeu. Tente novamente em alguns instantes.');
+  // Loop de tentativas (1 + retries)
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(url, {
+        method: options.method || 'GET',
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Se chegou aqui, a requisição foi bem sucedida (mas pode ter erro HTTP)
+      // Continua o processamento normal abaixo
+      return await processResponse<T>(res, options);
+
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      lastError = fetchError;
+
+      // Verificar se é erro de rede/timeout que pode ser retentado
+      const isRetryableError =
+        fetchError.name === 'AbortError' || // Timeout
+        fetchError.name === 'TypeError' ||  // Network error (fetch falhou)
+        fetchError.message?.includes('fetch'); // Outros erros de fetch
+
+      // Se ainda tem tentativas e é erro retentável
+      if (attempt < maxRetries && isRetryableError) {
+        // Backoff exponencial: 1s, 2s, 4s...
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`[API] Tentativa ${attempt + 1}/${maxRetries + 1} falhou, aguardando ${delay}ms...`);
+        await sleep(delay);
+        continue;
+      }
+
+      // Sem mais tentativas ou erro não retentável
+      if (fetchError.name === 'AbortError') {
+        const error: any = new Error(
+          maxRetries > 0
+            ? 'O servidor não respondeu após várias tentativas. O servidor pode estar iniciando, tente novamente em instantes.'
+            : 'O servidor não respondeu. Tente novamente em alguns instantes.'
+        );
+        error.status = 0;
+        error.errorCode = 'NETWORK_TIMEOUT';
+        error.isNetworkError = true;
+        error.isColdStart = true; // Flag para indicar possível cold start
+        throw error;
+      }
+
+      // Erro de rede genérico (sem internet, DNS, etc)
+      const error: any = new Error('Erro de conexão. Verifique sua internet e tente novamente.');
       error.status = 0;
-      error.errorCode = 'NETWORK_TIMEOUT';
+      error.errorCode = 'NETWORK_ERROR';
       error.isNetworkError = true;
+      error.originalError = fetchError;
       throw error;
     }
-
-    // Erro de rede genérico (sem internet, DNS, etc)
-    const error: any = new Error('Erro de conexão. Verifique sua internet e tente novamente.');
-    error.status = 0;
-    error.errorCode = 'NETWORK_ERROR';
-    error.isNetworkError = true;
-    error.originalError = fetchError;
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  // Nunca deveria chegar aqui, mas por segurança
+  throw lastError;
+}
+
+/**
+ * Processa a resposta HTTP e trata erros
+ */
+async function processResponse<T>(res: Response, options: RequestOptions): Promise<T> {
 
   const text = await res.text();
   let data: any;
@@ -182,6 +236,22 @@ async function apiRequest<T = any>(
   return data as T;
 }
 
+/**
+ * Faz request com retry automático para lidar com cold start do Render
+ * Use para operações críticas onde retry faz sentido (ex: login)
+ */
+async function apiRequestWithRetry<T = any>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  return apiRequest<T>(path, {
+    ...options,
+    retries: options.retries ?? 2, // 3 tentativas total
+    retryDelay: options.retryDelay ?? 1500, // 1.5s, 3s, 6s
+    timeout: options.timeout ?? 45000, // 45s timeout para cold start
+  });
+}
+
 export const api = {
   get: <T = any>(path: string, token?: string | null) =>
     apiRequest<T>(path, { method: 'GET', token }),
@@ -197,6 +267,10 @@ export const api = {
   // Método com opções completas (para casos especiais)
   request: <T = any>(path: string, options: RequestOptions) =>
     apiRequest<T>(path, options),
+
+  // Método com retry automático para cold start (login, operações críticas)
+  requestWithRetry: <T = any>(path: string, options: RequestOptions) =>
+    apiRequestWithRetry<T>(path, options),
 };
 
 export { BASE_URL };

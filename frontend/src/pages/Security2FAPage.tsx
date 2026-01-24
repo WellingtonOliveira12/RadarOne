@@ -149,8 +149,11 @@ export const Security2FAPage: React.FC = () => {
 
   const handleDisable2FA = async () => {
     try {
-      await api.post('/api/auth/2fa/disable', {
-        password: disablePassword,
+      // Usar skipAutoLogout para evitar logout automático em caso de senha incorreta (401)
+      await api.request('/api/auth/2fa/disable', {
+        method: 'POST',
+        body: { password: disablePassword },
+        skipAutoLogout: true, // CRÍTICO: não fazer logout se senha estiver errada
       });
 
       toast({
@@ -165,9 +168,15 @@ export const Security2FAPage: React.FC = () => {
       onDisableClose();
       await loadStatus();
     } catch (error: any) {
+      // Mostrar erro específico sem fazer logout
+      const errorMessage = error.response?.data?.error ||
+        error.data?.error ||
+        error.message ||
+        'Senha incorreta';
+
       toast({
         title: 'Erro',
-        description: error.response?.data?.error || 'Senha incorreta',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -177,8 +186,11 @@ export const Security2FAPage: React.FC = () => {
 
   const handleRegenerateBackupCodes = async () => {
     try {
-      const response = await api.post<{ backupCodes: string[] }>('/api/auth/2fa/backup-codes', {
-        password: backupPassword,
+      // Usar skipAutoLogout para evitar logout automático em caso de senha incorreta (401)
+      const response = await api.request<{ backupCodes: string[] }>('/api/auth/2fa/backup-codes', {
+        method: 'POST',
+        body: { password: backupPassword },
+        skipAutoLogout: true, // CRÍTICO: não fazer logout se senha estiver errada
       });
 
       setNewBackupCodes(response.backupCodes);
@@ -194,9 +206,15 @@ export const Security2FAPage: React.FC = () => {
 
       await loadStatus();
     } catch (error: any) {
+      // Mostrar erro específico sem fazer logout
+      const errorMessage = error.response?.data?.error ||
+        error.data?.error ||
+        error.message ||
+        'Senha incorreta';
+
       toast({
         title: 'Erro',
-        description: error.response?.data?.error || 'Senha incorreta',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,

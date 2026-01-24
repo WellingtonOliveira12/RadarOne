@@ -42,9 +42,11 @@ export function isTwoFactorRequired(response: LoginResponse): response is LoginT
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  const data = await api.post<LoginResponse>('/api/auth/login', {
-    email,
-    password,
+  // Usar requestWithRetry para lidar com cold start do Render
+  // 3 tentativas com backoff: 1.5s, 3s, 6s entre cada
+  const data = await api.requestWithRetry<LoginResponse>('/api/auth/login', {
+    method: 'POST',
+    body: { email, password },
   });
 
   return data;
