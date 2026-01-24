@@ -8,6 +8,10 @@ import { checkAbandonedCoupons } from './checkAbandonedCoupons';
 import { checkSessionExpiring } from './checkSessionExpiring';
 import { withJobLogging, JobNames } from '../utils/jobLogger';
 
+// Para warmup ping (evitar sleep do Render)
+import http from 'http';
+import https from 'https';
+
 /**
  * Scheduler de Jobs Automáticos
  *
@@ -16,6 +20,7 @@ import { withJobLogging, JobNames } from '../utils/jobLogger';
  * - Verificação de assinaturas expiradas
  * - Notificações automáticas
  * - Alertas de cupons
+ * - Warmup ping (evita sleep do Render)
  *
  * IMPORTANTE: Este scheduler é iniciado automaticamente no server.ts
  *
@@ -24,11 +29,72 @@ import { withJobLogging, JobNames } from '../utils/jobLogger';
  */
 
 /**
+ * Faz ping no próprio servidor para evitar sleep do Render
+ * Apenas em produção (BACKEND_URL configurado)
+ */
+async function warmupPing(): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+  const backendUrl = process.env.PUBLIC_URL || process.env.BACKEND_URL;
+
+  // Em desenvolvimento, não faz ping
+  if (!backendUrl || process.env.NODE_ENV !== 'production') {
+    return { success: true, latencyMs: 0 };
+  }
+
+  const healthUrl = `${backendUrl}/health`;
+  const startTime = Date.now();
+
+  return new Promise((resolve) => {
+    const client = healthUrl.startsWith('https') ? https : http;
+
+    const req = client.get(healthUrl, { timeout: 10000 }, (res) => {
+      const latencyMs = Date.now() - startTime;
+
+      if (res.statusCode === 200) {
+        console.log(`[WARMUP] ✅ Ping OK (${latencyMs}ms) - ${healthUrl}`);
+        resolve({ success: true, latencyMs });
+      } else {
+        console.warn(`[WARMUP] ⚠️ Ping retornou status ${res.statusCode} (${latencyMs}ms)`);
+        resolve({ success: false, latencyMs, error: `Status ${res.statusCode}` });
+      }
+
+      // Consumir resposta para liberar recursos
+      res.resume();
+    });
+
+    req.on('error', (err) => {
+      const latencyMs = Date.now() - startTime;
+      console.error(`[WARMUP] ❌ Ping falhou (${latencyMs}ms):`, err.message);
+      resolve({ success: false, latencyMs, error: err.message });
+    });
+
+    req.on('timeout', () => {
+      const latencyMs = Date.now() - startTime;
+      console.error(`[WARMUP] ⏰ Ping timeout (${latencyMs}ms)`);
+      req.destroy();
+      resolve({ success: false, latencyMs, error: 'Timeout' });
+    });
+  });
+}
+
+/**
  * Inicia o scheduler de jobs
  * Deve ser chamado uma única vez na inicialização do servidor
  */
 export function startScheduler() {
   console.log('[SCHEDULER] 🕐 Iniciando agendamento de jobs...');
+
+  // ============================================
+  // JOB 0: Warmup Ping (evita sleep do Render)
+  // ============================================
+  // Executa a cada 10 minutos para manter o servidor ativo
+  // Render free tier dorme após 15 min de inatividade
+  // Apenas em produção (quando PUBLIC_URL está configurado)
+  if (process.env.NODE_ENV === 'production') {
+    cron.schedule('*/10 * * * *', async () => {
+      await warmupPing();
+    });
+    console.log('[SCHEDULER]    🔥 warmupPing - A cada 10 minutos (evita sleep do Render)');
+  }
 
   // ============================================
   // JOB 1: Verificar trials expirando e expirados
@@ -207,6 +273,9 @@ export function startScheduler() {
   });
 
   console.log('[SCHEDULER] ✅ Jobs agendados:');
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[SCHEDULER]    🔥 warmupPing - A cada 10 minutos (evita sleep do Render)');
+  }
   console.log('[SCHEDULER]    📧 checkTrialExpiring - Diariamente às 9h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    💳 checkSubscriptionExpired - Diariamente às 10h (America/Sao_Paulo)');
   console.log('[SCHEDULER]    🔄 resetMonthlyQueries - Mensalmente no dia 1 às 3h (America/Sao_Paulo)');

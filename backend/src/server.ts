@@ -15,6 +15,50 @@ import { prisma } from './lib/prisma';
 // Re-exporta para compatibilidade com código existente
 export { prisma };
 
+// ============================================
+// MÉTRICAS DE COLD START
+// ============================================
+// Rastreia quando o servidor iniciou e se é o primeiro request
+const serverBootTime = Date.now();
+let firstRequestTime: number | null = null;
+let isFirstRequest = true;
+let requestCount = 0;
+
+/**
+ * Retorna métricas de cold start do servidor
+ */
+export function getColdStartMetrics() {
+  const now = Date.now();
+  const uptimeMs = now - serverBootTime;
+  const coldStartLatencyMs = firstRequestTime ? firstRequestTime - serverBootTime : null;
+
+  return {
+    serverBootTime: new Date(serverBootTime).toISOString(),
+    uptimeMs,
+    uptimeFormatted: formatUptime(uptimeMs),
+    firstRequestTime: firstRequestTime ? new Date(firstRequestTime).toISOString() : null,
+    coldStartLatencyMs,
+    coldStartLatencyFormatted: coldStartLatencyMs ? `${coldStartLatencyMs}ms` : null,
+    requestCount,
+    isCold: isFirstRequest,
+  };
+}
+
+/**
+ * Formata uptime em formato legível (ex: "2h 15m 30s")
+ */
+function formatUptime(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+  return `${seconds}s`;
+}
+
 // Importa rotas
 import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
@@ -104,6 +148,27 @@ app.use(apiRateLimiter);
 // Middleware de requestId e logging estruturado
 app.use(requestIdMiddleware);
 
+// Middleware para rastrear métricas de cold start
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  requestCount++;
+
+  // Registra o primeiro request após boot (cold start)
+  if (isFirstRequest) {
+    firstRequestTime = Date.now();
+    const coldStartLatency = firstRequestTime - serverBootTime;
+    isFirstRequest = false;
+
+    logInfo('First request after boot (cold start)', {
+      coldStartLatencyMs: coldStartLatency,
+      path: req.path,
+      method: req.method,
+      userAgent: req.get('user-agent'),
+    });
+  }
+
+  next();
+});
+
 // ============================================
 // ROTAS
 // ============================================
@@ -122,12 +187,23 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
-// Health check detalhado (JSON)
+// Health check detalhado (JSON) com métricas de cold start
 app.get('/health', (req: Request, res: Response) => {
+  const metrics = getColdStartMetrics();
+
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: 'RadarOne Backend'
+    service: 'RadarOne Backend',
+    uptime: metrics.uptimeFormatted,
+    uptimeMs: metrics.uptimeMs,
+    coldStart: {
+      bootTime: metrics.serverBootTime,
+      firstRequestTime: metrics.firstRequestTime,
+      latencyMs: metrics.coldStartLatencyMs,
+      isCold: metrics.isCold,
+    },
+    requestCount: metrics.requestCount,
   });
 });
 
