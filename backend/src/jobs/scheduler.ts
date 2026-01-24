@@ -1,16 +1,24 @@
 import cron from 'node-cron';
-import { checkTrialExpiring } from './checkTrialExpiring';
+import { checkTrialExpiring, JobRunResult } from './checkTrialExpiring';
 import { checkSubscriptionExpired } from './checkSubscriptionExpired';
 import { resetMonthlyQueries } from './resetMonthlyQueries';
 import { checkCouponAlerts } from './checkCouponAlerts';
 import { checkTrialUpgradeExpiring } from './checkTrialUpgradeExpiring';
 import { checkAbandonedCoupons } from './checkAbandonedCoupons';
 import { checkSessionExpiring } from './checkSessionExpiring';
-import { withJobLogging, JobNames } from '../utils/jobLogger';
+import { withJobLogging, JobNames, JobName } from '../utils/jobLogger';
 
 // Para warmup ping (evitar sleep do Render)
 import http from 'http';
 import https from 'https';
+
+/**
+ * Tipo para definição de job no scheduler
+ */
+interface JobDefinition {
+  name: JobName;
+  fn: () => Promise<JobRunResult>;
+}
 
 /**
  * Scheduler de Jobs Automáticos
@@ -303,7 +311,8 @@ export function stopScheduler() {
 export async function runJobsNow() {
   console.log('[SCHEDULER] 🔥 Executando todos os jobs AGORA (modo debug)...');
 
-  const jobs = [
+  // Tipagem explícita para evitar inferência de union type
+  const jobs: JobDefinition[] = [
     { name: JobNames.CHECK_TRIAL_EXPIRING, fn: checkTrialExpiring },
     { name: JobNames.CHECK_SUBSCRIPTION_EXPIRED, fn: checkSubscriptionExpired },
     { name: JobNames.RESET_MONTHLY_QUERIES, fn: resetMonthlyQueries },
@@ -319,9 +328,9 @@ export async function runJobsNow() {
       await withJobLogging(job.name, 'MANUAL', async () => {
         const result = await job.fn();
         return {
-          processedCount: result.processedCount || 0,
-          successCount: result.successCount || 0,
-          errorCount: result.errorCount || 0,
+          processedCount: result.processedCount,
+          successCount: result.successCount,
+          errorCount: result.errorCount,
           summary: result.summary,
           metadata: result.metadata,
         };

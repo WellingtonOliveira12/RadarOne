@@ -20,7 +20,8 @@ export function useSessionTimeout(
   onTimeout: () => void,
   timeoutMinutes: number = 30
 ) {
-  const timeoutIdRef = useRef<number | null>(null);
+  // Usar ReturnType para compatibilidade entre Node.js e navegador
+  const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutMs = timeoutMinutes * 60 * 1000; // Converter minutos para ms
 
   // Resetar timer de inatividade
