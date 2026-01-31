@@ -27,12 +27,14 @@ describe('api auto-logout behavior', () => {
   });
 
   function mockFetchResponse(status: number, body: any) {
-    (globalThis.fetch as any).mockResolvedValue({
-      ok: status >= 200 && status < 300,
-      status,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      text: () => Promise.resolve(JSON.stringify(body)),
-    });
+    (globalThis.fetch as any).mockImplementation(() =>
+      Promise.resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      })
+    );
   }
 
   function mockFetchNetworkError() {
@@ -178,6 +180,50 @@ describe('api auto-logout behavior', () => {
       expect(error.message).toContain('Não foi possível conectar ao servidor');
       expect(error.isColdStart).toBe(true);
     }
+  });
+
+  // =====================================================
+  // 2FA: INVALID_2FA_CODE should NOT cause logout
+  // =====================================================
+  it('should NOT call logout on 401 with INVALID_2FA_CODE', async () => {
+    mockFetchResponse(401, { errorCode: 'INVALID_2FA_CODE', message: 'Código inválido' });
+
+    let caught: any;
+    try {
+      await api.request('/api/auth/2fa/verify', { method: 'POST', body: { userId: 'x', code: '000000' }, skipAutoLogout: true });
+    } catch (err: any) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.message).toBe('Código inválido');
+    expect(caught.errorCode).toBe('INVALID_2FA_CODE');
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it('should NOT call logout on 401 with INVALID_2FA_CODE even without skipAutoLogout', async () => {
+    mockFetchResponse(401, { errorCode: 'INVALID_2FA_CODE', message: 'Código inválido' });
+
+    await expect(
+      api.request('/api/auth/2fa/verify', { method: 'POST', body: { userId: 'x', code: '000000' } })
+    ).rejects.toThrow('Código inválido');
+
+    // INVALID_2FA_CODE has errorCode set, and it's not INVALID_TOKEN, so no logout
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it('2FA verify error should contain errorCode and message from backend', async () => {
+    mockFetchResponse(401, { errorCode: 'INVALID_2FA_CODE', message: 'Código inválido' });
+
+    let caught: any;
+    try {
+      await api.request('/api/auth/2fa/verify', { method: 'POST', body: { userId: 'x', code: '000000' }, skipAutoLogout: true });
+    } catch (error: any) {
+      caught = error;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.errorCode).toBe('INVALID_2FA_CODE');
+    expect(caught.message).toBe('Código inválido');
+    expect(caught.status).toBe(401);
   });
 
   it('should NOT call logout on 403 TRIAL_EXPIRED', async () => {

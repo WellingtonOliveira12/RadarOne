@@ -186,6 +186,12 @@ async function apiRequest<T = any>(
       clearTimeout(timeoutId);
       lastError = fetchError;
 
+      // Se o erro veio de processResponse (tem status HTTP), propagar direto
+      // Não é erro de rede — é erro de aplicação (401, 400, 500, etc)
+      if (fetchError.status && fetchError.status > 0) {
+        throw fetchError;
+      }
+
       // Verificar se é erro de rede/timeout que pode ser retentado
       const isRetryableError =
         fetchError.name === 'AbortError' || // Timeout

@@ -79,11 +79,15 @@ export function TwoFactorVerifyPage() {
     setError('');
 
     try {
-      // Verificar código 2FA
-      const response = await api.post<VerifyResponse>(
+      // Verificar código 2FA (com retry para cold start + skipAutoLogout para não deslogar em erro)
+      const response = await api.requestWithRetry<VerifyResponse>(
         '/api/auth/2fa/verify',
-        { userId: state.userId, code },
-        state.tempToken // Usar token temporário
+        {
+          method: 'POST',
+          body: { userId: state.userId, code },
+          token: state.tempToken,
+          skipAutoLogout: true,
+        }
       );
 
       // Salvar token final
@@ -109,7 +113,11 @@ export function TwoFactorVerifyPage() {
         navigate(isAdmin ? '/admin/stats' : '/dashboard', { replace: true });
       }
     } catch (err: any) {
-      const errorMessage = err.message || 'Código inválido';
+      // Diferenciar erro de rede vs erro de validação
+      const isNetworkError = err.isNetworkError || err.errorCode === 'NETWORK_ERROR' || err.errorCode === 'NETWORK_TIMEOUT';
+      const errorMessage = isNetworkError
+        ? 'Servidor indisponível. Tente novamente em instantes.'
+        : (err.message || 'Código inválido');
       setError(errorMessage);
       showError(errorMessage);
     } finally {

@@ -826,7 +826,7 @@ export class AuthController {
       const { userId, code } = req.body;
 
       if (!userId || !code) {
-        res.status(400).json({ error: 'userId e code são obrigatórios' });
+        res.status(400).json({ errorCode: 'VALIDATION_ERROR', message: 'userId e code são obrigatórios' });
         return;
       }
 
@@ -851,7 +851,7 @@ export class AuthController {
       });
 
       if (!user) {
-        res.status(404).json({ error: 'Usuário não encontrado' });
+        res.status(404).json({ errorCode: 'USER_NOT_FOUND', message: 'Usuário não encontrado' });
         return;
       }
 
@@ -912,7 +912,7 @@ export class AuthController {
       }
     } catch (error) {
       logError('Failed to verify 2FA', { err: error, requestId: req.requestId });
-      res.status(500).json({ error: 'Erro ao verificar código 2FA' });
+      res.status(500).json({ errorCode: 'INTERNAL_ERROR', message: 'Erro ao verificar código 2FA' });
     }
   }
 
