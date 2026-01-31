@@ -368,7 +368,11 @@ export default function ConnectionsPage() {
   const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.get<SessionsResponse>('/api/sessions');
+      // NOTA: Usa skipAutoLogout pois é chamada não-crítica e não deve deslogar o usuário
+      const data = await api.request<SessionsResponse>('/api/sessions', {
+        method: 'GET',
+        skipAutoLogout: true,
+      });
       setSessions(data.sessions || []);
       setSupportedSites(data.supportedSites || []);
     } catch (error: any) {
@@ -404,8 +408,10 @@ export default function ConnectionsPage() {
         throw new Error(validation.error);
       }
 
-      await api.post(`/api/sessions/${siteId}/upload`, {
-        storageState: content,
+      await api.request(`/api/sessions/${siteId}/upload`, {
+        method: 'POST',
+        body: { storageState: content },
+        skipAutoLogout: true,
       });
 
       toast({
@@ -431,7 +437,10 @@ export default function ConnectionsPage() {
 
   const handleDelete = async (siteId: string) => {
     try {
-      await api.delete(`/api/sessions/${siteId}`);
+      await api.request(`/api/sessions/${siteId}`, {
+        method: 'DELETE',
+        skipAutoLogout: true,
+      });
       toast({
         title: 'Sessão removida',
         status: 'success',
