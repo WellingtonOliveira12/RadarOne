@@ -147,11 +147,16 @@ async function apiRequest<T = any>(
         throw error;
       }
 
-      // Erro de rede genérico (sem internet, DNS, etc)
-      const error: any = new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+      // Erro de rede genérico (sem internet, DNS, cold start do servidor, etc)
+      const error: any = new Error(
+        maxRetries > 0
+          ? 'Não foi possível conectar ao servidor após várias tentativas. O servidor pode estar iniciando, tente novamente em instantes.'
+          : 'Não foi possível conectar ao servidor. Tente novamente em alguns instantes.'
+      );
       error.status = 0;
       error.errorCode = 'NETWORK_ERROR';
       error.isNetworkError = true;
+      error.isColdStart = true;
       error.originalError = fetchError;
       throw error;
     }

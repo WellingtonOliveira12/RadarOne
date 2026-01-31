@@ -368,19 +368,38 @@ export default function ConnectionsPage() {
   const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
-      // NOTA: Usa skipAutoLogout pois é chamada não-crítica e não deve deslogar o usuário
-      const data = await api.request<SessionsResponse>('/api/sessions', {
+      // Usa requestWithRetry para lidar com cold start do Render (até 3 tentativas)
+      // skipAutoLogout: não deslogar em 401 (chamada não-crítica)
+      const data = await api.requestWithRetry<SessionsResponse>('/api/sessions', {
         method: 'GET',
         skipAutoLogout: true,
       });
       setSessions(data.sessions || []);
       setSupportedSites(data.supportedSites || []);
     } catch (error: any) {
+      // Diferenciar mensagens por tipo de erro
+      let description = 'Erro desconhecido. Tente novamente.';
+      let duration = 5000;
+
+      if (error.isNetworkError || error.isColdStart) {
+        description = 'Servidor temporariamente indisponível. Tente novamente em instantes.';
+        duration = 7000;
+      } else if (error.status === 401) {
+        description = 'Sessão expirada. Faça login novamente.';
+      } else if (error.status >= 500) {
+        description = 'Erro no servidor. Tente novamente.';
+      } else if (error.status === 404) {
+        description = 'Serviço não encontrado. Contate o suporte.';
+      } else if (error.message) {
+        description = error.message;
+      }
+
       toast({
         title: 'Erro ao carregar conexões',
-        description: error.message,
+        description,
         status: 'error',
-        duration: 5000,
+        duration,
+        isClosable: true,
       });
     } finally {
       setLoading(false);
@@ -408,7 +427,7 @@ export default function ConnectionsPage() {
         throw new Error(validation.error);
       }
 
-      await api.request(`/api/sessions/${siteId}/upload`, {
+      await api.requestWithRetry(`/api/sessions/${siteId}/upload`, {
         method: 'POST',
         body: { storageState: content },
         skipAutoLogout: true,

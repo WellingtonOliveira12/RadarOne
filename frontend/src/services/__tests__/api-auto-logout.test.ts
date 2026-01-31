@@ -126,6 +126,60 @@ describe('api auto-logout behavior', () => {
   // =====================================================
   // 403 subscription errors should NOT cause logout
   // =====================================================
+  // =====================================================
+  // requestWithRetry should retry on network errors
+  // =====================================================
+  it('requestWithRetry should retry on network error and succeed', async () => {
+    // First call fails, second succeeds
+    (globalThis.fetch as any)
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify({ success: true })),
+      });
+
+    const result = await api.requestWithRetry('/api/sessions', {
+      method: 'GET',
+      skipAutoLogout: true,
+      retries: 1,
+      retryDelay: 10, // fast for tests
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it('requestWithRetry should throw after exhausting retries', async () => {
+    mockFetchNetworkError();
+
+    await expect(
+      api.requestWithRetry('/api/sessions', {
+        method: 'GET',
+        skipAutoLogout: true,
+        retries: 1,
+        retryDelay: 10,
+      })
+    ).rejects.toThrow('Não foi possível conectar ao servidor');
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2); // 1 + 1 retry
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it('network error message should NOT mention "verifique sua internet"', async () => {
+    mockFetchNetworkError();
+
+    try {
+      await api.request('/api/test', { method: 'GET' });
+    } catch (error: any) {
+      expect(error.message).not.toContain('Verifique sua internet');
+      expect(error.message).toContain('Não foi possível conectar ao servidor');
+      expect(error.isColdStart).toBe(true);
+    }
+  });
+
   it('should NOT call logout on 403 TRIAL_EXPIRED', async () => {
     // Mock window.location for redirect check
     Object.defineProperty(window, 'location', {
