@@ -356,18 +356,32 @@ function SiteCard({
   );
 }
 
+// Fallback de sites suportados para garantir que a UI nunca fique vazia
+const FALLBACK_SUPPORTED_SITES: SupportedSite[] = [
+  {
+    id: 'MERCADO_LIVRE',
+    name: 'Mercado Livre',
+    domains: ['mercadolivre.com.br', 'mercadolibre.com'],
+  },
+];
+
 // Componente Principal
 export default function ConnectionsPage() {
   const [sessions, setSessions] = useState<SiteSession[]>([]);
   const [supportedSites, setSupportedSites] = useState<SupportedSite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [uploadingSite, setUploadingSite] = useState<string | null>(null);
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
+  // Sites efetivos: usa API se disponível, senão fallback
+  const effectiveSites = supportedSites.length > 0 ? supportedSites : FALLBACK_SUPPORTED_SITES;
+
   const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       // Usa requestWithRetry para lidar com cold start do Render (até 3 tentativas)
       // skipAutoLogout: não deslogar em 401 (chamada não-crítica)
       const data = await api.requestWithRetry<SessionsResponse>('/api/sessions', {
@@ -379,11 +393,9 @@ export default function ConnectionsPage() {
     } catch (error: any) {
       // Diferenciar mensagens por tipo de erro
       let description = 'Erro desconhecido. Tente novamente.';
-      let duration = 5000;
 
       if (error.isNetworkError || error.isColdStart) {
         description = 'Servidor temporariamente indisponível. Tente novamente em instantes.';
-        duration = 7000;
       } else if (error.status === 401) {
         description = 'Sessão expirada. Faça login novamente.';
       } else if (error.status >= 500) {
@@ -394,17 +406,11 @@ export default function ConnectionsPage() {
         description = error.message;
       }
 
-      toast({
-        title: 'Erro ao carregar conexões',
-        description,
-        status: 'error',
-        duration,
-        isClosable: true,
-      });
+      setFetchError(description);
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     fetchSessions();
@@ -534,9 +540,23 @@ export default function ConnectionsPage() {
           </Alert>
         )}
 
+        {/* Erro persistente ao carregar */}
+        {fetchError && (
+          <Alert status="error" borderRadius="md">
+            <AlertIcon />
+            <Box flex="1">
+              <AlertTitle>Erro ao carregar conexões</AlertTitle>
+              <AlertDescription>{fetchError}</AlertDescription>
+            </Box>
+            <Button size="sm" colorScheme="red" variant="outline" onClick={fetchSessions} ml={2}>
+              Tentar novamente
+            </Button>
+          </Alert>
+        )}
+
         {/* Cards de Sites */}
         <VStack spacing={4} align="stretch">
-          {supportedSites
+          {effectiveSites
             .filter((site) => ['MERCADO_LIVRE'].includes(site.id)) // Apenas ML por enquanto
             .map((site) => (
               <SiteCard
