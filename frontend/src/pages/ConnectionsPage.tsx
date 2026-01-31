@@ -55,7 +55,10 @@ import {
   Copy,
   Check,
   FileUp,
+  ArrowLeft,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AppLayout } from '../components/AppLayout';
 import { api } from '../services/api';
 
 // ============================================================
@@ -821,6 +824,7 @@ const FALLBACK_SUPPORTED_SITES: SupportedSite[] = [
 ];
 
 export default function ConnectionsPage() {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<SiteSession[]>([]);
   const [supportedSites, setSupportedSites] = useState<SupportedSite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -897,15 +901,29 @@ export default function ConnectionsPage() {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minH="50vh">
-        <Spinner size="xl" />
-      </Box>
+      <AppLayout>
+        <Box display="flex" justifyContent="center" alignItems="center" minH="50vh">
+          <Spinner size="xl" />
+        </Box>
+      </AppLayout>
     );
   }
 
   return (
+    <AppLayout>
     <Box maxW="800px" mx="auto" py={8} px={4}>
       <VStack spacing={6} align="stretch">
+        {/* Back to monitors */}
+        <Button
+          leftIcon={<ArrowLeft size={16} />}
+          variant="ghost"
+          size="sm"
+          alignSelf="flex-start"
+          onClick={() => navigate('/monitors')}
+        >
+          Voltar para Monitores
+        </Button>
+
         {/* Header */}
         <HStack justify="space-between">
           <VStack align="start" spacing={1}>
@@ -1049,5 +1067,6 @@ export default function ConnectionsPage() {
         />
       )}
     </Box>
+    </AppLayout>
   );
 }
