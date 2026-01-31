@@ -18,13 +18,8 @@ import {
 // TIPOS
 // ============================================================
 
-interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-  };
-}
+// Auth middleware sets req.userId (not req.user.id)
+// Use standard Express Request which already has userId via global declaration
 
 // ============================================================
 // ENDPOINTS
@@ -34,11 +29,11 @@ interface AuthRequest extends Request {
  * GET /api/sessions
  * Lista todas as sessões do usuário
  */
-export async function listSessions(req: AuthRequest, res: Response) {
+export async function listSessions(req: Request, res: Response) {
   try {
-    const userId = req.user?.id;
+    const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ error: 'Não autenticado' });
+      return res.status(401).json({ errorCode: 'INVALID_TOKEN', message: 'Não autenticado' });
     }
 
     const sessions = await sessionService.getAll(userId);
@@ -78,11 +73,11 @@ export async function listSessions(req: AuthRequest, res: Response) {
  * GET /api/sessions/:site/status
  * Obtém status de uma sessão específica
  */
-export async function getSessionStatus(req: AuthRequest, res: Response) {
+export async function getSessionStatus(req: Request, res: Response) {
   try {
-    const userId = req.user?.id;
+    const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ error: 'Não autenticado' });
+      return res.status(401).json({ errorCode: 'INVALID_TOKEN', message: 'Não autenticado' });
     }
 
     const { site } = req.params;
@@ -131,11 +126,11 @@ export async function getSessionStatus(req: AuthRequest, res: Response) {
  * POST /api/sessions/:site/upload
  * Upload de storageState.json
  */
-export async function uploadSession(req: AuthRequest, res: Response) {
+export async function uploadSession(req: Request, res: Response) {
   try {
-    const userId = req.user?.id;
+    const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ error: 'Não autenticado' });
+      return res.status(401).json({ errorCode: 'INVALID_TOKEN', message: 'Não autenticado' });
     }
 
     const { site } = req.params;
@@ -209,11 +204,11 @@ export async function uploadSession(req: AuthRequest, res: Response) {
  * DELETE /api/sessions/:site
  * Remove uma sessão
  */
-export async function deleteSession(req: AuthRequest, res: Response) {
+export async function deleteSession(req: Request, res: Response) {
   try {
-    const userId = req.user?.id;
+    const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ error: 'Não autenticado' });
+      return res.status(401).json({ errorCode: 'INVALID_TOKEN', message: 'Não autenticado' });
     }
 
     const { site } = req.params;
@@ -246,11 +241,11 @@ export async function deleteSession(req: AuthRequest, res: Response) {
  * POST /api/sessions/:site/validate
  * Valida manualmente uma sessão (marca como ACTIVE se estava NEEDS_REAUTH)
  */
-export async function validateSession(req: AuthRequest, res: Response) {
+export async function validateSession(req: Request, res: Response) {
   try {
-    const userId = req.user?.id;
+    const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ error: 'Não autenticado' });
+      return res.status(401).json({ errorCode: 'INVALID_TOKEN', message: 'Não autenticado' });
     }
 
     const { site } = req.params;

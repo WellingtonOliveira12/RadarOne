@@ -278,6 +278,7 @@ function ConnectionWizard({
   const [uploadError, setUploadError] = useState<{
     message: string;
     details?: string;
+    isAuthError?: boolean;
   } | null>(null);
 
   // Reset state when modal opens/closes
@@ -370,8 +371,10 @@ function ConnectionWizard({
         message = 'O servidor não respondeu. Ele pode estar iniciando (isso leva até 60 segundos no primeiro acesso do dia).';
         details = `Código: ${error.errorCode || 'NETWORK_ERROR'} | Tentativas: 3`;
       } else if (error.status === 401) {
-        message = 'Sua sessão de login expirou. Faça login novamente no RadarOne e tente de novo.';
+        message = 'Sua sessão do RadarOne expirou. Faça login novamente.';
         details = `HTTP 401 — ${error.errorCode || 'INVALID_TOKEN'}`;
+        setUploadError({ message, details, isAuthError: true });
+        return;
       } else if (error.status === 400) {
         message = error.message || 'O servidor rejeitou o arquivo. Verifique se é um arquivo de sessão válido.';
         details = `HTTP 400 — ${error.errorCode || 'VALIDATION_ERROR'}`;
@@ -597,17 +600,27 @@ function ConnectionWizard({
               </Alert>
             )}
 
-            {/* Upload error (inline, with retry) */}
+            {/* Upload error (inline, with retry or re-login) */}
             {uploadError && (
-              <Alert status="error" borderRadius="md" data-testid="upload-error">
+              <Alert status={uploadError.isAuthError ? 'warning' : 'error'} borderRadius="md" data-testid="upload-error">
                 <AlertIcon />
                 <Box fontSize="sm" flex="1">
-                  <AlertTitle>Erro ao conectar conta</AlertTitle>
+                  <AlertTitle>{uploadError.isAuthError ? 'Sessão expirada' : 'Erro ao conectar conta'}</AlertTitle>
                   <AlertDescription>{uploadError.message}</AlertDescription>
                   {uploadError.details && (
                     <Text fontSize="xs" color="gray.500" mt={1}>
                       Detalhes técnicos: {uploadError.details}
                     </Text>
+                  )}
+                  {uploadError.isAuthError && (
+                    <Button
+                      size="sm"
+                      colorScheme="orange"
+                      mt={2}
+                      onClick={() => { window.location.href = '/login?reason=session_expired'; }}
+                    >
+                      Fazer login
+                    </Button>
                   )}
                 </Box>
               </Alert>
@@ -812,6 +825,7 @@ export default function ConnectionsPage() {
   const [supportedSites, setSupportedSites] = useState<SupportedSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
   const toast = useToast();
 
   // Wizard modal state
@@ -824,6 +838,7 @@ export default function ConnectionsPage() {
     try {
       setLoading(true);
       setFetchError(null);
+      setIsSessionExpired(false);
       const data = await api.requestWithRetry<SessionsResponse>('/api/sessions', {
         method: 'GET',
         skipAutoLogout: true,
@@ -835,7 +850,8 @@ export default function ConnectionsPage() {
       if (error.isNetworkError || error.isColdStart) {
         description = 'Servidor temporariamente indisponível. Tente novamente em instantes.';
       } else if (error.status === 401) {
-        description = 'Sessão expirada. Faça login novamente.';
+        description = 'Sua sessão do RadarOne expirou. Faça login novamente.';
+        setIsSessionExpired(true);
       } else if (error.status >= 500) {
         description = 'Erro no servidor. Tente novamente.';
       } else if (error.status === 404) {
@@ -923,15 +939,26 @@ export default function ConnectionsPage() {
         )}
 
         {fetchError && (
-          <Alert status="error" borderRadius="md">
+          <Alert status={isSessionExpired ? 'warning' : 'error'} borderRadius="md">
             <AlertIcon />
             <Box flex="1">
-              <AlertTitle>Erro ao carregar conexões</AlertTitle>
+              <AlertTitle>{isSessionExpired ? 'Sessão expirada' : 'Erro ao carregar conexões'}</AlertTitle>
               <AlertDescription>{fetchError}</AlertDescription>
             </Box>
-            <Button size="sm" colorScheme="red" variant="outline" onClick={fetchSessions} ml={2}>
-              Tentar novamente
-            </Button>
+            {isSessionExpired ? (
+              <Button
+                size="sm"
+                colorScheme="orange"
+                onClick={() => { window.location.href = '/login?reason=session_expired'; }}
+                ml={2}
+              >
+                Fazer login
+              </Button>
+            ) : (
+              <Button size="sm" colorScheme="red" variant="outline" onClick={fetchSessions} ml={2}>
+                Tentar novamente
+              </Button>
+            )}
           </Alert>
         )}
 

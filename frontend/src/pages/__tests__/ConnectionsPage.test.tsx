@@ -156,6 +156,21 @@ describe('ConnectionsPage', () => {
     expect(screen.getByTestId('submit-upload-btn')).toBeDisabled();
   });
 
+  it('mostra alerta de sessão expirada com botão de login quando API retorna 401', async () => {
+    const error401: any = new Error('Não autenticado');
+    error401.status = 401;
+    error401.errorCode = 'INVALID_TOKEN';
+    (api.requestWithRetry as any).mockRejectedValue(error401);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Sessão expirada')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/sessão do RadarOne expirou/i)).toBeInTheDocument();
+    expect(screen.getByText('Fazer login')).toBeInTheDocument();
+  });
+
   it('não tem link hardcoded para Chrome Web Store', async () => {
     mockSessionsSuccess();
     renderPage();
