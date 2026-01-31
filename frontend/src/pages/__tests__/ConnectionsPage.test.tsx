@@ -122,6 +122,40 @@ describe('ConnectionsPage', () => {
     expect(screen.getByText(/Arraste o arquivo .json/)).toBeInTheDocument();
   });
 
+  it('wizard mostra aviso de servidor quando fetchError existe', async () => {
+    (api.requestWithRetry as any).mockRejectedValue(new Error('Network error'));
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Mercado Livre')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Conectar conta'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('server-warning')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Servidor iniciando')).toBeInTheDocument();
+  });
+
+  it('wizard submit button is disabled without file', async () => {
+    mockSessionsSuccess();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Mercado Livre')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Conectar conta'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('submit-upload-btn')).toBeInTheDocument();
+    });
+
+    // Button should be disabled without a file
+    expect(screen.getByTestId('submit-upload-btn')).toBeDisabled();
+  });
+
   it('não tem link hardcoded para Chrome Web Store', async () => {
     mockSessionsSuccess();
     renderPage();

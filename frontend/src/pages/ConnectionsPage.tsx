@@ -251,12 +251,14 @@ function ConnectionWizard({
   siteName,
   siteId,
   onUploadSuccess,
+  serverUnavailable,
 }: {
   isOpen: boolean;
   onClose: () => void;
   siteName: string;
   siteId: string;
   onUploadSuccess: () => void;
+  serverUnavailable: boolean;
 }) {
   const { onCopy, hasCopied } = useClipboard(PLAYWRIGHT_COMMAND);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -271,7 +273,12 @@ function ConnectionWizard({
     normalized?: string;
   } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState<{
+    message: string;
+    details?: string;
+  } | null>(null);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -279,11 +286,14 @@ function ConnectionWizard({
       setSelectedFile(null);
       setValidationResult(null);
       setIsUploading(false);
+      setUploadStatus('');
       setIsDragging(false);
+      setUploadError(null);
     }
   }, [isOpen]);
 
   const processFile = async (file: File) => {
+    setUploadError(null);
     if (file.size > 5 * 1024 * 1024) {
       setValidationResult({ valid: false, error: 'Arquivo muito grande (max 5 MB).' });
       setSelectedFile(file);
@@ -322,13 +332,27 @@ function ConnectionWizard({
 
   const handleSubmit = async () => {
     if (!validationResult?.valid || !validationResult.normalized) return;
+    setUploadError(null);
+
     try {
       setIsUploading(true);
+
+      // Step 1: Wake server with health ping (fast, no auth needed)
+      setUploadStatus('Verificando servidor...');
+      try {
+        await api.request('/health', { method: 'GET', timeout: 15000, skipAutoLogout: true });
+      } catch {
+        // Server didn't respond to health — try anyway, requestWithRetry will handle it
+      }
+
+      // Step 2: Upload
+      setUploadStatus('Enviando arquivo de sessão...');
       await api.requestWithRetry(`/api/sessions/${siteId}/upload`, {
         method: 'POST',
         body: { storageState: validationResult.normalized },
         skipAutoLogout: true,
       });
+
       toast({
         title: 'Conta conectada!',
         description: `Sessão salva com ${validationResult.cookiesCount} cookies. Seus monitores agora funcionarão automaticamente.`,
@@ -338,15 +362,31 @@ function ConnectionWizard({
       onUploadSuccess();
       onClose();
     } catch (error: any) {
-      toast({
-        title: 'Erro ao conectar conta',
-        description: error.message || 'Verifique se o arquivo é válido e tente novamente.',
-        status: 'error',
-        duration: 7000,
-        isClosable: true,
-      });
+      // Differentiate error types for user
+      let message: string;
+      let details: string | undefined;
+
+      if (error.isNetworkError || error.errorCode === 'NETWORK_ERROR' || error.errorCode === 'NETWORK_TIMEOUT') {
+        message = 'O servidor não respondeu. Ele pode estar iniciando (isso leva até 60 segundos no primeiro acesso do dia).';
+        details = `Código: ${error.errorCode || 'NETWORK_ERROR'} | Tentativas: 3`;
+      } else if (error.status === 401) {
+        message = 'Sua sessão de login expirou. Faça login novamente no RadarOne e tente de novo.';
+        details = `HTTP 401 — ${error.errorCode || 'INVALID_TOKEN'}`;
+      } else if (error.status === 400) {
+        message = error.message || 'O servidor rejeitou o arquivo. Verifique se é um arquivo de sessão válido.';
+        details = `HTTP 400 — ${error.errorCode || 'VALIDATION_ERROR'}`;
+      } else if (error.status >= 500) {
+        message = 'Erro interno no servidor. Tente novamente em instantes.';
+        details = `HTTP ${error.status} — ${error.errorCode || 'SERVER_ERROR'}`;
+      } else {
+        message = error.message || 'Erro desconhecido. Tente novamente.';
+        details = error.status ? `HTTP ${error.status}` : undefined;
+      }
+
+      setUploadError({ message, details });
     } finally {
       setIsUploading(false);
+      setUploadStatus('');
     }
   };
 
@@ -543,6 +583,35 @@ function ConnectionWizard({
                 </Box>
               </Alert>
             )}
+
+            {/* Server unavailable warning */}
+            {serverUnavailable && !uploadError && (
+              <Alert status="warning" borderRadius="md" data-testid="server-warning">
+                <AlertIcon />
+                <Box fontSize="sm">
+                  <AlertTitle>Servidor iniciando</AlertTitle>
+                  <AlertDescription>
+                    O servidor pode estar em processo de inicialização. O envio pode demorar até 60 segundos.
+                  </AlertDescription>
+                </Box>
+              </Alert>
+            )}
+
+            {/* Upload error (inline, with retry) */}
+            {uploadError && (
+              <Alert status="error" borderRadius="md" data-testid="upload-error">
+                <AlertIcon />
+                <Box fontSize="sm" flex="1">
+                  <AlertTitle>Erro ao conectar conta</AlertTitle>
+                  <AlertDescription>{uploadError.message}</AlertDescription>
+                  {uploadError.details && (
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      Detalhes técnicos: {uploadError.details}
+                    </Text>
+                  )}
+                </Box>
+              </Alert>
+            )}
           </VStack>
         </ModalBody>
         <ModalFooter>
@@ -551,14 +620,15 @@ function ConnectionWizard({
               Cancelar
             </Button>
             <Button
-              colorScheme="blue"
+              colorScheme={uploadError ? 'orange' : 'blue'}
               leftIcon={<Upload size={16} />}
               isDisabled={!validationResult?.valid}
               isLoading={isUploading}
+              loadingText={uploadStatus || 'Enviando...'}
               onClick={handleSubmit}
               data-testid="submit-upload-btn"
             >
-              Conectar conta
+              {uploadError ? 'Tentar novamente' : 'Conectar conta'}
             </Button>
           </HStack>
         </ModalFooter>
@@ -948,6 +1018,7 @@ export default function ConnectionsPage() {
           siteName={wizardSite.name}
           siteId={wizardSite.id}
           onUploadSuccess={fetchSessions}
+          serverUnavailable={!!fetchError}
         />
       )}
     </Box>
