@@ -7,6 +7,7 @@ import { checkTrialUpgradeExpiring } from './checkTrialUpgradeExpiring';
 import { checkAbandonedCoupons } from './checkAbandonedCoupons';
 import { checkSessionExpiring } from './checkSessionExpiring';
 import { withJobLogging, JobNames, JobName } from '../utils/jobLogger';
+import { logInfo, logError, logSimpleInfo, logWarning } from '../utils/loggerHelpers';
 
 // Para warmup ping (evitar sleep do Render)
 import http from 'http';
@@ -58,10 +59,10 @@ async function warmupPing(): Promise<{ success: boolean; latencyMs: number; erro
       const latencyMs = Date.now() - startTime;
 
       if (res.statusCode === 200) {
-        console.log(`[WARMUP] ✅ Ping OK (${latencyMs}ms) - ${healthUrl}`);
+        logInfo('Ping OK', { latencyMs, healthUrl });
         resolve({ success: true, latencyMs });
       } else {
-        console.warn(`[WARMUP] ⚠️ Ping retornou status ${res.statusCode} (${latencyMs}ms)`);
+        logWarning(`Ping retornou status ${res.statusCode}`, { latencyMs, statusCode: res.statusCode });
         resolve({ success: false, latencyMs, error: `Status ${res.statusCode}` });
       }
 
@@ -71,13 +72,13 @@ async function warmupPing(): Promise<{ success: boolean; latencyMs: number; erro
 
     req.on('error', (err) => {
       const latencyMs = Date.now() - startTime;
-      console.error(`[WARMUP] ❌ Ping falhou (${latencyMs}ms):`, err.message);
+      logError('Ping falhou', { latencyMs, err: err.message });
       resolve({ success: false, latencyMs, error: err.message });
     });
 
     req.on('timeout', () => {
       const latencyMs = Date.now() - startTime;
-      console.error(`[WARMUP] ⏰ Ping timeout (${latencyMs}ms)`);
+      logError('Ping timeout', { latencyMs });
       req.destroy();
       resolve({ success: false, latencyMs, error: 'Timeout' });
     });
@@ -89,7 +90,7 @@ async function warmupPing(): Promise<{ success: boolean; latencyMs: number; erro
  * Deve ser chamado uma única vez na inicialização do servidor
  */
 export function startScheduler() {
-  console.log('[SCHEDULER] 🕐 Iniciando agendamento de jobs...');
+  logSimpleInfo('Iniciando agendamento de jobs...');
 
   // ============================================
   // JOB 0: Warmup Ping (evita sleep do Render)
@@ -101,7 +102,7 @@ export function startScheduler() {
     cron.schedule('*/10 * * * *', async () => {
       await warmupPing();
     });
-    console.log('[SCHEDULER]    🔥 warmupPing - A cada 10 minutos (evita sleep do Render)');
+    logSimpleInfo('   warmupPing - A cada 10 minutos (evita sleep do Render)');
   }
 
   // ============================================
@@ -280,18 +281,18 @@ export function startScheduler() {
     timezone: 'America/Sao_Paulo'
   });
 
-  console.log('[SCHEDULER] ✅ Jobs agendados:');
+  logSimpleInfo('Jobs agendados:');
   if (process.env.NODE_ENV === 'production') {
-    console.log('[SCHEDULER]    🔥 warmupPing - A cada 10 minutos (evita sleep do Render)');
+    logSimpleInfo('   warmupPing - A cada 10 minutos (evita sleep do Render)');
   }
-  console.log('[SCHEDULER]    📧 checkTrialExpiring - Diariamente às 9h (America/Sao_Paulo)');
-  console.log('[SCHEDULER]    💳 checkSubscriptionExpired - Diariamente às 10h (America/Sao_Paulo)');
-  console.log('[SCHEDULER]    🔄 resetMonthlyQueries - Mensalmente no dia 1 às 3h (America/Sao_Paulo)');
-  console.log('[SCHEDULER]    🎟️  checkCouponAlerts - Diariamente às 11h (America/Sao_Paulo)');
-  console.log('[SCHEDULER]    ⏰ checkTrialUpgradeExpiring - Diariamente às 12h (America/Sao_Paulo)');
-  console.log('[SCHEDULER]    🎫 checkAbandonedCoupons - Diariamente às 13h (America/Sao_Paulo)');
-  console.log('[SCHEDULER]    🔒 checkSessionExpiring - Diariamente às 14h (America/Sao_Paulo)');
-  console.log('[SCHEDULER]    📊 Todas as execuções serão registradas na tabela JobRun');
+  logSimpleInfo('   checkTrialExpiring - Diariamente às 9h (America/Sao_Paulo)');
+  logSimpleInfo('   checkSubscriptionExpired - Diariamente às 10h (America/Sao_Paulo)');
+  logSimpleInfo('   resetMonthlyQueries - Mensalmente no dia 1 às 3h (America/Sao_Paulo)');
+  logSimpleInfo('   checkCouponAlerts - Diariamente às 11h (America/Sao_Paulo)');
+  logSimpleInfo('   checkTrialUpgradeExpiring - Diariamente às 12h (America/Sao_Paulo)');
+  logSimpleInfo('   checkAbandonedCoupons - Diariamente às 13h (America/Sao_Paulo)');
+  logSimpleInfo('   checkSessionExpiring - Diariamente às 14h (America/Sao_Paulo)');
+  logSimpleInfo('   Todas as execuções serão registradas na tabela JobRun');
 }
 
 /**
@@ -299,7 +300,7 @@ export function startScheduler() {
  * Útil para testes ou shutdown graceful
  */
 export function stopScheduler() {
-  console.log('[SCHEDULER] ⏸️  Parando scheduler...');
+  logSimpleInfo('Parando scheduler...');
   // node-cron não tem API de stop global
   // Os jobs param automaticamente quando o processo é finalizado
 }
@@ -309,7 +310,7 @@ export function stopScheduler() {
  * NÃO usar em produção - apenas para debug
  */
 export async function runJobsNow() {
-  console.log('[SCHEDULER] 🔥 Executando todos os jobs AGORA (modo debug)...');
+  logSimpleInfo('Executando todos os jobs AGORA (modo debug)...');
 
   // Tipagem explícita para evitar inferência de union type
   const jobs: JobDefinition[] = [
@@ -324,7 +325,7 @@ export async function runJobsNow() {
 
   for (const job of jobs) {
     try {
-      console.log(`[SCHEDULER] Executando ${job.name}...`);
+      logInfo(`Executando ${job.name}...`, {});
       await withJobLogging(job.name, 'MANUAL', async () => {
         const result = await job.fn();
         return {
@@ -335,13 +336,13 @@ export async function runJobsNow() {
           metadata: result.metadata,
         };
       });
-      console.log(`[SCHEDULER] ✅ ${job.name} OK`);
+      logInfo(`${job.name} OK`, {});
     } catch (error) {
-      console.error(`[SCHEDULER] ❌ Erro ${job.name}:`, error);
+      logError(`Erro ${job.name}`, { err: error });
     }
   }
 
-  console.log('[SCHEDULER] 🎉 Todos os jobs executados');
+  logSimpleInfo('Todos os jobs executados');
 }
 
 // ============================================
@@ -350,14 +351,14 @@ export async function runJobsNow() {
 // Permite executar o scheduler diretamente via CLI:
 // npx ts-node src/jobs/scheduler.ts
 if (require.main === module) {
-  console.log('[SCHEDULER] Modo standalone - executando jobs agora...');
+  logSimpleInfo('Modo standalone - executando jobs agora...');
   runJobsNow()
     .then(() => {
-      console.log('[SCHEDULER] ✅ Jobs finalizados');
+      logSimpleInfo('Jobs finalizados');
       process.exit(0);
     })
     .catch((err) => {
-      console.error('[SCHEDULER] ❌ Erro:', err);
+      logError('Erro', { err });
       process.exit(1);
     });
 }

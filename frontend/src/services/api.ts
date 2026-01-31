@@ -23,6 +23,49 @@ const DEFAULT_TIMEOUT = 30000;
 const DEFAULT_RETRIES = 0;
 const DEFAULT_RETRY_DELAY = 1000;
 
+// Flag para evitar múltiplos refreshes simultâneos
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+/**
+ * Tenta renovar o access token via refresh cookie (httpOnly)
+ * Retorna o novo token ou null se falhar
+ */
+async function refreshAccessToken(): Promise<string | null> {
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include', // Envia o httpOnly cookie
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      if (data.token) {
+        // Importar dinamicamente para evitar circular dependency
+        const { setToken } = await import('../lib/auth');
+        setToken(data.token);
+        return data.token as string;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 /**
  * Estrutura padronizada de erro da API
  * Backend SEMPRE retorna { errorCode, message, details? }
@@ -106,12 +149,37 @@ async function apiRequest<T = any>(
         headers,
         body: options.body ? JSON.stringify(options.body) : undefined,
         signal: controller.signal,
+        credentials: 'include', // Envia cookies httpOnly (refresh token)
       });
 
       clearTimeout(timeoutId);
 
+      // Tentativa de refresh automático em 401 (access token expirado)
+      if (res.status === 401 && !options.skipAutoLogout) {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          // Retry com novo token
+          headers['Authorization'] = `Bearer ${newToken}`;
+          const retryController = new AbortController();
+          const retryTimeout = setTimeout(() => retryController.abort(), timeout);
+          try {
+            const retryRes = await fetch(url, {
+              method: options.method || 'GET',
+              headers,
+              body: options.body ? JSON.stringify(options.body) : undefined,
+              signal: retryController.signal,
+              credentials: 'include',
+            });
+            clearTimeout(retryTimeout);
+            return await processResponse<T>(retryRes, options);
+          } catch (retryError) {
+            clearTimeout(retryTimeout);
+            throw retryError;
+          }
+        }
+      }
+
       // Se chegou aqui, a requisição foi bem sucedida (mas pode ter erro HTTP)
-      // Continua o processamento normal abaixo
       return await processResponse<T>(res, options);
 
     } catch (fetchError: any) {

@@ -5,34 +5,35 @@
 
 import { clearAuth } from './auth';
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com';
+
 /**
  * Executa logout global do usuário
  *
  * COMPORTAMENTO:
- * 1. Limpa TODAS as informações de autenticação (token, cache, etc.)
- * 2. Força reload completo da aplicação
- * 3. Redireciona para /login
- *
- * QUANDO USAR:
- * - Logout manual do usuário (botão "Sair")
- * - Logout automático por 401 Unauthorized
- * - Logout por timeout de sessão
- * - Troca de usuário
+ * 1. Chama /api/auth/logout no backend (revoga refresh token + limpa cookie)
+ * 2. Limpa TODAS as informações de autenticação local
+ * 3. Força reload completo da aplicação
+ * 4. Redireciona para /login
  *
  * @param reason - Motivo do logout (opcional) para mostrar mensagem ao usuário
- *                 Exemplos: 'session_expired', 'unauthorized', 'manual'
  */
 export function logout(reason?: string): void {
-  // 1. Limpa TUDO relacionado a autenticação
+  // 1. Chamar backend para revogar refresh token (fire-and-forget)
+  fetch(`${BASE_URL}/api/auth/logout`, {
+    method: 'POST',
+    credentials: 'include', // Envia o httpOnly cookie para revogação
+    headers: { 'Content-Type': 'application/json' },
+  }).catch(() => {
+    // Ignorar erros — logout local já garante segurança
+  });
+
+  // 2. Limpa TUDO relacionado a autenticação local
   clearAuth();
 
-  // 2. Monta URL de destino (com reason se fornecido)
+  // 3. Monta URL de destino
   const loginUrl = reason ? `/login?reason=${reason}` : '/login';
 
-  // 3. Força reload completo do app e redireciona
-  // Usamos window.location.href (não navigate) para garantir:
-  // - Limpeza completa de estado React
-  // - Sem estados fantasmas em memória
-  // - Fresh start garantido
+  // 4. Força reload completo do app e redireciona
   window.location.href = loginUrl;
 }

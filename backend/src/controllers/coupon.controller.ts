@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../errors/AppError';
+import { logInfo, logError } from '../utils/loggerHelpers';
 
 /**
  * Controller de Cupons
@@ -82,7 +83,7 @@ export class CouponController {
 
         if (!userId) {
           // Log interno: usuário não autenticado tentou usar VITALICIO
-          console.warn(`[VITALICIO] Acesso negado: usuário não autenticado tentou usar cupom VITALICIO`);
+          logInfo('Acesso negado: usuário não autenticado tentou usar cupom VITALICIO', {});
           res.status(404).json({
             valid: false,
             error: 'Cupom inválido ou não encontrado'
@@ -97,7 +98,7 @@ export class CouponController {
 
         if (!user || !isEmailAllowedForVitalicio(user.email)) {
           // Log interno: usuário não autorizado tentou usar VITALICIO
-          console.warn(`[VITALICIO] Acesso negado: usuário ${user?.email || 'desconhecido'} (ID: ${userId}) não está na allowlist`);
+          logInfo('Acesso negado: usuário não está na allowlist', { email: user?.email || 'desconhecido', userId });
           res.status(404).json({
             valid: false,
             error: 'Cupom inválido ou não encontrado'
@@ -106,7 +107,7 @@ export class CouponController {
         }
 
         // Log interno: acesso autorizado
-        console.info(`[VITALICIO] Acesso autorizado: usuário ${user.email} (ID: ${userId})`);
+        logInfo('Acesso autorizado para cupom VITALICIO', { email: user.email, userId });
       }
 
       // Cupom inativo
@@ -214,7 +215,7 @@ export class CouponController {
       });
 
     } catch (error) {
-      console.error('Erro ao validar cupom:', error);
+      logError('Erro ao validar cupom', { err: error });
       res.status(500).json({ error: 'Erro ao validar cupom' });
     }
   }
@@ -279,7 +280,7 @@ export class CouponController {
       });
 
     } catch (error) {
-      console.error('Erro ao aplicar cupom:', error);
+      logError('Erro ao aplicar cupom', { err: error });
       res.status(500).json({ error: 'Erro ao aplicar cupom' });
     }
   }
@@ -384,7 +385,7 @@ export class CouponController {
       });
 
     } catch (error) {
-      console.error('Erro ao buscar analytics de cupons:', error);
+      logError('Erro ao buscar analytics de cupons', { err: error });
       res.status(500).json({ error: 'Erro ao buscar analytics' });
     }
   }
@@ -444,7 +445,7 @@ export class CouponController {
 
         if (!user || !isEmailAllowedForVitalicio(user.email)) {
           // Log interno: usuário não autorizado tentou resgatar VITALICIO
-          console.warn(`[VITALICIO] Resgate negado: usuário ${user?.email || 'desconhecido'} (ID: ${userId}) não está na allowlist`);
+          logInfo('Resgate negado: usuário não está na allowlist', { email: user?.email || 'desconhecido', userId });
           res.status(404).json({
             valid: false,
             error: 'Cupom inválido ou não encontrado'
@@ -453,7 +454,7 @@ export class CouponController {
         }
 
         // Log interno: resgate autorizado
-        console.info(`[VITALICIO] Resgate autorizado: usuário ${user.email} (ID: ${userId})`);
+        logInfo('Resgate autorizado para cupom VITALICIO', { email: user.email, userId });
       }
 
       // Validar se é cupom de trial upgrade
@@ -692,7 +693,7 @@ export class CouponController {
       });
 
     } catch (error) {
-      console.error('Erro ao resgatar cupom de trial upgrade:', error);
+      logError('Erro ao resgatar cupom de trial upgrade', { err: error });
       res.status(500).json({ error: 'Erro ao resgatar cupom' });
     }
   }

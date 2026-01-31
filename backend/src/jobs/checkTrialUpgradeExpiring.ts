@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { sendTrialUpgradeExpiringEmail } from '../services/emailService';
 import { JobRunResult } from './checkTrialExpiring';
+import { logInfo, logError } from '../utils/loggerHelpers';
 
 /**
  * FASE: Cupons de Upgrade
@@ -19,7 +20,7 @@ import { JobRunResult } from './checkTrialExpiring';
  * RETORNO: Agora retorna um objeto padronizado para logging
  */
 export async function checkTrialUpgradeExpiring(): Promise<JobRunResult> {
-  console.log('[checkTrialUpgradeExpiring] 🔍 Verificando trial upgrades expirando...');
+  logInfo('Verificando trial upgrades expirando...', {});
 
   let processedCount = 0;
   let successCount = 0;
@@ -68,9 +69,7 @@ export async function checkTrialUpgradeExpiring(): Promise<JobRunResult> {
         },
       });
 
-      console.log(
-        `[checkTrialUpgradeExpiring] 📧 Encontradas ${expiringSubscriptions.length} subscriptions expirando em ${window.days} ${window.days === 1 ? 'dia' : 'dias'}`
-      );
+      logInfo(`Encontradas subscriptions expirando em ${window.days} ${window.days === 1 ? 'dia' : 'dias'}`, { count: expiringSubscriptions.length, days: window.days });
 
       processedCount += expiringSubscriptions.length;
 
@@ -91,9 +90,7 @@ export async function checkTrialUpgradeExpiring(): Promise<JobRunResult> {
           });
 
           if (recentNotification) {
-            console.log(
-              `[checkTrialUpgradeExpiring] ⏭️  Notificação já enviada recentemente para ${subscription.user.email}, pulando...`
-            );
+            logInfo('Notificação já enviada recentemente, pulando...', { email: subscription.user.email });
             continue;
           }
 
@@ -106,9 +103,11 @@ export async function checkTrialUpgradeExpiring(): Promise<JobRunResult> {
           );
 
           if (result.success) {
-            console.log(
-              `[checkTrialUpgradeExpiring] ✅ Email enviado para ${subscription.user.email} (${subscription.plan.name}, expira em ${window.days} ${window.days === 1 ? 'dia' : 'dias'})`
-            );
+            logInfo('Email enviado', {
+              email: subscription.user.email,
+              planName: subscription.plan.name,
+              daysRemaining: window.days
+            });
 
             // Registrar no audit log
             await prisma.auditLog.create({
@@ -133,25 +132,23 @@ export async function checkTrialUpgradeExpiring(): Promise<JobRunResult> {
             successCount++;
             notifications.push({ email: subscription.user.email, days: window.days });
           } else {
-            console.error(
-              `[checkTrialUpgradeExpiring] ❌ Erro ao enviar email para ${subscription.user.email}:`,
-              result.error
-            );
+            logError('Erro ao enviar email', {
+              email: subscription.user.email,
+              err: result.error
+            });
             errorCount++;
           }
         } catch (error: any) {
-          console.error(
-            `[checkTrialUpgradeExpiring] ❌ Erro ao processar subscription ${subscription.id}:`,
-            error.message
-          );
+          logError('Erro ao processar subscription', {
+            subscriptionId: subscription.id,
+            err: error.message
+          });
           errorCount++;
         }
       }
     }
 
-    console.log(
-      `[checkTrialUpgradeExpiring] ✅ Job concluído. Total de notificações enviadas: ${successCount}`
-    );
+    logInfo('Job concluído', { totalNotifications: successCount });
 
     return {
       processedCount,
@@ -164,7 +161,7 @@ export async function checkTrialUpgradeExpiring(): Promise<JobRunResult> {
     };
 
   } catch (error) {
-    console.error('[checkTrialUpgradeExpiring] ❌ Erro ao executar job:', error);
+    logError('Erro ao executar job', { err: error });
 
     return {
       processedCount,

@@ -71,7 +71,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const loadUser = async () => {
     try {
-      const token = getToken();
+      let token = getToken();
+
+      // Se não tem token em memória, tentar refresh via httpOnly cookie
+      if (!token) {
+        try {
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com';
+          const refreshRes = await fetch(`${baseUrl}/api/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (refreshRes.ok) {
+            const data = await refreshRes.json();
+            if (data.token) {
+              setToken(data.token);
+              token = data.token;
+            }
+          }
+        } catch {
+          // Refresh falhou — continuar sem token
+        }
+      }
+
       if (token) {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com';
         const statusUrl = `${baseUrl}/api/auth/status`;

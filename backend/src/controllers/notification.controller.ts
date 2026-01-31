@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { generateLinkCode, sendTelegramMessage, getChatIdForUser } from '../services/telegramService';
 import { sendWelcomeEmail } from '../services/emailService';
 import { TELEGRAM_BOT_USERNAME } from '../constants/telegram';
+import { logInfo, logError } from '../utils/loggerHelpers';
 
 /**
  * Controller de Configurações de Notificações
@@ -21,7 +22,7 @@ export class NotificationController {
         return;
       }
 
-      console.log('[NotificationController.getSettings] Buscando configurações', { userId });
+      logInfo('Buscando configurações de notificação', { userId });
 
       // Buscar ou criar configurações
       let settings = await prisma.notificationSettings.findUnique({
@@ -30,7 +31,7 @@ export class NotificationController {
 
       // Se não existir, criar com padrões
       if (!settings) {
-        console.log('[NotificationController.getSettings] Criando configurações padrão', { userId });
+        logInfo('Criando configurações padrão de notificação', { userId });
 
         settings = await prisma.notificationSettings.create({
           data: {
@@ -51,7 +52,7 @@ export class NotificationController {
         updatedAt: settings.updatedAt
       });
     } catch (error: any) {
-      console.error('[NotificationController.getSettings] Erro ao buscar configurações', { error });
+      logError('Erro ao buscar configurações de notificação', { err: error });
       res.status(500).json({
         error: 'Erro ao buscar configurações de notificação',
         message: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -73,7 +74,7 @@ export class NotificationController {
         return;
       }
 
-      console.log('[NotificationController.updateSettings] Atualizando configurações', { userId, telegramUsername });
+      logInfo('Atualizando configurações de notificação', { userId, telegramUsername });
 
       // Validar e normalizar telegram username
       let normalizedUsername: string | null = null;
@@ -97,7 +98,7 @@ export class NotificationController {
         }
 
         telegramEnabled = true;
-        console.log('[NotificationController.updateSettings] Telegram username validado', { normalizedUsername });
+        logInfo('Telegram username validado', { normalizedUsername });
       }
 
       // Buscar configurações existentes
@@ -130,7 +131,7 @@ export class NotificationController {
         });
       }
 
-      console.log('[NotificationController.updateSettings] Configurações atualizadas', { userId, telegramEnabled });
+      logInfo('Configurações de notificação atualizadas', { userId, telegramEnabled });
 
       res.json({
         message: 'Configurações atualizadas com sucesso',
@@ -141,7 +142,7 @@ export class NotificationController {
         updatedAt: settings.updatedAt
       });
     } catch (error: any) {
-      console.error('[NotificationController.updateSettings] Erro ao atualizar configurações', { error });
+      logError('Erro ao atualizar configurações de notificação', { err: error });
       res.status(500).json({
         error: 'Erro ao atualizar configurações de notificação',
         message: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -169,7 +170,7 @@ export class NotificationController {
         return;
       }
 
-      console.log('[NotificationController.testEmail] Enviando email de teste', { to: user.email });
+      logInfo('Enviando email de teste', { to: user.email });
 
       // Enviar email de teste real
       const result = await sendWelcomeEmail(user.email, user.name);
@@ -187,7 +188,7 @@ export class NotificationController {
         });
       }
     } catch (error: any) {
-      console.error('[NotificationController.testEmail] Erro ao enviar email de teste', { error });
+      logError('Erro ao enviar email de teste', { err: error });
       res.status(500).json({
         error: 'Erro ao enviar email de teste',
         message: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -208,7 +209,7 @@ export class NotificationController {
         return;
       }
 
-      console.log('[NotificationController.generateTelegramLinkCode] Gerando código', { userId });
+      logInfo('Gerando código de vínculo Telegram', { userId });
 
       const { code, expiresAt } = await generateLinkCode(userId);
 
@@ -226,7 +227,7 @@ export class NotificationController {
         ]
       });
     } catch (error: any) {
-      console.error('[NotificationController.generateTelegramLinkCode] Erro', { error });
+      logError('Erro ao gerar código de vínculo Telegram', { err: error });
       res.status(500).json({
         error: 'Erro ao gerar código de vínculo',
         message: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -258,7 +259,7 @@ export class NotificationController {
         return;
       }
 
-      console.log('[NotificationController.testTelegram] Enviando mensagem de teste', {
+      logInfo('Enviando mensagem de teste Telegram', {
         userId,
         chatId,
         action: 'test_telegram_start'
@@ -270,7 +271,7 @@ export class NotificationController {
       });
 
       if (result.success) {
-        console.log('[NotificationController.testTelegram] Mensagem enviada com sucesso', {
+        logInfo('Mensagem de teste Telegram enviada com sucesso', {
           userId,
           chatId,
           messageId: result.messageId,
@@ -282,10 +283,10 @@ export class NotificationController {
           messageId: result.messageId
         });
       } else {
-        console.error('[NotificationController.testTelegram] Erro ao enviar mensagem', {
+        logError('Erro ao enviar mensagem de teste Telegram', {
           userId,
           chatId,
-          error: result.error,
+          errorMessage: result.error,
           action: 'test_telegram_failed'
         });
 
@@ -295,7 +296,7 @@ export class NotificationController {
         });
       }
     } catch (error: any) {
-      console.error('[NotificationController.testTelegram] Erro', { error });
+      logError('Erro ao testar Telegram', { err: error });
       res.status(500).json({
         error: 'Erro ao testar Telegram',
         message: process.env.NODE_ENV === 'development' ? error.message : undefined

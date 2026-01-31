@@ -3,6 +3,7 @@ import { sendMonthlyQueriesResetReport } from '../services/emailService';
 import { captureJobException } from '../monitoring/sentry';
 import { retryAsync } from '../utils/retry';
 import { JobRunResult } from './checkTrialExpiring';
+import { logInfo, logError, logSimpleInfo } from '../utils/loggerHelpers';
 
 /**
  * Job: Reset mensal de queries
@@ -21,7 +22,7 @@ import { JobRunResult } from './checkTrialExpiring';
  */
 
 async function resetMonthlyQueries(): Promise<JobRunResult> {
-  console.log('[RESET_QUERIES_JOB] 🔄 Iniciando reset mensal de queries...');
+  logSimpleInfo('Iniciando reset mensal de queries...');
 
   let processedCount = 0;
   let successCount = 0;
@@ -33,7 +34,7 @@ async function resetMonthlyQueries(): Promise<JobRunResult> {
 
     // Envolver operação principal com retry
     const result = await retryAsync(async () => {
-      console.log(`[RESET_QUERIES_JOB] 📅 Data de execução: ${now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
+      logInfo('Data de execução', { date: now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) });
 
       // Reset de queries apenas para assinaturas ATIVAS
       const updateResult = await prisma.subscription.updateMany({
@@ -56,22 +57,22 @@ async function resetMonthlyQueries(): Promise<JobRunResult> {
     processedCount = result.count;
     successCount = result.count;
 
-    console.log(`[RESET_QUERIES_JOB] ✅ Reset mensal concluído com sucesso!`);
-    console.log(`[RESET_QUERIES_JOB] 📊 Assinaturas atualizadas: ${result.count}`);
+    logSimpleInfo('Reset mensal concluído com sucesso!');
+    logInfo('Assinaturas atualizadas', { count: result.count });
 
     // Log adicional para auditoria
     if (result.count === 0) {
-      console.log('[RESET_QUERIES_JOB] ⚠️  Nenhuma assinatura ativa encontrada para resetar.');
+      logInfo('Nenhuma assinatura ativa encontrada para resetar.', {});
     }
 
     // Enviar e-mail de relatório para o admin
     try {
       const adminEmail = process.env.ADMIN_EMAIL || 'admin@radarone.com';
       await sendMonthlyQueriesResetReport(adminEmail, result.count);
-      console.log('[RESET_QUERIES_JOB] 📧 E-mail de relatório enviado com sucesso');
+      logSimpleInfo('E-mail de relatório enviado com sucesso');
       emailSent = true;
     } catch (emailError: any) {
-      console.error('[RESET_QUERIES_JOB] ⚠️  Falha ao enviar e-mail de relatório:', emailError.message);
+      logError('Falha ao enviar e-mail de relatório', { err: emailError.message });
       // Não incrementa errorCount porque o job principal foi bem-sucedido
     }
 
@@ -88,7 +89,7 @@ async function resetMonthlyQueries(): Promise<JobRunResult> {
     };
 
   } catch (error) {
-    console.error('[RESET_QUERIES_JOB] ❌ Erro ao resetar queries mensais:', error);
+    logError('Erro ao resetar queries mensais', { err: error });
     // Enviar exceção para o Sentry
     captureJobException(error, { jobName: 'resetMonthlyQueries' });
 
@@ -108,11 +109,11 @@ async function resetMonthlyQueries(): Promise<JobRunResult> {
 if (require.main === module) {
   resetMonthlyQueries()
     .then((result) => {
-      console.log('[RESET_QUERIES_JOB] Job finalizado:', result);
+      logInfo('Job finalizado', result as unknown as Record<string, unknown>);
       process.exit(result.errorCount > 0 ? 1 : 0);
     })
     .catch((err) => {
-      console.error('[RESET_QUERIES_JOB] Job falhou:', err);
+      logError('Job falhou', { err });
       process.exit(1);
     });
 }

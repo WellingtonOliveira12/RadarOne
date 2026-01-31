@@ -2,31 +2,38 @@ import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { authenticateToken } from '../middlewares/auth.middleware';
 import { authRateLimiter, strictRateLimiter } from '../middlewares/rateLimit.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import {
+  LoginRequestSchema,
+  RegisterRequestSchema,
+  Verify2FARequestSchema,
+  ForgotPasswordRequestSchema,
+  ResetPasswordRequestSchema,
+} from '../schemas/api-responses';
 
 const router = Router();
 
 /**
- * Rotas de Autenticação (com rate limiting)
+ * Rotas de Autenticação (com rate limiting + validação Zod)
  */
 
 // POST /api/auth/register - Criar nova conta (10 req/15min)
-router.post('/register', authRateLimiter, AuthController.register);
+router.post('/register', authRateLimiter, validate(RegisterRequestSchema), AuthController.register);
 
 // POST /api/auth/login - Fazer login (10 req/15min)
-router.post('/login', authRateLimiter, AuthController.login);
+router.post('/login', authRateLimiter, validate(LoginRequestSchema), AuthController.login);
 
 // GET /api/auth/me - Obter dados do usuário autenticado
 router.get('/me', authenticateToken, AuthController.me);
 
 // GET /api/auth/status - Obter estado de autenticação (inclui 2FA status)
-// Não requer authenticateToken pois precisa funcionar sem token válido
 router.get('/status', AuthController.getAuthStatus);
 
 // POST /api/auth/forgot-password - Solicitar reset de senha (5 req/hora)
-router.post('/forgot-password', strictRateLimiter, AuthController.requestPasswordReset);
+router.post('/forgot-password', strictRateLimiter, validate(ForgotPasswordRequestSchema), AuthController.requestPasswordReset);
 
 // POST /api/auth/reset-password - Resetar senha (10 req/15min)
-router.post('/reset-password', authRateLimiter, AuthController.resetPassword);
+router.post('/reset-password', authRateLimiter, validate(ResetPasswordRequestSchema), AuthController.resetPassword);
 
 // ============================================
 // FASE 4.4 - Two-Factor Authentication (2FA)
@@ -45,7 +52,7 @@ router.post('/2fa/enable', authenticateToken, authRateLimiter, AuthController.en
 router.post('/2fa/disable', authenticateToken, authRateLimiter, AuthController.disable2FA);
 
 // POST /api/auth/2fa/verify - Verificar código 2FA durante login (público)
-router.post('/2fa/verify', authRateLimiter, AuthController.verify2FA);
+router.post('/2fa/verify', authRateLimiter, validate(Verify2FARequestSchema), AuthController.verify2FA);
 
 // POST /api/auth/2fa/backup-codes - Regenerar códigos de backup (requer autenticação e senha)
 router.post('/2fa/backup-codes', authenticateToken, strictRateLimiter, AuthController.regenerateBackupCodes);
@@ -53,8 +60,10 @@ router.post('/2fa/backup-codes', authenticateToken, strictRateLimiter, AuthContr
 // POST /api/auth/revalidate-password - Revalidar senha para ações críticas (requer autenticação)
 router.post('/revalidate-password', authenticateToken, authRateLimiter, AuthController.revalidatePassword);
 
-// TODO: Implementar outras rotas
-// POST /api/auth/refresh-token - Renovar token
-// POST /api/auth/logout - Logout (invalidar token)
+// POST /api/auth/refresh - Renovar access token via refresh cookie (httpOnly)
+router.post('/refresh', authRateLimiter, AuthController.refresh);
+
+// POST /api/auth/logout - Logout (revogar refresh token + limpar cookie)
+router.post('/logout', AuthController.logout);
 
 export default router;

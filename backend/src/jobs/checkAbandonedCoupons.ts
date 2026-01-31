@@ -4,6 +4,7 @@ import { sendAbandonedCouponPush } from '../services/pushService';
 import { captureJobException } from '../monitoring/sentry';
 import { retryAsync } from '../utils/retry';
 import { JobRunResult } from './checkTrialExpiring';
+import { logInfo, logError, logSimpleInfo } from '../utils/loggerHelpers';
 
 /**
  * Job: Verificar cupons validados mas não utilizados (abandono) - RETARGETING AVANÇADO
@@ -26,7 +27,7 @@ const HOURS_BEFORE_FIRST_REMINDER = 24; // 1º lembrete após 24h
 const HOURS_BEFORE_SECOND_REMINDER = 48; // 2º lembrete após 48h
 
 async function checkAbandonedCoupons(): Promise<JobRunResult> {
-  console.log('[JOB] 🎫 Verificando cupons abandonados (retargeting avançado)...');
+  logSimpleInfo('Verificando cupons abandonados (retargeting avançado)...');
 
   let processedCount = 0;
   let successCount = 0;
@@ -52,7 +53,7 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
         },
       });
 
-      console.log(`[JOB] 📧 ${firstReminderCandidates.length} candidatos para 1º email (24h)`);
+      logInfo('Candidatos para 1º email (24h)', { count: firstReminderCandidates.length });
       processedCount += firstReminderCandidates.length;
 
       for (const validation of firstReminderCandidates) {
@@ -62,7 +63,7 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
           });
 
           if (!coupon || !coupon.isActive) {
-            console.log(`[JOB] ⏭️  Cupom ${validation.couponId} inativo - pulando`);
+            logInfo('Cupom inativo - pulando', { couponId: validation.couponId });
             continue;
           }
 
@@ -83,7 +84,7 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
           }
 
           if (!recipientEmail) {
-            console.log(`[JOB] ⚠️  Validação ${validation.id} sem email - pulando`);
+            logInfo('Validação sem email - pulando', { validationId: validation.id });
             continue;
           }
 
@@ -110,7 +111,7 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
               discountText,
               false // primeiro lembrete
             );
-            console.log(`[JOB] 📱 Push enviado para userId ${validation.userId}`);
+            logInfo('Push enviado', { userId: validation.userId });
           }
 
           // Marcar reminderSentAt
@@ -119,11 +120,11 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
             data: { reminderSentAt: new Date() },
           });
 
-          console.log(`[JOB] ✅ 1º email enviado para ${recipientEmail} (cupom: ${coupon.code})`);
+          logInfo('1º email enviado', { email: recipientEmail, couponCode: coupon.code });
           successCount++;
           firstRemindersSent++;
         } catch (err) {
-          console.error(`[JOB] ❌ Erro ao processar 1º email validação ${validation.id}:`, err);
+          logError('Erro ao processar 1º email validação', { validationId: validation.id, err });
           errorCount++;
         }
       }
@@ -141,7 +142,7 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
         },
       });
 
-      console.log(`[JOB] 📧 ${secondReminderCandidates.length} candidatos para 2º email (48h)`);
+      logInfo('Candidatos para 2º email (48h)', { count: secondReminderCandidates.length });
       processedCount += secondReminderCandidates.length;
 
       for (const validation of secondReminderCandidates) {
@@ -151,7 +152,7 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
           });
 
           if (!coupon || !coupon.isActive) {
-            console.log(`[JOB] ⏭️  Cupom ${validation.couponId} inativo - pulando`);
+            logInfo('Cupom inativo - pulando', { couponId: validation.couponId });
             continue;
           }
 
@@ -172,7 +173,7 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
           }
 
           if (!recipientEmail) {
-            console.log(`[JOB] ⚠️  Validação ${validation.id} sem email - pulando`);
+            logInfo('Validação sem email - pulando', { validationId: validation.id });
             continue;
           }
 
@@ -199,7 +200,7 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
               discountText,
               true // segundo lembrete (urgente)
             );
-            console.log(`[JOB] 📱 Push de 2º lembrete enviado para userId ${validation.userId}`);
+            logInfo('Push de 2º lembrete enviado', { userId: validation.userId });
           }
 
           // Marcar secondReminderSentAt
@@ -208,16 +209,16 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
             data: { secondReminderSentAt: new Date() },
           });
 
-          console.log(`[JOB] ✅ 2º email enviado para ${recipientEmail} (cupom: ${coupon.code})`);
+          logInfo('2º email enviado', { email: recipientEmail, couponCode: coupon.code });
           successCount++;
           secondRemindersSent++;
         } catch (err) {
-          console.error(`[JOB] ❌ Erro ao processar 2º email validação ${validation.id}:`, err);
+          logError('Erro ao processar 2º email validação', { validationId: validation.id, err });
           errorCount++;
         }
       }
 
-      console.log('[JOB] ✅ Verificação de cupons abandonados concluída!');
+      logSimpleInfo('Verificação de cupons abandonados concluída!');
     }, {
       retries: 3,
       delayMs: 1000,
@@ -237,7 +238,7 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
     };
 
   } catch (error) {
-    console.error('[JOB] ❌ Erro ao verificar cupons abandonados:', error);
+    logError('Erro ao verificar cupons abandonados', { err: error });
     captureJobException(error, { jobName: 'checkAbandonedCoupons' });
 
     return {
@@ -258,11 +259,11 @@ async function checkAbandonedCoupons(): Promise<JobRunResult> {
 if (require.main === module) {
   checkAbandonedCoupons()
     .then((result) => {
-      console.log('[JOB] Job finalizado:', result);
+      logInfo('Job finalizado', result as unknown as Record<string, unknown>);
       process.exit(result.errorCount > 0 ? 1 : 0);
     })
     .catch((err) => {
-      console.error('[JOB] Job falhou:', err);
+      logError('Job falhou', { err });
       process.exit(1);
     });
 }

@@ -67,16 +67,25 @@ export const requireAdmin = async (
       return;
     }
 
-    // TODO: Verificar role do usuário no banco
-    // const user = await prisma.user.findUnique({
-    //   where: { id: req.userId },
-    //   select: { role: true }
-    // });
-    //
-    // if (user?.role !== 'ADMIN') {
-    //   res.status(403).json({ error: 'Acesso negado. Requer privilégios de admin' });
-    //   return;
-    // }
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true }
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+
+    const adminRoles = ['ADMIN', 'ADMIN_SUPER', 'ADMIN_SUPPORT', 'ADMIN_FINANCE', 'ADMIN_READ'];
+    if (!adminRoles.includes(user.role)) {
+      logWithUser(req.userId, 'warn', 'Admin access denied', {
+        role: user.role,
+        endpoint: `${req.method} ${req.path}`,
+      });
+      res.status(403).json({ error: 'Acesso negado. Requer privilégios de admin' });
+      return;
+    }
 
     next();
   } catch (error) {

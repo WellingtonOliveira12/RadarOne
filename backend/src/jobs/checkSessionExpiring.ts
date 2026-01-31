@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { sendTelegramMessage } from '../services/telegramService';
 import { sendEmail } from '../services/emailService';
 import { JobRunResult } from './checkTrialExpiring';
+import { logInfo, logError } from '../utils/loggerHelpers';
 
 /**
  * Job: Verificar Sessões Expirando
@@ -33,7 +34,7 @@ interface ExpiringSession {
 }
 
 export async function checkSessionExpiring(): Promise<JobRunResult> {
-  console.log('[checkSessionExpiring] Iniciando verificação de sessões expirando...');
+  logInfo('Iniciando verificação de sessões expirando...', {});
 
   let processedCount = 0;
   let successCount = 0;
@@ -85,7 +86,10 @@ export async function checkSessionExpiring(): Promise<JobRunResult> {
       return new Date(lastNotified) < twentyFourHoursAgo;
     });
 
-    console.log(`[checkSessionExpiring] Encontradas ${expiringSessions.length} sessões expirando, ${sessionsToNotify.length} a notificar`);
+    logInfo('Encontradas sessões expirando', {
+      totalExpiring: expiringSessions.length,
+      toNotify: sessionsToNotify.length
+    });
     processedCount = sessionsToNotify.length;
 
     for (const session of sessionsToNotify) {
@@ -119,14 +123,12 @@ export async function checkSessionExpiring(): Promise<JobRunResult> {
             telegramsSent++;
             sessionNotified = true;
 
-            console.log(
-              `[checkSessionExpiring] Telegram enviado para user ${session.user.id} (${session.site})`
-            );
+            logInfo('Telegram enviado', { userId: session.user.id, site: session.site });
           } catch (telegramError) {
-            console.error(
-              `[checkSessionExpiring] Erro ao enviar Telegram para user ${session.user.id}:`,
-              telegramError
-            );
+            logError('Erro ao enviar Telegram', {
+              userId: session.user.id,
+              err: telegramError
+            });
           }
         }
 
@@ -181,14 +183,12 @@ export async function checkSessionExpiring(): Promise<JobRunResult> {
               sessionNotified = true;
             }
 
-            console.log(
-              `[checkSessionExpiring] Email enviado para ${session.user.email} (${session.site})`
-            );
+            logInfo('Email enviado', { email: session.user.email, site: session.site });
           } catch (emailError) {
-            console.error(
-              `[checkSessionExpiring] Erro ao enviar email para ${session.user.email}:`,
-              emailError
-            );
+            logError('Erro ao enviar email', {
+              email: session.user.email,
+              err: emailError
+            });
           }
         }
 
@@ -208,17 +208,18 @@ export async function checkSessionExpiring(): Promise<JobRunResult> {
           },
         });
       } catch (sessionError) {
-        console.error(
-          `[checkSessionExpiring] Erro ao processar sessão ${session.id}:`,
-          sessionError
-        );
+        logError('Erro ao processar sessão', {
+          sessionId: session.id,
+          err: sessionError
+        });
         errorCount++;
       }
     }
 
-    console.log(
-      `[checkSessionExpiring] Concluído. ${successCount} sessões notificadas de ${sessionsToNotify.length}`
-    );
+    logInfo('Concluído', {
+      sessionsNotified: successCount,
+      totalProcessed: sessionsToNotify.length
+    });
 
     return {
       processedCount,
@@ -233,7 +234,7 @@ export async function checkSessionExpiring(): Promise<JobRunResult> {
     };
 
   } catch (error) {
-    console.error('[checkSessionExpiring] Erro geral:', error);
+    logError('Erro geral', { err: error });
 
     return {
       processedCount,

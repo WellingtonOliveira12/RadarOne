@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { startTrialForUser } from '../services/billingService';
 import { generateCheckoutUrl } from '../services/kiwifyService';
 import { getCurrentSubscriptionForUser } from '../services/subscriptionService';
+import { logInfo, logError } from '../utils/loggerHelpers';
 
 /**
  * Controller de Assinaturas
@@ -21,14 +22,14 @@ export class SubscriptionController {
         return;
       }
 
-      console.log('[getMySubscription] Buscando subscription do usuário', { userId });
+      logInfo('Buscando subscription do usuário', { userId });
 
       // FONTE CANÔNICA: Usar subscriptionService para determinar subscription válida
       const subscription = await getCurrentSubscriptionForUser(userId);
 
       // Se não houver subscription, verificar trial implícito baseado em user.createdAt
       if (!subscription) {
-        console.warn('[getMySubscription] Usuário sem subscription, verificando trial de 7 dias', { userId });
+        logInfo('Usuário sem subscription, verificando trial de 7 dias', { userId });
 
         const user = await prisma.user.findUnique({
           where: { id: userId },
@@ -55,7 +56,7 @@ export class SubscriptionController {
         });
 
         if (!freePlan) {
-          console.error('[getMySubscription] Plano Free não encontrado no banco');
+          logError('Plano Free não encontrado no banco', {});
           res.status(500).json({ error: 'Plano Free não configurado' });
           return;
         }
@@ -150,7 +151,7 @@ export class SubscriptionController {
 
       res.json(response);
     } catch (error) {
-      console.error('Erro ao buscar assinatura:', error);
+      logError('Erro ao buscar assinatura', { err: error });
       res.status(500).json({ error: 'Erro ao buscar assinatura' });
     }
   }
@@ -198,7 +199,7 @@ export class SubscriptionController {
         subscription
       });
     } catch (error) {
-      console.error('Erro ao iniciar trial:', error);
+      logError('Erro ao iniciar trial', { err: error });
       res.status(500).json({ error: 'Erro ao iniciar trial' });
     }
   }
@@ -263,7 +264,7 @@ export class SubscriptionController {
         subscription: newSubscription
       });
     } catch (error) {
-      console.error('Erro ao trocar plano:', error);
+      logError('Erro ao trocar plano', { err: error });
       res.status(500).json({ error: 'Erro ao trocar plano' });
     }
   }
@@ -310,7 +311,7 @@ export class SubscriptionController {
         subscription: canceledSubscription
       });
     } catch (error) {
-      console.error('Erro ao cancelar assinatura:', error);
+      logError('Erro ao cancelar assinatura', { err: error });
       res.status(500).json({ error: 'Erro ao cancelar assinatura' });
     }
   }
@@ -366,7 +367,7 @@ export class SubscriptionController {
           return;
         }
 
-        console.log(`[Checkout] Cupom validado: ${couponCode} (${coupon.discountType} ${coupon.discountValue})`);
+        logInfo('Cupom validado', { couponCode, discountType: coupon.discountType, discountValue: coupon.discountValue });
       }
 
       // Gerar URL de checkout
@@ -386,7 +387,7 @@ export class SubscriptionController {
         price: checkoutData.price,
       });
     } catch (error: any) {
-      console.error('Erro ao criar checkout:', error);
+      logError('Erro ao criar checkout', { err: error });
       res.status(500).json({ error: error.message || 'Erro ao criar checkout' });
     }
   }

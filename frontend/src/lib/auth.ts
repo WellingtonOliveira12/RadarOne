@@ -1,38 +1,44 @@
 /**
  * Biblioteca centralizada de autenticação
- * Gerencia tokens e estado de autenticação no localStorage
+ *
+ * ESTRATÉGIA DE SEGURANÇA:
+ * - Access token: armazenado em memória (variável) — curta duração (15min)
+ * - Refresh token: httpOnly cookie (gerenciado pelo backend) — 7 dias
+ * - Fallback: localStorage para backward compatibility durante transição
+ *
+ * Ao recarregar a página, o access token é perdido (memória) e renovado
+ * automaticamente via /auth/refresh (que usa o cookie httpOnly).
  */
 
 const TOKEN_KEY = 'radarone_token';
 
+// Access token em memória (mais seguro que localStorage)
+let inMemoryToken: string | null = null;
+
 /**
- * Obtém o token JWT do localStorage
+ * Obtém o token JWT
+ * Prioridade: memória > localStorage (fallback de transição)
  */
 export function getToken(): string | null {
+  if (inMemoryToken) return inMemoryToken;
+  // Fallback: verificar localStorage (tokens antigos antes da migração)
   return localStorage.getItem(TOKEN_KEY);
 }
 
 /**
- * Salva o token JWT no localStorage
+ * Salva o token JWT em memória (e localStorage para fallback)
  */
 export function setToken(token: string): void {
+  inMemoryToken = token;
+  // Manter localStorage durante transição para que abas existentes continuem funcionando
   localStorage.setItem(TOKEN_KEY, token);
 }
 
 /**
- * Limpa TODAS as informações de autenticação do localStorage
- * Remove: token, user data, preferences, etc.
- *
- * IMPORTANTE: Esta função NÃO faz redirect - use logout() para isso
+ * Limpa TODAS as informações de autenticação
  */
 export function clearAuth(): void {
-  // Remove token
+  inMemoryToken = null;
   localStorage.removeItem(TOKEN_KEY);
-
-  // Remove qualquer outro dado relacionado a auth que possa existir
-  // (ex: cached user data, returnUrl, etc.)
   sessionStorage.removeItem('returnUrl');
-
-  // Se houver outros dados de auth no localStorage, remova aqui
-  // Exemplo: localStorage.removeItem('user_preferences');
 }

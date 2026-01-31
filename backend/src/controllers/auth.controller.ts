@@ -7,6 +7,8 @@ import { validateCpf, encryptCpf } from '../utils/crypto';
 import { startTrialForUser } from '../services/billingService';
 import { sendWelcomeEmail } from '../services/emailService';
 import { logError, logInfo } from '../utils/loggerHelpers';
+import { createRefreshToken, rotateRefreshToken, revokeAllUserTokens, revokeRefreshToken } from '../services/refreshTokenService';
+import { setRefreshTokenCookie, clearRefreshTokenCookie, getRefreshTokenFromCookie } from '../utils/cookieHelpers';
 
 /**
  * Controller de Autenticação
@@ -287,22 +289,26 @@ export class AuthController {
         return;
       }
 
-      // Gera token JWT
+      // Gera access token JWT (curto: 15 minutos)
       const secret = process.env.JWT_SECRET;
       if (!secret) {
         throw new Error('JWT_SECRET não configurado');
       }
 
-      const expiresIn = (process.env.JWT_EXPIRES_IN || '7d') as any;
-      const options: SignOptions = {
-        expiresIn
-      };
-
+      const accessExpiresIn = (process.env.ACCESS_TOKEN_EXPIRES_IN || '15m') as any;
       const token = jwt.sign(
         { userId: user.id },
         secret,
-        options
+        { expiresIn: accessExpiresIn } as SignOptions
       );
+
+      // Gera refresh token (httpOnly cookie, 7 dias)
+      const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '') as string;
+      const { token: refreshToken, expiresAt } = await createRefreshToken(user.id, {
+        userAgent: req.get('user-agent'),
+        ipAddress: typeof clientIp === 'string' ? clientIp.split(',')[0].trim() : clientIp,
+      });
+      setRefreshTokenCookie(res, refreshToken, expiresAt);
 
       // Remove senha do objeto
       const { passwordHash: _, ...userWithoutPassword } = user;
@@ -369,7 +375,7 @@ export class AuthController {
 
       res.json({ user });
     } catch (error) {
-      console.error('Erro ao buscar dados do usuário:', error);
+      logError('Failed to fetch user data', { err: error, requestId: req.requestId });
       res.status(500).json({ error: 'Erro ao buscar dados' });
     }
   }
@@ -400,7 +406,7 @@ export class AuthController {
 
       // Se o usuário não existir
       if (!user) {
-        console.log(`[AUTH] Tentativa de reset para email não cadastrado: ${sanitizeEmail(email)}`);
+        logInfo('Password reset attempt for unregistered email', { email: sanitizeEmail(email) });
 
         if (revealEmailNotFound) {
           // DEV: retornar erro específico
@@ -418,7 +424,7 @@ export class AuthController {
 
       // Verificar se usuário está bloqueado
       if (user.blocked) {
-        console.log(`[AUTH] Tentativa de reset para usuário bloqueado: ${sanitizeEmail(email)}`);
+        logInfo('Password reset attempt for blocked user', { email: sanitizeEmail(email) });
         res.json({ message: genericMessage });
         return;
       }
@@ -451,15 +457,15 @@ export class AuthController {
       // Enviar email com link de reset (não bloqueia a resposta se falhar)
       const emailService = await import('../services/emailService');
       emailService.sendPasswordResetEmail(user.email, resetToken).catch((err) => {
-        console.error('[AUTH] Erro ao enviar e-mail de reset de senha:', err);
+        logError('Failed to send password reset email', { err, email: sanitizeEmail(user.email) });
       });
 
-      console.log(`[AUTH] Email de reset enviado para: ${sanitizeEmail(user.email)}`);
+      logInfo('Password reset email sent', { email: sanitizeEmail(user.email) });
 
       // Retorna sempre a mesma mensagem genérica
       res.json({ message: genericMessage });
     } catch (error) {
-      console.error('Erro ao solicitar reset de senha:', error);
+      logError('Failed to request password reset', { err: error, requestId: req.requestId });
       res.status(500).json({ error: 'Erro ao processar solicitação' });
     }
   }
@@ -548,20 +554,112 @@ export class AuthController {
         data: { passwordHash: newPasswordHash }
       });
 
-      console.log(`[AUTH] Senha redefinida com sucesso para usuário: ${sanitizeEmail(user.email)}`);
+      logInfo('Password reset successful', { userId, email: sanitizeEmail(user.email) });
 
       // Enviar email de confirmação (não bloqueia a resposta se falhar)
       const emailService = await import('../services/emailService');
       emailService.sendPasswordChangedEmail(user.email).catch((err) => {
-        console.error('[AUTH] Erro ao enviar e-mail de confirmação de senha alterada:', err);
+        logError('Failed to send password changed confirmation email', { err, email: sanitizeEmail(user.email) });
       });
 
       res.json({
         message: 'Senha redefinida com sucesso. Você já pode fazer login com a nova senha.'
       });
     } catch (error) {
-      console.error('Erro ao redefinir senha:', error);
+      logError('Failed to reset password', { err: error, requestId: req.requestId });
       res.status(500).json({ error: 'Erro ao redefinir senha' });
+    }
+  }
+
+  // ============================================
+  // REFRESH TOKEN & LOGOUT
+  // ============================================
+
+  /**
+   * Rotaciona refresh token e emite novo access token
+   * POST /api/auth/refresh
+   * Cookie: radarone_refresh (httpOnly)
+   */
+  static async refresh(req: Request, res: Response): Promise<void> {
+    try {
+      const oldRefreshToken = getRefreshTokenFromCookie(req);
+
+      if (!oldRefreshToken) {
+        res.status(401).json({ errorCode: 'NO_REFRESH_TOKEN', message: 'Sessão expirada. Faça login novamente.' });
+        return;
+      }
+
+      const result = await rotateRefreshToken(oldRefreshToken, {
+        userAgent: req.get('user-agent'),
+        ipAddress: ((req.headers['x-forwarded-for'] || req.socket.remoteAddress || '') as string).split(',')[0].trim(),
+      });
+
+      if (!result) {
+        clearRefreshTokenCookie(res);
+        res.status(401).json({ errorCode: 'INVALID_REFRESH_TOKEN', message: 'Sessão inválida. Faça login novamente.' });
+        return;
+      }
+
+      // Buscar user para verificar status
+      const user = await prisma.user.findUnique({
+        where: { id: result.userId },
+        select: { id: true, blocked: true, isActive: true, twoFactorEnabled: true },
+      });
+
+      if (!user || user.blocked || !user.isActive) {
+        clearRefreshTokenCookie(res);
+        await revokeAllUserTokens(result.userId);
+        res.status(401).json({ errorCode: 'USER_BLOCKED', message: 'Conta bloqueada' });
+        return;
+      }
+
+      // Novo access token
+      const secret = process.env.JWT_SECRET!;
+      const accessExpiresIn = (process.env.ACCESS_TOKEN_EXPIRES_IN || '15m') as any;
+      const accessToken = jwt.sign(
+        { userId: user.id, twoFactorVerified: user.twoFactorEnabled ? true : undefined },
+        secret,
+        { expiresIn: accessExpiresIn } as SignOptions
+      );
+
+      // Novo refresh cookie
+      setRefreshTokenCookie(res, result.token, result.expiresAt);
+
+      res.json({
+        token: accessToken,
+        expiresIn: accessExpiresIn,
+      });
+    } catch (error) {
+      logError('Failed to refresh token', { err: error, requestId: req.requestId });
+      res.status(500).json({ error: 'Erro ao renovar sessão' });
+    }
+  }
+
+  /**
+   * Logout — revoga refresh token e limpa cookie
+   * POST /api/auth/logout
+   */
+  static async logout(req: Request, res: Response): Promise<void> {
+    try {
+      const refreshToken = getRefreshTokenFromCookie(req);
+
+      if (refreshToken) {
+        await revokeRefreshToken(refreshToken);
+      }
+
+      // Se logado, revogar todos os tokens (logout completo)
+      if (req.userId) {
+        await revokeAllUserTokens(req.userId);
+      }
+
+      clearRefreshTokenCookie(res);
+
+      res.json({ message: 'Logout realizado com sucesso' });
+    } catch (error) {
+      logError('Failed to logout', { err: error, requestId: req.requestId });
+      // Mesmo com erro, limpar cookie
+      clearRefreshTokenCookie(res);
+      res.json({ message: 'Logout realizado' });
     }
   }
 
@@ -767,26 +865,26 @@ export class AuthController {
         }
       });
 
-      // Gerar token JWT (com timeout diferenciado se aplicável)
+      // Gerar access token JWT (curto: 15 minutos, admins: 15 minutos também)
       const secret = process.env.JWT_SECRET;
       if (!secret) {
         throw new Error('JWT_SECRET não configurado');
       }
 
-      // FASE 4.4: Timeout diferenciado para admins
-      const isAdmin = user.role.startsWith('ADMIN');
-      const customTimeout = user.sessionTimeoutMinutes;
-      const defaultExpiry = isAdmin ? '4h' : '7d';
-      const expiresIn = (customTimeout ? `${customTimeout}m` : defaultExpiry) as any;
-      const options: SignOptions = {
-        expiresIn
-      };
-
+      const accessExpiresIn = (process.env.ACCESS_TOKEN_EXPIRES_IN || '15m') as any;
       const token = jwt.sign(
         { userId: user.id, twoFactorVerified: true },
         secret,
-        options
+        { expiresIn: accessExpiresIn } as SignOptions
       );
+
+      // Gera refresh token (httpOnly cookie)
+      const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '') as string;
+      const { token: refreshToken, expiresAt } = await createRefreshToken(user.id, {
+        userAgent: req.get('user-agent'),
+        ipAddress: typeof clientIp === 'string' ? clientIp.split(',')[0].trim() : clientIp,
+      });
+      setRefreshTokenCookie(res, refreshToken, expiresAt);
 
       // Remove senha do objeto
       const { passwordHash: _, ...userWithoutPassword } = user;

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { logAdminAction, AuditAction, AuditTargetType, getClientIp } from '../utils/auditLog';
+import { logInfo, logError } from '../utils/loggerHelpers';
 
 /**
  * Retorna nome amigável do job
@@ -114,7 +115,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao listar usuários:', error);
+      logError('Erro ao listar usuários', { err: error });
       return res.status(500).json({ error: 'Erro ao listar usuários' });
     }
   }
@@ -199,7 +200,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao buscar detalhes do usuário:', error);
+      logError('Erro ao buscar detalhes do usuário', { err: error });
       return res.status(500).json({ error: 'Erro ao buscar detalhes do usuário' });
     }
   }
@@ -316,7 +317,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao bloquear usuário:', error);
+      logError('Erro ao bloquear usuário', { err: error });
       return res.status(500).json({ error: 'Erro ao bloquear usuário' });
     }
   }
@@ -387,7 +388,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao desbloquear usuário:', error);
+      logError('Erro ao desbloquear usuário', { err: error });
       return res.status(500).json({ error: 'Erro ao desbloquear usuário' });
     }
   }
@@ -466,7 +467,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao listar subscriptions:', error);
+      logError('Erro ao listar subscriptions', { err: error });
       return res.status(500).json({ error: 'Erro ao listar subscriptions' });
     }
   }
@@ -565,7 +566,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao atualizar subscription:', error);
+      logError('Erro ao atualizar subscription', { err: error });
       return res.status(500).json({ error: 'Erro ao atualizar subscription' });
     }
   }
@@ -754,7 +755,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao buscar estatísticas:', error);
+      logError('Erro ao buscar estatísticas do sistema', { err: error });
       return res.status(500).json({ error: 'Erro ao buscar estatísticas do sistema' });
     }
   }
@@ -828,7 +829,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao listar logs de webhooks:', error);
+      logError('Erro ao listar logs de webhooks', { err: error });
       return res.status(500).json({ error: 'Erro ao listar logs de webhooks' });
     }
   }
@@ -902,7 +903,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao listar monitores:', error);
+      logError('Erro ao listar monitores', { err: error });
       return res.status(500).json({ error: 'Erro ao listar monitores' });
     }
   }
@@ -1005,7 +1006,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao listar execuções de jobs:', error);
+      logError('Erro ao listar execuções de jobs', { err: error });
       return res.status(500).json({ error: 'Erro ao listar execuções de jobs' });
     }
   }
@@ -1079,7 +1080,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao listar audit logs:', error);
+      logError('Erro ao listar audit logs', { err: error });
       return res.status(500).json({ error: 'Erro ao listar audit logs' });
     }
   }
@@ -1108,7 +1109,7 @@ export class AdminController {
       return res.json({ settings });
 
     } catch (error) {
-      console.error('Erro ao listar configurações:', error);
+      logError('Erro ao listar configurações do sistema', { err: error });
       return res.status(500).json({ error: 'Erro ao listar configurações do sistema' });
     }
   }
@@ -1181,7 +1182,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao atualizar configuração:', error);
+      logError('Erro ao atualizar configuração', { err: error });
       return res.status(500).json({ error: 'Erro ao atualizar configuração' });
     }
   }
@@ -1241,7 +1242,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao listar alertas:', error);
+      logError('Erro ao listar alertas', { err: error });
       return res.status(500).json({ error: 'Erro ao listar alertas' });
     }
   }
@@ -1290,7 +1291,7 @@ export class AdminController {
       return res.json({ message: 'Alerta marcado como lido', alert });
 
     } catch (error) {
-      console.error('Erro ao marcar alerta como lido:', error);
+      logError('Erro ao marcar alerta como lido', { err: error });
       return res.status(500).json({ error: 'Erro ao marcar alerta como lido' });
     }
   }
@@ -1308,7 +1309,7 @@ export class AdminController {
       return res.json({ count });
 
     } catch (error) {
-      console.error('Erro ao obter contagem de alertas:', error);
+      logError('Erro ao obter contagem de alertas', { err: error });
       return res.status(500).json({ error: 'Erro ao obter contagem de alertas' });
     }
   }
@@ -1587,7 +1588,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao buscar estatísticas temporais:', error);
+      logError('Erro ao buscar estatísticas temporais', { err: error });
       return res.status(500).json({ error: 'Erro ao buscar estatísticas temporais' });
     }
   }
@@ -1713,7 +1714,7 @@ export class AdminController {
       res.send('\ufeff' + csv); // BOM para UTF-8
 
     } catch (error) {
-      console.error('Erro ao exportar usuários:', error);
+      logError('Erro ao exportar usuários', { err: error });
       return res.status(500).json({ error: 'Erro ao exportar usuários' });
     }
   }
@@ -1826,7 +1827,7 @@ export class AdminController {
       res.send('\ufeff' + csv);
 
     } catch (error) {
-      console.error('Erro ao exportar subscriptions:', error);
+      logError('Erro ao exportar subscriptions', { err: error });
       return res.status(500).json({ error: 'Erro ao exportar subscriptions' });
     }
   }
@@ -1926,7 +1927,7 @@ export class AdminController {
       res.send('\ufeff' + csv);
 
     } catch (error) {
-      console.error('Erro ao exportar audit logs:', error);
+      logError('Erro ao exportar audit logs', { err: error });
       return res.status(500).json({ error: 'Erro ao exportar audit logs' });
     }
   }
@@ -2020,7 +2021,7 @@ export class AdminController {
       res.send('\ufeff' + csv);
 
     } catch (error) {
-      console.error('Erro ao exportar alertas:', error);
+      logError('Erro ao exportar alertas', { err: error });
       return res.status(500).json({ error: 'Erro ao exportar alertas' });
     }
   }
@@ -2129,7 +2130,7 @@ export class AdminController {
       res.send('\ufeff' + csv);
 
     } catch (error) {
-      console.error('Erro ao exportar monitores:', error);
+      logError('Erro ao exportar monitores', { err: error });
       return res.status(500).json({ error: 'Erro ao exportar monitores' });
     }
   }
@@ -2255,7 +2256,7 @@ export class AdminController {
       res.send('\ufeff' + csv);
 
     } catch (error) {
-      console.error('Erro ao exportar cupons:', error);
+      logError('Erro ao exportar cupons', { err: error });
       return res.status(500).json({ error: 'Erro ao exportar cupons' });
     }
   }
@@ -2336,7 +2337,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao listar cupons:', error);
+      logError('Erro ao listar cupons', { err: error });
       return res.status(500).json({ error: 'Erro ao listar cupons' });
     }
   }
@@ -2489,7 +2490,7 @@ export class AdminController {
       return res.status(201).json(coupon);
 
     } catch (error) {
-      console.error('Erro ao criar cupom:', error);
+      logError('Erro ao criar cupom', { err: error });
       return res.status(500).json({ error: 'Erro ao criar cupom' });
     }
   }
@@ -2619,7 +2620,7 @@ export class AdminController {
       return res.json(updated);
 
     } catch (error) {
-      console.error('Erro ao atualizar cupom:', error);
+      logError('Erro ao atualizar cupom', { err: error });
       return res.status(500).json({ error: 'Erro ao atualizar cupom' });
     }
   }
@@ -2676,7 +2677,7 @@ export class AdminController {
       return res.json(updated);
 
     } catch (error) {
-      console.error('Erro ao alternar status do cupom:', error);
+      logError('Erro ao alternar status do cupom', { err: error });
       return res.status(500).json({ error: 'Erro ao alternar status do cupom' });
     }
   }
@@ -2757,7 +2758,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao deletar cupom:', error);
+      logError('Erro ao deletar cupom', { err: error });
       return res.status(500).json({ error: 'Erro ao deletar cupom' });
     }
   }
@@ -2811,7 +2812,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao alternar múltiplos cupons:', error);
+      logError('Erro ao alternar múltiplos cupons', { err: error });
       return res.status(500).json({ error: 'Erro ao alternar múltiplos cupons' });
     }
   }
@@ -2900,7 +2901,7 @@ export class AdminController {
       });
 
     } catch (error) {
-      console.error('Erro ao deletar múltiplos cupons:', error);
+      logError('Erro ao deletar múltiplos cupons', { err: error });
       return res.status(500).json({ error: 'Erro ao deletar múltiplos cupons' });
     }
   }
@@ -3110,7 +3111,7 @@ export class AdminController {
         results,
       });
     } catch (error) {
-      console.error('Erro ao importar cupons:', error);
+      logError('Erro ao importar cupons via CSV', { err: error });
       return res.status(500).json({ error: 'Erro ao importar cupons via CSV' });
     }
   }
@@ -3330,7 +3331,7 @@ export class AdminController {
 
       return res.json(responseData);
     } catch (error) {
-      console.error('Erro ao buscar analytics de cupons:', error);
+      logError('Erro ao buscar analytics de cupons', { err: error });
       return res.status(500).json({ error: 'Erro ao buscar analytics de cupons' });
     }
   }
@@ -3500,7 +3501,7 @@ export class AdminController {
         planDistribution,
       });
     } catch (error) {
-      console.error('Erro ao buscar detailed stats do cupom:', error);
+      logError('Erro ao buscar estatísticas detalhadas do cupom', { err: error });
       return res.status(500).json({ error: 'Erro ao buscar estatísticas detalhadas do cupom' });
     }
   }

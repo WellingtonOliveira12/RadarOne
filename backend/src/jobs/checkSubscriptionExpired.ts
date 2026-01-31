@@ -3,6 +3,7 @@ import { sendSubscriptionExpiredEmail } from '../services/emailService';
 import { captureJobException } from '../monitoring/sentry';
 import { retryAsync } from '../utils/retry';
 import { JobRunResult } from './checkTrialExpiring';
+import { logInfo, logError, logSimpleInfo } from '../utils/loggerHelpers';
 
 /**
  * Job: Verificar assinaturas pagas expiradas
@@ -16,7 +17,7 @@ import { JobRunResult } from './checkTrialExpiring';
  */
 
 async function checkSubscriptionExpired(): Promise<JobRunResult> {
-  console.log('[JOB] 🔍 Verificando assinaturas expiradas...');
+  logSimpleInfo('Verificando assinaturas expiradas...');
 
   let processedCount = 0;
   let successCount = 0;
@@ -44,7 +45,7 @@ async function checkSubscriptionExpired(): Promise<JobRunResult> {
         }
       });
 
-      console.log(`[JOB] 🚫 ${subscriptionsExpired.length} assinaturas expiradas`);
+      logInfo('Assinaturas expiradas', { count: subscriptionsExpired.length });
       processedCount = subscriptionsExpired.length;
 
       // Processar cada assinatura expirada
@@ -63,16 +64,16 @@ async function checkSubscriptionExpired(): Promise<JobRunResult> {
             subscription.plan.name
           );
 
-          console.log(`[JOB] ✅ Assinatura expirada: ${subscription.user.email} - Status atualizado e e-mail enviado`);
+          logInfo('Assinatura expirada - Status atualizado e e-mail enviado', { email: subscription.user.email });
           successCount++;
           emailsSent.push(subscription.user.email);
         } catch (err) {
-          console.error(`[JOB] ❌ Erro ao processar assinatura expirada ${subscription.id}:`, err);
+          logError('Erro ao processar assinatura expirada', { subscriptionId: subscription.id, err });
           errorCount++;
         }
       }
 
-      console.log('[JOB] ✅ Verificação de assinaturas concluída!');
+      logSimpleInfo('Verificação de assinaturas concluída!');
     }, {
       retries: 3,
       delayMs: 1000,
@@ -91,7 +92,7 @@ async function checkSubscriptionExpired(): Promise<JobRunResult> {
     };
 
   } catch (error) {
-    console.error('[JOB] ❌ Erro ao verificar assinaturas expiradas:', error);
+    logError('Erro ao verificar assinaturas expiradas', { err: error });
     captureJobException(error, { jobName: 'checkSubscriptionExpired' });
 
     return {
@@ -111,11 +112,11 @@ async function checkSubscriptionExpired(): Promise<JobRunResult> {
 if (require.main === module) {
   checkSubscriptionExpired()
     .then((result) => {
-      console.log('[JOB] Job finalizado:', result);
+      logInfo('Job finalizado', result as unknown as Record<string, unknown>);
       process.exit(result.errorCount > 0 ? 1 : 0);
     })
     .catch((err) => {
-      console.error('[JOB] Job falhou:', err);
+      logError('Job falhou', { err });
       process.exit(1);
     });
 }

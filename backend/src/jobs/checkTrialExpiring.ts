@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { sendTrialEndingEmail, sendTrialExpiredEmail } from '../services/emailService';
 import { captureJobException } from '../monitoring/sentry';
 import { retryAsync } from '../utils/retry';
+import { logInfo, logError, logSimpleInfo } from '../utils/loggerHelpers';
 
 /**
  * Resultado padronizado de um job
@@ -28,7 +29,7 @@ export interface JobRunResult {
 const DAYS_BEFORE_WARNING = 3; // Avisar 3 dias antes de expirar
 
 async function checkTrialExpiring(): Promise<JobRunResult> {
-  console.log('[JOB] 🔍 Verificando trials expirando...');
+  logSimpleInfo('Verificando trials expirando...');
 
   let processedCount = 0;
   let successCount = 0;
@@ -61,7 +62,7 @@ async function checkTrialExpiring(): Promise<JobRunResult> {
         }
       });
 
-      console.log(`[JOB] 📧 ${trialsExpiringSoon.length} trials expirando em breve`);
+      logInfo('Trials expirando em breve', { count: trialsExpiringSoon.length });
       expiringSoonCount = trialsExpiringSoon.length;
       processedCount += trialsExpiringSoon.length;
 
@@ -79,11 +80,11 @@ async function checkTrialExpiring(): Promise<JobRunResult> {
               daysRemaining,
               subscription.plan.name
             );
-            console.log(`[JOB] ✅ E-mail de trial terminando enviado para ${subscription.user.email}`);
+            logInfo('E-mail de trial terminando enviado', { email: subscription.user.email });
             successCount++;
             emailsSent.push(`trial_ending:${subscription.user.email}`);
           } catch (err) {
-            console.error(`[JOB] ❌ Erro ao enviar e-mail para ${subscription.user.email}:`, err);
+            logError('Erro ao enviar e-mail', { email: subscription.user.email, err });
             errorCount++;
           }
         }
@@ -105,7 +106,7 @@ async function checkTrialExpiring(): Promise<JobRunResult> {
         }
       });
 
-      console.log(`[JOB] 🚫 ${trialsExpired.length} trials expirados`);
+      logInfo('Trials expirados', { count: trialsExpired.length });
       expiredCount = trialsExpired.length;
       processedCount += trialsExpired.length;
 
@@ -125,16 +126,16 @@ async function checkTrialExpiring(): Promise<JobRunResult> {
             subscription.plan.name
           );
 
-          console.log(`[JOB] ✅ Trial expirado: ${subscription.user.email} - Status atualizado e e-mail enviado`);
+          logInfo('Trial expirado - Status atualizado e e-mail enviado', { email: subscription.user.email });
           successCount++;
           emailsSent.push(`trial_expired:${subscription.user.email}`);
         } catch (err) {
-          console.error(`[JOB] ❌ Erro ao processar trial expirado ${subscription.id}:`, err);
+          logError('Erro ao processar trial expirado', { subscriptionId: subscription.id, err });
           errorCount++;
         }
       }
 
-      console.log('[JOB] ✅ Verificação de trials concluída!');
+      logSimpleInfo('Verificação de trials concluída!');
     }, {
       retries: 3,
       delayMs: 1000,
@@ -155,7 +156,7 @@ async function checkTrialExpiring(): Promise<JobRunResult> {
     };
 
   } catch (error) {
-    console.error('[JOB] ❌ Erro ao verificar trials:', error);
+    logError('Erro ao verificar trials', { err: error });
     captureJobException(error, { jobName: 'checkTrialExpiring' });
 
     return {
@@ -177,11 +178,11 @@ async function checkTrialExpiring(): Promise<JobRunResult> {
 if (require.main === module) {
   checkTrialExpiring()
     .then((result) => {
-      console.log('[JOB] Job finalizado:', result);
+      logInfo('Job finalizado', result as unknown as Record<string, unknown>);
       process.exit(result.errorCount > 0 ? 1 : 0);
     })
     .catch((err) => {
-      console.error('[JOB] Job falhou:', err);
+      logError('Job falhou', { err });
       process.exit(1);
     });
 }

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
+import { logInfo, logError } from '../utils/loggerHelpers';
 
 /**
  * Controller de Usuário
@@ -75,7 +76,7 @@ export class UserController {
 
       res.json({ user });
     } catch (error) {
-      console.error('Erro ao buscar dados do usuário:', error);
+      logError('Erro ao buscar dados do usuário', { err: error });
       res.status(500).json({ error: 'Erro ao buscar dados' });
     }
   }
@@ -156,7 +157,7 @@ export class UserController {
         user: updatedUser
       });
     } catch (error) {
-      console.error('Erro ao atualizar notificações:', error);
+      logError('Erro ao atualizar notificações', { err: error });
       res.status(500).json({ error: 'Erro ao atualizar preferências' });
     }
   }
@@ -205,7 +206,7 @@ export class UserController {
         user: updatedUser
       });
     } catch (error) {
-      console.error('Erro ao atualizar perfil:', error);
+      logError('Erro ao atualizar perfil', { err: error });
       res.status(500).json({ error: 'Erro ao atualizar perfil' });
     }
   }
