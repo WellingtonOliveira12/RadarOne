@@ -835,7 +835,7 @@ export class AuthController {
       const result = await twoFactorService.verifyTwoFactorCode(userId, code);
 
       if (!result.valid) {
-        res.status(401).json({ error: 'Código inválido' });
+        res.status(401).json({ errorCode: 'INVALID_2FA_CODE', message: 'Código inválido' });
         return;
       }
 

@@ -124,6 +124,13 @@ export class SubscriptionController {
         }
       });
 
+      // Contar sites distintos
+      const distinctSites = await prisma.monitor.findMany({
+        where: { userId, active: true },
+        select: { site: true },
+        distinct: ['site']
+      });
+
       // Montar resposta
       const response = {
         subscription: {
@@ -140,7 +147,8 @@ export class SubscriptionController {
         usage: {
           monitorsCreated: monitorCount,
           monitorsLimit: subscription.plan.maxMonitors,
-          canCreateMore: monitorCount < subscription.plan.maxMonitors
+          canCreateMore: monitorCount < subscription.plan.maxMonitors,
+          uniqueSitesCount: distinctSites.length
         },
         timeRemaining: {
           daysRemaining: subscription.isLifetime ? -1 : Math.max(0, daysRemaining),

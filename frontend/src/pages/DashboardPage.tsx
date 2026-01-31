@@ -76,7 +76,7 @@ export const DashboardPage: React.FC = () => {
 
       setStats({
         monitorsCount: subData.usage.monitorsCreated,
-        sitesCount: 0
+        sitesCount: subData.usage.uniqueSitesCount || 0
       });
     } catch (err: any) {
       const isDev = import.meta.env.DEV;
