@@ -46,7 +46,7 @@ export const AdminSettingsPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<SettingsResponse>('/api/admin/settings');
+      const response = await api.request<SettingsResponse>('/api/admin/settings', { method: 'GET', skipAutoLogout: true });
       setSettings(response.settings);
     } catch (err: any) {
       console.error('Erro ao carregar configurações:', err);

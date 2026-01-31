@@ -42,7 +42,11 @@ export function TrialBanner() {
         return;
       }
 
-      const data: UserData = await api.get('/api/auth/me', token);
+      const data: UserData = await api.request('/api/auth/me', {
+        method: 'GET',
+        token,
+        skipAutoLogout: true,
+      });
 
       if (data.user?.subscriptions && data.user.subscriptions.length > 0) {
         const subscription = data.user.subscriptions[0];

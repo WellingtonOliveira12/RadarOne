@@ -80,7 +80,7 @@ export const AdminAlertsPage: React.FC = () => {
       if (filterStatus === 'unread') params.append('isRead', 'false');
       if (filterStatus === 'read') params.append('isRead', 'true');
 
-      const response = await api.get(`/api/admin/alerts?${params.toString()}`);
+      const response = await api.request(`/api/admin/alerts?${params.toString()}`, { method: 'GET', skipAutoLogout: true });
       setAlerts(response.alerts);
       setUnreadCount(response.unreadCount);
       setTotal(response.total);

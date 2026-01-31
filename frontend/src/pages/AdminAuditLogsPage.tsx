@@ -156,7 +156,7 @@ export const AdminAuditLogsPage: React.FC = () => {
       if (filters.startDate) params.append('startDate', filters.startDate);
       if (filters.endDate) params.append('endDate', filters.endDate);
 
-      const response = await api.get<AuditLogsResponse>(`/api/admin/audit-logs?${params}`);
+      const response = await api.request<AuditLogsResponse>(`/api/admin/audit-logs?${params}`, { method: 'GET', skipAutoLogout: true });
       setLogs(response.logs);
       setPagination(response.pagination);
     } catch (err: any) {

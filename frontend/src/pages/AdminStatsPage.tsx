@@ -153,8 +153,8 @@ export const AdminStatsPage: React.FC = () => {
       setError(null);
 
       const [statsResponse, temporalResponse] = await Promise.all([
-        api.get('/api/admin/stats'),
-        api.get(`/api/admin/stats/temporal?period=${period}`),
+        api.request('/api/admin/stats', { method: 'GET', skipAutoLogout: true }),
+        api.request(`/api/admin/stats/temporal?period=${period}`, { method: 'GET', skipAutoLogout: true }),
       ]);
 
       setStats(statsResponse.data);

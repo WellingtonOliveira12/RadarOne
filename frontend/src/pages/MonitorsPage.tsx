@@ -149,7 +149,11 @@ export function MonitorsPage() {
         return;
       }
 
-      const data = await api.get<MonitorsResponse>('/api/monitors', token);
+      const data = await api.request<MonitorsResponse>('/api/monitors', {
+        method: 'GET',
+        token,
+        skipAutoLogout: true,
+      });
       setMonitors(data.data);
       setHasSubscription(true);
     } catch (err: any) {

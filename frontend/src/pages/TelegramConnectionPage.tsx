@@ -36,7 +36,10 @@ export const TelegramConnectionPage: React.FC = () => {
 
   const loadStatus = async () => {
     try {
-      const data = await api.get('/api/telegram/status');
+      const data = await api.request('/api/telegram/status', {
+        method: 'GET',
+        skipAutoLogout: true,
+      });
       setStatus(data);
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar status');

@@ -124,8 +124,9 @@ export const AdminSubscriptionsPage: React.FC = () => {
 
       if (filters.status) params.append('status', filters.status);
 
-      const response = await api.get<SubscriptionsResponse>(
-        `/api/admin/subscriptions?${params.toString()}`
+      const response = await api.request<SubscriptionsResponse>(
+        `/api/admin/subscriptions?${params.toString()}`,
+        { method: 'GET', skipAutoLogout: true }
       );
       setSubscriptions(response.subscriptions);
       setPagination(response.pagination);

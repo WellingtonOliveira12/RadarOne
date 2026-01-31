@@ -137,7 +137,7 @@ export const AdminUsersPage: React.FC = () => {
       if (filters.role) params.append('role', filters.role);
       if (filters.email) params.append('email', filters.email);
 
-      const response = await api.get<UsersResponse>(`/api/admin/users?${params.toString()}`);
+      const response = await api.request<UsersResponse>(`/api/admin/users?${params.toString()}`, { method: 'GET', skipAutoLogout: true });
       setUsers(response.users);
       setPagination(response.pagination);
     } catch (err: any) {

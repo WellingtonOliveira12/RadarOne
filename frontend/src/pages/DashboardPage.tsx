@@ -60,7 +60,10 @@ export const DashboardPage: React.FC = () => {
 
   const loadDashboardData = async () => {
     try {
-      const subData = await api.get('/api/subscriptions/my');
+      const subData = await api.request('/api/subscriptions/my', {
+        method: 'GET',
+        skipAutoLogout: true,
+      });
 
       setSubscription({
         id: subData.subscription.id,

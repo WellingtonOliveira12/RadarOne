@@ -15,7 +15,7 @@ export const AdminWebhooksPage: React.FC = () => {
   const loadLogs = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/admin/webhooks?page=${pagination.page}&limit=20`);
+      const response = await api.request(`/api/admin/webhooks?page=${pagination.page}&limit=20`, { method: 'GET', skipAutoLogout: true });
       setLogs(response.logs);
       setPagination(response.pagination);
     } catch (err) {

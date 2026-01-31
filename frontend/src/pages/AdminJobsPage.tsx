@@ -135,9 +135,9 @@ export const AdminJobsPage: React.FC = () => {
         queryParams.append('status', selectedStatus);
       }
 
-      const response = await api.get<JobsResponse>(
+      const response = await api.request<JobsResponse>(
         `/api/admin/jobs?${queryParams.toString()}`,
-        token
+        { method: 'GET', token, skipAutoLogout: true }
       );
 
       setJobs(response.data);

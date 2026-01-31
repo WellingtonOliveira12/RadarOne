@@ -46,7 +46,10 @@ export const NotificationSettingsPage: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const data = await api.get('/api/notifications/settings');
+      const data = await api.request('/api/notifications/settings', {
+        method: 'GET',
+        skipAutoLogout: true,
+      });
       setSettings(data);
       setTelegramUsername(data.telegramUsername || '');
     } catch (err: any) {

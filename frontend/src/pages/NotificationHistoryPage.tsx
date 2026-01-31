@@ -46,8 +46,11 @@ export function NotificationHistoryPage() {
       setLoading(true);
       setError('');
 
-      const response = await api.get<NotificationHistoryResponse>(
-        `/api/notifications/history?page=${currentPage}&limit=20`
+      const response = await api.request<NotificationHistoryResponse>(
+        `/api/notifications/history?page=${currentPage}&limit=20`, {
+          method: 'GET',
+          skipAutoLogout: true,
+        }
       );
 
       if (!response || !response.data) {

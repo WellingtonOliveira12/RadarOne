@@ -64,7 +64,10 @@ export const Security2FAPage: React.FC = () => {
   const loadStatus = async () => {
     try {
       setLoading(true);
-      const response = await api.get<TwoFactorStatus>('/api/auth/2fa/status');
+      const response = await api.request<TwoFactorStatus>('/api/auth/2fa/status', {
+        method: 'GET',
+        skipAutoLogout: true,
+      });
       setStatus(response);
     } catch (error: any) {
       console.error('Erro ao carregar status de 2FA:', error);
@@ -86,7 +89,10 @@ export const Security2FAPage: React.FC = () => {
 
   const handleSetup2FA = async () => {
     try {
-      const response = await api.get<TwoFactorSetup>('/api/auth/2fa/setup');
+      const response = await api.request<TwoFactorSetup>('/api/auth/2fa/setup', {
+        method: 'GET',
+        skipAutoLogout: true,
+      });
       setSetupData(response);
       toast({
         title: 'QR Code gerado',

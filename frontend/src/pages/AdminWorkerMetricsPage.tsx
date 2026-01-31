@@ -67,9 +67,9 @@ export function AdminWorkerMetricsPage() {
 
     try {
       const [overviewRes, performanceRes, errorsRes] = await Promise.all([
-        api.get('/metrics/overview'),
-        api.get('/metrics/performance?days=30'),
-        api.get('/metrics/errors?days=7&limit=5'),
+        api.request('/metrics/overview', { method: 'GET', skipAutoLogout: true }),
+        api.request('/metrics/performance?days=30', { method: 'GET', skipAutoLogout: true }),
+        api.request('/metrics/errors?days=7&limit=5', { method: 'GET', skipAutoLogout: true }),
       ]);
 
       setOverview(overviewRes);

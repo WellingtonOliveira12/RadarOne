@@ -46,7 +46,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   useEffect(() => {
     const fetchUnreadAlerts = async () => {
       try {
-        const response = await api.get('/api/admin/alerts/unread-count');
+        const response = await api.request('/api/admin/alerts/unread-count', {
+          method: 'GET',
+          skipAutoLogout: true,
+        });
         setUnreadAlerts(response.count);
       } catch (error) {
         console.error('Erro ao buscar alertas não lidos:', error);

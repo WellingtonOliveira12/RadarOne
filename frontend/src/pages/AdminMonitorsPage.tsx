@@ -16,7 +16,7 @@ export const AdminMonitorsPage: React.FC = () => {
   const loadMonitors = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/admin/monitors?page=${pagination.page}&limit=20`);
+      const response = await api.request(`/api/admin/monitors?page=${pagination.page}&limit=20`, { method: 'GET', skipAutoLogout: true });
       setMonitors(response.monitors);
       setPagination(response.pagination);
     } catch (err) {

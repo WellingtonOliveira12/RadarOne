@@ -219,7 +219,7 @@ export const AdminCouponsPage: React.FC = () => {
   const loadPlans = async () => {
     try {
       const token = getToken();
-      const response = await api.get<{ plans: Plan[] }>('/api/plans', token);
+      const response = await api.request<{ plans: Plan[] }>('/api/plans', { method: 'GET', token, skipAutoLogout: true });
       setPlans(response.plans || []);
     } catch (err: any) {
       console.error('Erro ao carregar planos:', err);
@@ -240,9 +240,9 @@ export const AdminCouponsPage: React.FC = () => {
       if (filterStatus) queryParams.append('status', filterStatus);
       if (filterType) queryParams.append('type', filterType);
 
-      const response = await api.get<{ coupons: Coupon[]; pagination: PaginationInfo }>(
+      const response = await api.request<{ coupons: Coupon[]; pagination: PaginationInfo }>(
         `/api/admin/coupons?${queryParams.toString()}`,
-        token
+        { method: 'GET', token, skipAutoLogout: true }
       );
 
       setCoupons(response.coupons);
@@ -272,9 +272,9 @@ export const AdminCouponsPage: React.FC = () => {
         groupBy: 'day',
       });
 
-      const response = await api.get<CouponAnalytics>(
+      const response = await api.request<CouponAnalytics>(
         `/api/admin/coupons/analytics?${queryParams.toString()}`,
-        token
+        { method: 'GET', token, skipAutoLogout: true }
       );
 
       setAnalytics(response);
