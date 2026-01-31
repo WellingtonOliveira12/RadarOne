@@ -73,78 +73,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const token = getToken();
       if (token) {
-        // Timeout de 10s para evitar travamento se backend não responder
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com';
+        const statusUrl = `${baseUrl}/api/auth/status`;
 
-        // Usar endpoint /auth/status para obter estado completo
-        let response: Response;
-        try {
-          response = await fetch(
-            `${import.meta.env.VITE_API_BASE_URL || 'https://radarone.onrender.com'}/api/auth/status`,
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-              },
+        // Retry com backoff para lidar com cold start do Render
+        // 3 tentativas: 15s, 20s, 25s timeout (total máx ~60s)
+        const maxAttempts = 3;
+        const timeouts = [15000, 20000, 25000];
+        const retryDelays = [2000, 4000]; // delay entre tentativas
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeouts[attempt]);
+
+          try {
+            const response = await fetch(statusUrl, {
+              headers: { 'Authorization': `Bearer ${token}` },
               signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            // Verificar se resposta é HTML (indica problema de configuração)
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('text/html')) {
+              console.warn('[AuthContext] Backend retornou HTML em vez de JSON');
+              clearAuth();
+              setUser(null);
+              setAuthStep(AuthStep.NONE);
+              return;
             }
-          );
-        } catch (fetchError: any) {
-          clearTimeout(timeoutId);
-          // Timeout ou erro de rede - tratar graciosamente
-          console.warn('[AuthContext] Erro de rede ao verificar status:', fetchError.name);
-          clearAuth();
-          setUser(null);
-          setAuthStep(AuthStep.NONE);
-          return;
-        } finally {
-          clearTimeout(timeoutId);
-        }
 
-        // Verificar se resposta é HTML (indica problema de configuração)
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('text/html')) {
-          console.warn('[AuthContext] Backend retornou HTML em vez de JSON');
-          clearAuth();
-          setUser(null);
-          setAuthStep(AuthStep.NONE);
-          return;
-        }
+            if (response.ok) {
+              const statusData = await response.json();
 
-        if (response.ok) {
-          const statusData = await response.json();
+              if (statusData.isAuthenticated && statusData.user) {
+                setUser(statusData.user);
+                setAuthStep(AuthStep.AUTHENTICATED);
+              } else if (statusData.authStep === AuthStep.TWO_FACTOR_REQUIRED) {
+                console.log('[AuthContext] 2FA pendente, limpando token temporário');
+                clearAuth();
+                setUser(null);
+                setAuthStep(AuthStep.NONE);
+              } else {
+                console.log('[AuthContext] Token inválido, limpando autenticação');
+                clearAuth();
+                setUser(null);
+                setAuthStep(AuthStep.NONE);
+              }
+            } else if (response.status === 401) {
+              // Token realmente inválido/expirado — limpar auth
+              console.log('[AuthContext] Token expirado (401), limpando autenticação');
+              clearAuth();
+              setUser(null);
+              setAuthStep(AuthStep.NONE);
+            } else {
+              // 5xx ou outro erro do servidor — NÃO limpar auth, manter token
+              // O usuário pode ter sessão válida, o servidor que falhou
+              console.warn(`[AuthContext] Servidor retornou ${response.status}, mantendo sessão`);
+              // Não limpa auth — preserva token para próxima tentativa do usuário
+            }
+            return; // Request completou (sucesso ou erro HTTP), sair do loop
+          } catch (fetchError: any) {
+            clearTimeout(timeoutId);
+            const isRetryable = fetchError.name === 'AbortError' || fetchError.name === 'TypeError';
 
-          if (statusData.isAuthenticated && statusData.user) {
-            setUser(statusData.user);
-            setAuthStep(AuthStep.AUTHENTICATED);
-          } else if (statusData.authStep === AuthStep.TWO_FACTOR_REQUIRED) {
-            // Token é temporário, 2FA pendente
-            console.log('[AuthContext] 2FA pendente, limpando token temporário');
-            clearAuth();
-            setUser(null);
-            setAuthStep(AuthStep.NONE);
-          } else {
-            // Token inválido ou expirado
-            console.log('[AuthContext] Token inválido, limpando autenticação');
-            clearAuth();
-            setUser(null);
-            setAuthStep(AuthStep.NONE);
+            if (isRetryable && attempt < maxAttempts - 1) {
+              console.warn(`[AuthContext] Tentativa ${attempt + 1}/${maxAttempts} falhou (${fetchError.name}), retentando em ${retryDelays[attempt]}ms...`);
+              await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+              continue;
+            }
+
+            // Esgotou tentativas — NÃO limpar auth em erro de rede/timeout
+            // O token pode ser válido, o servidor é que está indisponível
+            console.warn(`[AuthContext] Servidor indisponível após ${maxAttempts} tentativas, mantendo sessão local`);
+            // Mantém token no localStorage e user=null temporariamente
+            // Na próxima navegação ou refresh, tentará novamente
+            return;
           }
-        } else {
-          // Token inválido, limpar auth e garantir que user seja null
-          console.log('[AuthContext] Token inválido, limpando autenticação');
-          clearAuth();
-          setUser(null);
-          setAuthStep(AuthStep.NONE);
         }
       } else {
         setAuthStep(AuthStep.NONE);
       }
     } catch (error) {
-      console.error('[AuthContext] Erro ao carregar usuário:', error);
-      clearAuth();
-      setUser(null);
-      setAuthStep(AuthStep.NONE);
+      console.error('[AuthContext] Erro inesperado ao carregar usuário:', error);
+      // Erro inesperado — NÃO limpar auth por segurança
     } finally {
       setLoading(false);
     }
