@@ -61,10 +61,11 @@ export function TwoFactorVerifyPage() {
     }
   }, [state, navigate]);
 
-  async function handleSubmit(e?: FormEvent) {
+  async function handleSubmit(e?: FormEvent, codeOverride?: string) {
     e?.preventDefault();
 
-    if (!code || code.length < 6) {
+    const submitCode = codeOverride || code;
+    if (!submitCode || submitCode.length < 6) {
       setError('Digite o código de 6 dígitos');
       return;
     }
@@ -84,7 +85,7 @@ export function TwoFactorVerifyPage() {
         '/api/auth/2fa/verify',
         {
           method: 'POST',
-          body: { userId: state.userId, code },
+          body: { userId: state.userId, code: submitCode },
           token: state.tempToken,
           skipAutoLogout: true,
         }
@@ -127,10 +128,10 @@ export function TwoFactorVerifyPage() {
 
   function handleCodeComplete(value: string) {
     setCode(value);
-    // Auto-submit quando completar 6 dígitos
+    // Auto-submit quando completar 6 dígitos — passa valor direto para evitar stale closure
     if (value.length === 6) {
       setTimeout(() => {
-        handleSubmit();
+        handleSubmit(undefined, value);
       }, 100);
     }
   }

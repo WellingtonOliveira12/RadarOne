@@ -226,6 +226,74 @@ describe('api auto-logout behavior', () => {
     expect(caught.status).toBe(401);
   });
 
+  // =====================================================
+  // Token passado via options deve ir no Authorization header
+  // =====================================================
+  it('should send custom token in Authorization header when provided', async () => {
+    mockFetchResponse(200, { ok: true });
+
+    await api.request('/api/auth/2fa/verify', {
+      method: 'POST',
+      body: { userId: 'test', code: '123456' },
+      token: 'my-temp-token-123',
+      skipAutoLogout: true,
+    });
+
+    // Verificar que fetch foi chamado com o header correto
+    const fetchCall = (globalThis.fetch as any).mock.calls[0];
+    const fetchOptions = fetchCall[1];
+    expect(fetchOptions.headers['Authorization']).toBe('Bearer my-temp-token-123');
+  });
+
+  // =====================================================
+  // HTTP errors (401, 400, 500) must NOT be masked as NETWORK_ERROR
+  // This was the root cause of the 2FA "Não foi possível conectar" bug
+  // =====================================================
+  it('401 error should propagate with original status, not become NETWORK_ERROR', async () => {
+    mockFetchResponse(401, { errorCode: 'INVALID_2FA_CODE', message: 'Código inválido' });
+
+    let caught: any;
+    try {
+      await api.request('/api/test', { method: 'POST', skipAutoLogout: true });
+    } catch (err: any) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.status).toBe(401);
+    expect(caught.errorCode).not.toBe('NETWORK_ERROR');
+    expect(caught.isNetworkError).toBeUndefined();
+  });
+
+  it('400 validation error should propagate with original message, not NETWORK_ERROR', async () => {
+    mockFetchResponse(400, { errorCode: 'VALIDATION_ERROR', message: 'Dados inválidos' });
+
+    let caught: any;
+    try {
+      await api.request('/api/test', { method: 'POST', skipAutoLogout: true });
+    } catch (err: any) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.status).toBe(400);
+    expect(caught.errorCode).toBe('VALIDATION_ERROR');
+    expect(caught.message).toBe('Dados inválidos');
+  });
+
+  it('500 error should propagate with original status, not become NETWORK_ERROR', async () => {
+    mockFetchResponse(500, { errorCode: 'INTERNAL_ERROR', message: 'Server error' });
+
+    let caught: any;
+    try {
+      await api.request('/api/test', { method: 'POST', skipAutoLogout: true });
+    } catch (err: any) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.status).toBe(500);
+    expect(caught.errorCode).toBe('INTERNAL_ERROR');
+    expect(caught.isNetworkError).toBeUndefined();
+  });
+
   it('should NOT call logout on 403 TRIAL_EXPIRED', async () => {
     // Mock window.location for redirect check
     Object.defineProperty(window, 'location', {
