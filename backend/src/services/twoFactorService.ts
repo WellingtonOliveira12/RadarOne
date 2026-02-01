@@ -212,17 +212,6 @@ export async function verifyTwoFactorCode(
   // Descriptografar secret
   const secret = decryptSecret(user.twoFactorSecret);
 
-  // ── Diagnóstico TOTP ──
-  // Gerar código esperado pelo servidor para comparar com o recebido
-  try {
-    const serverCode = OTPAuth.authenticator.generate(secret);
-    const secretPrefix = secret.substring(0, 4);
-    const secretSuffix = secret.substring(secret.length - 4);
-    console.log(`[2FA-DIAG] userId=${userId} serverCode=${serverCode} receivedCode=${code} match=${serverCode === code} secretLen=${secret.length} secretHint=${secretPrefix}...${secretSuffix} serverTime=${new Date().toISOString()}`);
-  } catch (diagErr) {
-    console.error('[2FA-DIAG] failed to generate server TOTP:', diagErr);
-  }
-
   // Tentar verificar como código TOTP
   const isTOTPValid = verifyTOTP(secret, code);
   if (isTOTPValid) {
