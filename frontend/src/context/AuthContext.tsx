@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { login as authLogin, register as authRegister, isTwoFactorRequired, AuthStep } from '../services/auth';
 import type { LoginTwoFactorRequiredResponse } from '../services/auth';
 import { getToken, setToken, clearAuth } from '../lib/auth';
-import { logout as globalLogout } from '../lib/logout';
+import { logout as globalLogout, isLoggingOut, clearLogoutFlag } from '../lib/logout';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
 
 /**
@@ -71,6 +71,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const loadUser = async () => {
     try {
+      // Se logout está em andamento, não tentar refresh (evita race condition)
+      if (isLoggingOut()) {
+        clearLogoutFlag();
+        clearAuth();
+        setUser(null);
+        setAuthStep(AuthStep.NONE);
+        return;
+      }
+
       let token = getToken();
 
       // Se não tem token em memória, tentar refresh via httpOnly cookie
