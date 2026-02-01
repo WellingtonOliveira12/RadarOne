@@ -823,18 +823,77 @@ export class AuthController {
    */
   static async verify2FA(req: Request, res: Response): Promise<void> {
     try {
-      const { userId, code } = req.body;
+      const { userId: bodyUserId, code } = req.body;
 
-      if (!userId || !code) {
+      if (!bodyUserId || !code) {
         res.status(400).json({ errorCode: 'VALIDATION_ERROR', message: 'userId e code são obrigatórios' });
         return;
       }
 
-      // Verificar código
+      // ── Validar tempToken e derivar userId real ──
+      // Segurança: não confiar cegamente no userId do body.
+      // Derivar do tempToken quando disponível.
+      let userId = bodyUserId;
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        try {
+          const tempToken = authHeader.slice(7);
+          const secret = process.env.JWT_SECRET;
+          if (secret) {
+            const decoded = jwt.verify(tempToken, secret) as any;
+            if (decoded.type === 'two_factor_pending' && decoded.userId) {
+              if (decoded.userId !== bodyUserId) {
+                logInfo('[2FA-DIAG] userId MISMATCH', {
+                  tokenUserId: decoded.userId,
+                  bodyUserId,
+                  requestId: req.requestId,
+                });
+              }
+              // Usar sempre o userId do token (fonte confiável)
+              userId = decoded.userId;
+            }
+          }
+        } catch (tokenErr: any) {
+          // tempToken expirado ou inválido — logar mas continuar com bodyUserId
+          logInfo('[2FA-DIAG] tempToken invalid/expired', {
+            error: tokenErr.message,
+            requestId: req.requestId,
+          });
+        }
+      }
+
+      // ── Diagnóstico: logar estado do 2FA antes de verificar ──
       const twoFactorService = await import('../services/twoFactorService');
+
+      const userRecord = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          twoFactorEnabled: true,
+          twoFactorSecret: true,
+        },
+      });
+
+      logInfo('[2FA-DIAG] verify attempt', {
+        requestId: req.requestId,
+        userId,
+        serverTime: new Date().toISOString(),
+        hasTwoFASecret: !!userRecord?.twoFactorSecret,
+        twoFAEnabled: !!userRecord?.twoFactorEnabled,
+        twoFASecretLength: userRecord?.twoFactorSecret?.length ?? 0,
+        codeLength: code.length,
+      });
+
+      // Verificar código
       const result = await twoFactorService.verifyTwoFactorCode(userId, code);
 
       if (!result.valid) {
+        logInfo('[2FA-DIAG] code REJECTED', {
+          requestId: req.requestId,
+          userId,
+          codeLength: code.length,
+          serverTime: new Date().toISOString(),
+        });
         res.status(401).json({ errorCode: 'INVALID_2FA_CODE', message: 'Código inválido' });
         return;
       }
