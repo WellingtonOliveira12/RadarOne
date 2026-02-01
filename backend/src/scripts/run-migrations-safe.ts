@@ -86,6 +86,38 @@ async function runMigrations(): Promise<void> {
     },
   };
 
+  // ── HOTFIX: resolver migration falhada + resetar 2FA do admin ──
+  // A migration 20260201140000_reset_admin_2fa falhou e bloqueia deploys.
+  // REMOVER este bloco após o admin re-configurar 2FA.
+  try {
+    log('Verificando migrations falhadas...');
+    execSync(
+      `npx prisma migrate resolve --rolled-back 20260201140000_reset_admin_2fa`,
+      execOptions
+    );
+    log('Migration falhada marcada como rolled-back');
+  } catch {
+    // Ignora se migration não existe ou já foi resolvida
+  }
+
+  // Resetar 2FA do admin via SQL direto (não depende de migration)
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const db = new PrismaClient();
+    const result = await db.$executeRaw`
+      UPDATE "User"
+      SET two_factor_enabled = false, two_factor_secret = NULL, two_factor_backup_codes = '{}'
+      WHERE id = 'cmjul3uys000043avi0csh1wg' AND two_factor_enabled = true
+    `;
+    if (result > 0) {
+      log('2FA resetado para admin bloqueado');
+    }
+    await db.$disconnect();
+  } catch (e: any) {
+    log(`Aviso ao resetar 2FA: ${e.message}`, 'WARN');
+  }
+  // ── FIM HOTFIX ──
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     log(`Tentativa ${attempt}/${MAX_RETRIES}...`);
 

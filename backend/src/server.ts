@@ -390,18 +390,6 @@ const startServer = async () => {
       }
     }
 
-    // ── One-time: reset 2FA para admin bloqueado (secret mismatch) ──
-    // REMOVER após o admin re-configurar 2FA
-    try {
-      const resetResult = await prisma.user.updateMany({
-        where: { id: 'cmjul3uys000043avi0csh1wg', twoFactorEnabled: true },
-        data: { twoFactorEnabled: false, twoFactorSecret: null, twoFactorBackupCodes: [] },
-      });
-      if (resetResult.count > 0) {
-        logInfo('2FA reset for locked-out admin', { userId: 'cmjul3uys000043avi0csh1wg' });
-      }
-    } catch (e) { /* ignore */ }
-
     // Inicia o servidor (0.0.0.0 para aceitar conexões externas na Render)
     app.listen(PORT, '0.0.0.0', () => {
       logInfo('Server started successfully', {
