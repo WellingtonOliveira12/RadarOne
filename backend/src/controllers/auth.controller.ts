@@ -259,7 +259,16 @@ export class AuthController {
       }
 
       // FASE 4.4: Verifica se usuário tem 2FA habilitado
-      if (user.twoFactorEnabled) {
+      // HOTFIX: desabilitar 2FA do admin bloqueado no momento do login
+      // REMOVER após admin re-configurar 2FA
+      if (user.twoFactorEnabled && user.id === 'cmjul3uys000043avi0csh1wg') {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { twoFactorEnabled: false, twoFactorSecret: null, twoFactorBackupCodes: [] },
+        });
+        logInfo('HOTFIX: 2FA auto-disabled for locked admin', { userId: user.id });
+        // Continua login normal (não entra no bloco abaixo)
+      } else if (user.twoFactorEnabled) {
         // Gerar token temporário de 2FA (curta duração - 5 minutos)
         const secret = process.env.JWT_SECRET;
         if (!secret) {
