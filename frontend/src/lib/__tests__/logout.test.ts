@@ -27,6 +27,7 @@ describe('logout', () => {
   });
 
   afterEach(() => {
+    globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
     Object.defineProperty(window, 'location', {
       writable: true,
