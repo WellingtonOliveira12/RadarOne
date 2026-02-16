@@ -421,22 +421,78 @@ function ConnectionWizard({
 
             <Tabs variant="enclosed" colorScheme="blue">
               <TabList>
-                <Tab data-testid="tab-automatico">
-                  <HStack spacing={1}>
-                    <Icon as={Terminal} boxSize={4} />
-                    <Text>Automático (Recomendado)</Text>
-                  </HStack>
-                </Tab>
                 <Tab data-testid="tab-extensao">
                   <HStack spacing={1}>
                     <Icon as={FileText} boxSize={4} />
-                    <Text>Via extensão</Text>
+                    <Text>Via Cookies (Recomendado)</Text>
+                  </HStack>
+                </Tab>
+                <Tab data-testid="tab-automatico">
+                  <HStack spacing={1}>
+                    <Icon as={Terminal} boxSize={4} />
+                    <Text>Automático</Text>
                   </HStack>
                 </Tab>
               </TabList>
 
               <TabPanels>
-                {/* TAB 1: Playwright automático */}
+                {/* TAB 1: Via Cookies (Recomendado) */}
+                <TabPanel px={0}>
+                  <Box bg="green.50" border="1px solid" borderColor="green.200" borderRadius="md" p={2} mb={3}>
+                    <HStack>
+                      <Badge colorScheme="green" fontSize="xs">Recomendado</Badge>
+                      <Text fontSize="xs" color="green.700">Mais simples e prático para a maioria dos usuários.</Text>
+                    </HStack>
+                  </Box>
+                  <VStack align="start" spacing={3}>
+                    <Box>
+                      <Text fontWeight="medium" fontSize="sm" mb={1}>1. Instale uma extensão que exporte cookies para JSON.</Text>
+                      <Text fontSize="xs" color="gray.500" mb={2}>
+                        Clique para instalar direto da Chrome Web Store:
+                      </Text>
+                      <VStack align="start" spacing={1} pl={3}>
+                        <a
+                          href="https://chromewebstore.google.com/detail/export-cookie-json-file-f/nmckokihipjgplolmcmjakknndddifde?hl=en"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: '13px', color: '#3182ce', textDecoration: 'underline' }}
+                        >
+                          Export Cookie JSON File
+                        </a>
+                        <a
+                          href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm?hl=en"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: '13px', color: '#3182ce', textDecoration: 'underline' }}
+                        >
+                          Cookie Editor
+                        </a>
+                        <a
+                          href="https://chromewebstore.google.com/detail/editthiscookie-v3/ojfebgpkimhlhcblbalbfjblapadhbol"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: '13px', color: '#3182ce', textDecoration: 'underline' }}
+                        >
+                          EditThisCookie
+                        </a>
+                      </VStack>
+                    </Box>
+
+                    <Box>
+                      <Text fontWeight="medium" fontSize="sm">2. Faça login no mercadolivre.com.br.</Text>
+                    </Box>
+
+                    <Box>
+                      <Text fontWeight="medium" fontSize="sm">3. Use a extensão para exportar os cookies como .json.</Text>
+                    </Box>
+
+                    <Box>
+                      <Text fontWeight="medium" fontSize="sm">4. Envie o arquivo .json na área abaixo.</Text>
+                    </Box>
+                  </VStack>
+                </TabPanel>
+
+                {/* TAB 2: Automático (Alternativa) */}
                 <TabPanel px={0}>
                   <VStack align="start" spacing={3}>
                     <Text fontSize="sm" color="gray.600">
@@ -479,43 +535,6 @@ function ConnectionWizard({
                       <Text fontWeight="medium" fontSize="sm">
                         3. Envie o arquivo <Code fontSize="xs">sessao.json</Code> gerado na área abaixo.
                       </Text>
-                    </Box>
-                  </VStack>
-                </TabPanel>
-
-                {/* TAB 2: Via extensão */}
-                <TabPanel px={0}>
-                  <VStack align="start" spacing={3}>
-                    <Text fontSize="sm" color="gray.600">
-                      Se preferir usar uma extensão de navegador, siga os passos abaixo.
-                    </Text>
-
-                    <Box>
-                      <Text fontWeight="medium" fontSize="sm" mb={1}>1. Instale uma extensão que exporte cookies para JSON.</Text>
-                      <Text fontSize="xs" color="gray.500">
-                        Na loja de extensões do seu navegador, procure por termos como:
-                      </Text>
-                      <Box pl={3} mt={1}>
-                        <Text fontSize="xs" color="gray.600">&bull; "Export cookies JSON"</Text>
-                        <Text fontSize="xs" color="gray.600">&bull; "Cookie editor export"</Text>
-                        <Text fontSize="xs" color="gray.600">&bull; "EditThisCookie"</Text>
-                      </Box>
-                      <Text fontSize="xs" color="gray.400" mt={1}>
-                        Extensões mudam com frequência. Se uma não estiver disponível, use outra ou
-                        prefira o método automático.
-                      </Text>
-                    </Box>
-
-                    <Box>
-                      <Text fontWeight="medium" fontSize="sm">2. Faça login no mercadolivre.com.br.</Text>
-                    </Box>
-
-                    <Box>
-                      <Text fontWeight="medium" fontSize="sm">3. Use a extensão para exportar os cookies como .json.</Text>
-                    </Box>
-
-                    <Box>
-                      <Text fontWeight="medium" fontSize="sm">4. Envie o arquivo .json na área abaixo.</Text>
                     </Box>
                   </VStack>
                 </TabPanel>

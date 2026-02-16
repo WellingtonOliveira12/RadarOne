@@ -221,7 +221,7 @@ export function MonitorsPage() {
       }
 
       if (idSelecionado) {
-        await api.post(`/api/monitors/${idSelecionado}`, body, token);
+        await api.put(`/api/monitors/${idSelecionado}`, body, token);
       } else {
         await api.post('/api/monitors', body, token);
         // Track monitor creation
