@@ -382,25 +382,22 @@ export const PlansPage: React.FC = () => {
           </div>
         )}
 
-        {/* Banner de trial expirado */}
-        {reason === 'trial_expired' && (
+        {/* Banner único de motivo de bloqueio (mutuamente exclusivos) */}
+        {reason === 'trial_expired' ? (
           <div style={styles.trialExpiredBanner}>
             <p style={styles.trialExpiredText}>
               ⏰ {getABMessage('trialExpiredBanner')}
             </p>
           </div>
-        )}
-
-        {error && <div style={styles.error}>{error}</div>}
-
-        {/* Banner fixo informando motivo do bloqueio (se houver) */}
-        {reason && (
+        ) : reason ? (
           <div style={styles.reasonBannerFixed}>
             <p style={styles.reasonBannerText}>
               ⚠️ {getSubscriptionMessage(reason)}
             </p>
           </div>
-        )}
+        ) : null}
+
+        {error && <div style={styles.error}>{error}</div>}
 
         {/* Sucesso do cupom de Trial Upgrade - Mostrar no topo se aplicado */}
         {couponSuccess && (

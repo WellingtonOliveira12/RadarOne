@@ -94,10 +94,11 @@ export const requireAdmin = async (
 };
 
 /**
- * Middleware para verificar se o trial FREE expirou
- * Bloqueia acesso aos recursos se:
- * 1. Usuário tem plano FREE (trial)
- * 2. Trial já expirou (trialEndsAt < now)
+ * Middleware para verificar se o usuário tem subscription válida
+ * Bloqueia acesso aos recursos se não houver subscription ativa/trial válido.
+ *
+ * Distingue entre TRIAL_EXPIRED e SUBSCRIPTION_REQUIRED para que o frontend
+ * redirecione com o motivo correto.
  *
  * Deve ser usado APÓS authenticateToken
  */
@@ -114,16 +115,28 @@ export const checkTrialExpired = async (
     // FONTE CANÔNICA: Usar subscriptionService para determinar subscription válida
     const subscription = await getCurrentSubscriptionForUser(req.userId);
 
-    // Se não tem assinatura válida, bloquear acesso
-    if (!subscription) {
-      throw AppError.subscriptionRequired('Você precisa assinar um plano para acessar este recurso');
+    if (subscription) {
+      // Subscription válida — permitir acesso
+      next();
+      return;
     }
 
-    // Se chegou aqui, a subscription é válida (a função canônica já validou)
-    // Não precisa verificar datas ou status - getCurrentSubscriptionForUser já faz isso
+    // Sem subscription válida — descobrir se é trial expirado ou sem subscription
+    const expiredTrial = await prisma.subscription.findFirst({
+      where: {
+        userId: req.userId,
+        status: 'TRIAL',
+        isTrial: true,
+        trialEndsAt: { lt: new Date() }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
-    // Se passou por todas as verificações, permitir acesso
-    next();
+    if (expiredTrial) {
+      throw AppError.trialExpired('Seu período de teste gratuito expirou. Assine um plano para continuar.');
+    }
+
+    throw AppError.subscriptionRequired('Você precisa assinar um plano para acessar este recurso');
   } catch (error) {
     next(error);
   }

@@ -224,7 +224,8 @@ export class AuthController {
             },
             include: {
               plan: true
-            }
+            },
+            orderBy: { createdAt: 'desc' }
           }
         }
       });
@@ -356,7 +357,8 @@ export class AuthController {
             },
             include: {
               plan: true
-            }
+            },
+            orderBy: { createdAt: 'desc' }
           }
         }
       });
@@ -857,13 +859,14 @@ export class AuthController {
         return;
       }
 
-      // Buscar usuário completo
+      // Buscar usuário completo (incluir TRIAL e ACTIVE, ordenar por mais recente)
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
           subscriptions: {
-            where: { status: 'ACTIVE' },
-            include: { plan: true }
+            where: { status: { in: ['ACTIVE', 'TRIAL'] } },
+            include: { plan: true },
+            orderBy: { createdAt: 'desc' }
           }
         }
       });
@@ -1168,7 +1171,8 @@ export class AuthController {
           twoFactorEnabled: true,
           subscriptions: {
             where: { status: { in: ['ACTIVE', 'TRIAL'] } },
-            include: { plan: true }
+            include: { plan: true },
+            orderBy: { createdAt: 'desc' }
           }
         }
       });

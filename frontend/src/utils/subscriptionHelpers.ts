@@ -62,59 +62,64 @@ export function getSubscriptionStatus(user: User | null): SubscriptionStatus {
     };
   }
 
-  // Pegar a subscription mais recente (primeira do array, backend ordena por createdAt desc)
-  const subscription = user.subscriptions[0];
+  const now = new Date();
 
-  // Subscription ACTIVE → OK
-  if (subscription.status === 'ACTIVE') {
-    return {
-      hasValidSubscription: true,
-      subscription,
-    };
-  }
+  // Percorrer TODAS as subscriptions (ordenadas por createdAt desc pelo backend)
+  // e encontrar a PRIMEIRA válida. Isso evita que um trial expirado antigo
+  // mascare um trial/subscription mais recente válido.
+  let lastExpiredTrial: Subscription | undefined;
 
-  // Subscription TRIAL → verificar se expirou (exceto se vitalício)
-  if (subscription.status === 'TRIAL') {
-    // Se é vitalício, sempre válido
-    if (subscription.isLifetime) {
-      return {
-        hasValidSubscription: true,
-        subscription,
-      };
+  for (const subscription of user.subscriptions) {
+    // Subscription ACTIVE → OK
+    if (subscription.status === 'ACTIVE') {
+      // Vitalício ou sem data de expiração → sempre válido
+      if (subscription.isLifetime || !subscription.validUntil) {
+        return { hasValidSubscription: true, subscription };
+      }
+      // Verificar se validUntil >= now
+      if (new Date(subscription.validUntil) >= now) {
+        return { hasValidSubscription: true, subscription };
+      }
+      // ACTIVE expirado — continuar buscando
+      continue;
     }
 
-    if (subscription.trialEndsAt) {
-      const trialEnd = new Date(subscription.trialEndsAt);
-      const now = new Date();
-
-      if (trialEnd < now) {
-        // Trial expirado
-        return {
-          hasValidSubscription: false,
-          reason: 'trial_expired',
-          subscription,
-        };
+    // Subscription TRIAL → verificar se expirou (exceto se vitalício)
+    if (subscription.status === 'TRIAL') {
+      if (subscription.isLifetime) {
+        return { hasValidSubscription: true, subscription };
       }
 
-      // Trial ainda válido
-      return {
-        hasValidSubscription: true,
-        subscription,
-      };
+      if (subscription.trialEndsAt) {
+        if (new Date(subscription.trialEndsAt) >= now) {
+          return { hasValidSubscription: true, subscription };
+        }
+        // Trial expirado — guardar para usar como reason se nenhuma válida for encontrada
+        if (!lastExpiredTrial) {
+          lastExpiredTrial = subscription;
+        }
+        continue;
+      }
+
+      // TRIAL sem trialEndsAt (edge case) → considerar válido
+      return { hasValidSubscription: true, subscription };
     }
 
-    // TRIAL sem trialEndsAt (edge case) → considerar válido
+    // Outros status (CANCELLED, EXPIRED, SUSPENDED, PAST_DUE) → pular
+  }
+
+  // Nenhuma subscription válida encontrada
+  if (lastExpiredTrial) {
     return {
-      hasValidSubscription: true,
-      subscription,
+      hasValidSubscription: false,
+      reason: 'trial_expired',
+      subscription: lastExpiredTrial,
     };
   }
 
-  // Qualquer outro status (CANCELLED, EXPIRED, SUSPENDED, PAST_DUE) → bloqueado
   return {
     hasValidSubscription: false,
     reason: 'subscription_required',
-    subscription,
   };
 }
 

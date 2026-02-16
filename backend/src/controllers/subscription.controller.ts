@@ -28,61 +28,16 @@ export class SubscriptionController {
       // FONTE CANÔNICA: Usar subscriptionService para determinar subscription válida
       const subscription = await getCurrentSubscriptionForUser(userId);
 
-      // Se não houver subscription, verificar trial implícito baseado em user.createdAt
+      // Sem subscription válida — retornar resposta clara (sem "trial implícito" fantasma)
       if (!subscription) {
-        logInfo('Usuário sem subscription, verificando trial de 7 dias', { userId });
-
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { createdAt: true }
-        });
-
-        if (!user) {
-          res.status(404).json({ error: 'Usuário não encontrado' });
-          return;
-        }
-
-        // Calcular se está dentro do trial de 7 dias
-        const now = new Date();
-        const trialEndDate = new Date(user.createdAt);
-        trialEndDate.setDate(trialEndDate.getDate() + 7);
-
-        const diffTime = trialEndDate.getTime() - now.getTime();
-        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const isExpired = daysRemaining <= 0;
-
-        // Buscar plano Free (deve ser o padrão para trial)
-        const freePlan = await prisma.plan.findFirst({
-          where: { slug: 'free' }
-        });
-
-        if (!freePlan) {
-          logError('Plano Free não encontrado no banco', {});
-          res.status(500).json({ error: 'Plano Free não configurado' });
-          return;
-        }
-
+        logInfo('Usuário sem subscription válida', { userId });
         res.status(200).json({
-          subscription: {
-            id: 'trial-implicit',
-            status: isExpired ? 'EXPIRED' : 'TRIAL',
-            startDate: user.createdAt,
-            validUntil: trialEndDate,
-            trialEndsAt: trialEndDate,
-            isLifetime: false,
-            isTrial: !isExpired,
-            createdAt: user.createdAt,
-            plan: freePlan
-          },
-          usage: {
-            monitorsCreated: 0,
-            monitorsLimit: freePlan.maxMonitors,
-            canCreateMore: !isExpired && 0 < freePlan.maxMonitors
-          },
+          subscription: null,
+          usage: null,
           timeRemaining: {
-            daysRemaining: Math.max(0, daysRemaining),
-            expiresAt: trialEndDate,
-            isExpired
+            daysRemaining: 0,
+            expiresAt: null,
+            isExpired: true
           }
         });
         return;
