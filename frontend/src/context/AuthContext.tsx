@@ -138,6 +138,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               const statusData = await response.json();
 
               if (statusData.isAuthenticated && statusData.user) {
+                // Log de diagnóstico: verificar dados de subscription recebidos
+                const subs = statusData.user.subscriptions;
+                if (subs && subs.length > 0) {
+                  const s = subs[0];
+                  console.log(`[AuthContext] Subscription: status=${s.status}, trialEndsAt=${s.trialEndsAt}, plan=${s.plan?.slug}`);
+                } else {
+                  console.log('[AuthContext] Nenhuma subscription recebida');
+                }
                 setUser(statusData.user);
                 setAuthStep(AuthStep.AUTHENTICATED);
               } else if (statusData.authStep === AuthStep.TWO_FACTOR_REQUIRED) {
@@ -204,6 +212,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Login completo (sem 2FA ou 2FA já verificado)
     setToken(response.token);
+    // Log de diagnóstico: verificar dados de subscription no login
+    const subs = (response.user as any)?.subscriptions;
+    if (subs && subs.length > 0) {
+      const s = subs[0];
+      console.log(`[AuthContext:login] Subscription: status=${s.status}, trialEndsAt=${s.trialEndsAt}, plan=${s.plan?.slug}`);
+    } else {
+      console.log('[AuthContext:login] Nenhuma subscription no response do login');
+    }
     setUser(response.user);
     setAuthStep(AuthStep.AUTHENTICATED);
   };

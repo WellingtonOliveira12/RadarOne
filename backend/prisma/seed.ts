@@ -13,7 +13,7 @@ const prisma = new PrismaClient({ adapter });
  * Seed dos Planos Comerciais do RadarOne
  *
  * Planos:
- * - FREE: Plano gratuito básico (1 monitor, 1 site, sem trial)
+ * - FREE: Plano gratuito básico (1 monitor, 1 site, 7 dias trial)
  * - STARTER: Plano inicial (5 monitores, 2 sites, 7 dias garantia) - R$ 29,00 - kiwifyProductId: qyvPYUx
  * - PRO: Plano recomendado ⭐ (10 monitores, 3 sites, 7 dias garantia) - R$ 49,00 - kiwifyProductId: giCvSH0
  * - PREMIUM: Plano avançado (20 monitores, 5 sites, 7 dias garantia) - R$ 97,00 - kiwifyProductId: 76JoTEL
@@ -36,7 +36,7 @@ async function main() {
       description: 'Plano gratuito para testar o RadarOne',
       priceCents: 0,
       billingPeriod: 'MONTHLY',
-      trialDays: 0, // FREE não tem trial
+      trialDays: 7, // 7 dias de trial gratuito para novos usuários
       maxMonitors: 1,
       maxSites: 1,
       maxAlertsPerDay: 10,
@@ -45,8 +45,8 @@ async function main() {
       priority: 1,
       isActive: true,
       isLifetime: false,
-      kiwifyProductId: null, // TODO: preencher após criar produto na Kiwify
-      checkoutUrl: null, // FREE não tem checkout
+      kiwifyProductId: null,
+      checkoutUrl: null,
     },
     create: {
       name: 'Free',
@@ -54,7 +54,7 @@ async function main() {
       description: 'Plano gratuito para testar o RadarOne',
       priceCents: 0,
       billingPeriod: 'MONTHLY',
-      trialDays: 0,
+      trialDays: 7, // 7 dias de trial gratuito para novos usuários
       maxMonitors: 1,
       maxSites: 1,
       maxAlertsPerDay: 10,

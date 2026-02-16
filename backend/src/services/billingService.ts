@@ -109,8 +109,28 @@ export async function startTrialForUser(
     throw new Error('Plano não encontrado: ' + planSlug);
   }
 
-  const trialEndsAt = new Date();
-  trialEndsAt.setDate(trialEndsAt.getDate() + plan.trialDays);
+  // GUARD RAIL: trialDays deve ser >= 1. Se for 0/null/negativo, usar fallback de 7 dias.
+  const FALLBACK_TRIAL_DAYS = 7;
+  const effectiveTrialDays = (plan.trialDays && plan.trialDays >= 1) ? plan.trialDays : FALLBACK_TRIAL_DAYS;
+
+  if (plan.trialDays < 1) {
+    console.error(
+      `[BILLING] CRITICAL: plan.trialDays inválido (${plan.trialDays}) para plano "${plan.slug}". ` +
+      `Usando fallback de ${FALLBACK_TRIAL_DAYS} dias. Corrija o banco!`
+    );
+  }
+
+  const now = new Date();
+  const trialEndsAt = new Date(now);
+  trialEndsAt.setDate(trialEndsAt.getDate() + effectiveTrialDays);
+
+  // Validação final: trialEndsAt DEVE ser no futuro
+  if (trialEndsAt <= now) {
+    throw new Error(
+      `[BILLING] BUG: trialEndsAt (${trialEndsAt.toISOString()}) não está no futuro. ` +
+      `plan=${plan.slug}, trialDays=${plan.trialDays}, effectiveTrialDays=${effectiveTrialDays}`
+    );
+  }
 
   const subscription = await prisma.subscription.create({
     data: {
@@ -125,7 +145,13 @@ export async function startTrialForUser(
     include: { plan: true, user: true }
   });
 
-  console.log('[BILLING] Trial iniciado:', userId, plan.name);
+  // Log estruturado de diagnóstico
+  const diffDays = Math.round((trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  console.log(
+    `[BILLING] Trial iniciado: userId=${userId}, plan=${plan.slug}, ` +
+    `trialDays=${effectiveTrialDays}, trialEndsAt=${trialEndsAt.toISOString()}, ` +
+    `now=${now.toISOString()}, diffDays=${diffDays}`
+  );
 
   // Enviar e-mail de trial iniciado (não bloqueia se falhar)
   if (subscription.user && subscription.trialEndsAt) {
