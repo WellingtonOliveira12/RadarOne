@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { Plan, Coupon, Subscription } from '@prisma/client';
 import { sendTrialStartedEmail } from './emailService';
+import { ErrorCodes } from '../constants/errorCodes';
 
 /**
  * Serviço de Billing e Assinaturas (SaaS Ready)
@@ -89,20 +90,42 @@ export async function applyCouponIfValid(
 }
 
 /**
- * Inicia período de trial INTERNO para usuário
+ * Resultado do startTrialForUser — indica se o trial já existia ou foi criado novo.
+ */
+export interface StartTrialResult {
+  subscription: Subscription;
+  isExisting: boolean;
+}
+
+/**
+ * Erro de negócio lançado pelo startTrialForUser.
+ * O controller deve capturar e traduzir em HTTP response.
+ */
+export class TrialBusinessError extends Error {
+  public readonly errorCode: string;
+  constructor(message: string, errorCode: string) {
+    super(message);
+    this.name = 'TrialBusinessError';
+    this.errorCode = errorCode;
+  }
+}
+
+/**
+ * Inicia período de trial INTERNO para usuário (TRANSACIONAL)
  *
- * IMPORTANTE: Este trial é INTERNO do RadarOne, usado para:
- * 1. Permitir que novos usuários testem o sistema ANTES de comprar
- * 2. Controlar acesso durante o período de teste gratuito (plano FREE)
+ * REGRAS:
+ * 1. Se já existe TRIAL válido do mesmo plano → retorna existente (idempotente)
+ * 2. Se já existe subscription ACTIVE → rejeita (SUBSCRIPTION_ALREADY_ACTIVE)
+ * 3. Se já usou trial deste plano antes (qualquer status) → rejeita (TRIAL_ALREADY_USED)
+ * 4. Cancela trials expirados antigos do user (limpeza)
+ * 5. Cria novo trial com guard rail de trialDays
  *
- * NÃO confundir com o período de garantia da Kiwify:
- * - Trial interno: Acesso gratuito sem cobrança (usado no plano FREE)
- * - Garantia Kiwify: Pagamento imediato + possibilidade de estorno em 7 dias
+ * Usa prisma.$transaction para evitar race conditions.
  */
 export async function startTrialForUser(
   userId: string,
   planSlug: string
-): Promise<Subscription> {
+): Promise<StartTrialResult> {
   const plan = await prisma.plan.findUnique({ where: { slug: planSlug } });
 
   if (!plan) {
@@ -132,39 +155,124 @@ export async function startTrialForUser(
     );
   }
 
-  const subscription = await prisma.subscription.create({
-    data: {
-      userId,
-      planId: plan.id,
-      status: 'TRIAL',
-      isTrial: true,
-      trialEndsAt,
-      validUntil: trialEndsAt,
-      queriesLimit: 1000,
-    },
-    include: { plan: true, user: true }
+  // TRANSAÇÃO: verificar duplicidade + criar trial atomicamente
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Buscar subscription válida ACTIVE ou TRIAL do user
+    const existingSubs = await tx.subscription.findMany({
+      where: {
+        userId,
+        status: { in: ['ACTIVE', 'TRIAL'] },
+      },
+      include: { plan: true },
+      orderBy: [
+        { isLifetime: 'desc' },
+        { status: 'asc' },
+        { createdAt: 'desc' },
+      ],
+    });
+
+    for (const sub of existingSubs) {
+      // TRIAL válido do mesmo plano → idempotente
+      if (sub.status === 'TRIAL' && sub.plan.slug === planSlug) {
+        const stillValid = sub.isLifetime ||
+          (sub.trialEndsAt && sub.trialEndsAt >= now) ||
+          !sub.trialEndsAt;
+        if (stillValid) {
+          console.log(
+            `[TRIAL] Idempotente: userId=${userId}, planSlug=${planSlug}, existingSubId=${sub.id}`
+          );
+          return { subscription: sub as Subscription, isExisting: true };
+        }
+      }
+
+      // ACTIVE válido → bloqueia
+      if (sub.status === 'ACTIVE') {
+        const stillValid = sub.isLifetime ||
+          (sub.validUntil && sub.validUntil >= now) ||
+          !sub.validUntil;
+        if (stillValid) {
+          console.log(
+            `[TRIAL] Rejeitado: userId=${userId} já possui subscription ACTIVE (subId=${sub.id})`
+          );
+          throw new TrialBusinessError(
+            'Você já possui uma assinatura ativa.',
+            ErrorCodes.SUBSCRIPTION_ALREADY_ACTIVE
+          );
+        }
+      }
+    }
+
+    // 2. Verificar se já usou trial deste plano antes (qualquer status)
+    //    1 trial por email/CPF — como userId é 1:1 com email/CPF, basta checar userId+planId
+    const previousTrial = await tx.subscription.findFirst({
+      where: {
+        userId,
+        planId: plan.id,
+        isTrial: true,
+      },
+    });
+
+    if (previousTrial) {
+      console.log(
+        `[TRIAL] Rejeitado: userId=${userId} já usou trial do plano ${planSlug} (subId=${previousTrial.id})`
+      );
+      throw new TrialBusinessError(
+        'Você já utilizou o período de teste deste plano.',
+        ErrorCodes.TRIAL_ALREADY_USED
+      );
+    }
+
+    // 3. Cancelar trials expirados de outros planos (limpeza)
+    await tx.subscription.updateMany({
+      where: {
+        userId,
+        status: 'TRIAL',
+        isTrial: true,
+        trialEndsAt: { lt: now },
+      },
+      data: { status: 'EXPIRED' },
+    });
+
+    // 4. Criar novo trial
+    const subscription = await tx.subscription.create({
+      data: {
+        userId,
+        planId: plan.id,
+        status: 'TRIAL',
+        isTrial: true,
+        trialEndsAt,
+        validUntil: trialEndsAt,
+        queriesLimit: 1000,
+      },
+      include: { plan: true, user: true },
+    });
+
+    return { subscription, isExisting: false };
   });
 
-  // Log estruturado de diagnóstico
-  const diffDays = Math.round((trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  console.log(
-    `[BILLING] Trial iniciado: userId=${userId}, plan=${plan.slug}, ` +
-    `trialDays=${effectiveTrialDays}, trialEndsAt=${trialEndsAt.toISOString()}, ` +
-    `now=${now.toISOString()}, diffDays=${diffDays}`
-  );
+  // Log estruturado de diagnóstico (fora da transação)
+  if (!result.isExisting) {
+    const diffDays = Math.round((trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    console.log(
+      `[TRIAL] Criado: userId=${userId}, plan=${plan.slug}, ` +
+      `trialDays=${effectiveTrialDays}, trialEndsAt=${trialEndsAt.toISOString()}, ` +
+      `now=${now.toISOString()}, diffDays=${diffDays}`
+    );
 
-  // Enviar e-mail de trial iniciado (não bloqueia se falhar)
-  if (subscription.user && subscription.trialEndsAt) {
-    sendTrialStartedEmail(
-      subscription.user.email,
-      plan.name,
-      subscription.trialEndsAt
-    ).catch((err) => {
-      console.error('[BILLING] Erro ao enviar e-mail de trial iniciado:', err);
-    });
+    // Enviar e-mail de trial iniciado (não bloqueia se falhar)
+    const sub = result.subscription as any;
+    if (sub.user && sub.trialEndsAt) {
+      sendTrialStartedEmail(
+        sub.user.email,
+        plan.name,
+        sub.trialEndsAt
+      ).catch((err: any) => {
+        console.error('[BILLING] Erro ao enviar e-mail de trial iniciado:', err);
+      });
+    }
   }
 
-  return subscription;
+  return result;
 }
 
 /**

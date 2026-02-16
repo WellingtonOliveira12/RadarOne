@@ -362,6 +362,10 @@ const startServer = async () => {
     await prisma.$connect();
     logSimpleInfo('Database connected successfully');
 
+    // Anti-regressão: validar integridade dos planos no boot
+    const { ensurePlansIntegrity } = await import('./services/planBootValidation');
+    await ensurePlansIntegrity();
+
     // Define URL pública para produção
     const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
     const isProduction = process.env.NODE_ENV === 'production';

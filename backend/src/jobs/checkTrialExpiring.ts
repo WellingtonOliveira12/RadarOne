@@ -136,6 +136,24 @@ async function checkTrialExpiring(): Promise<JobRunResult> {
       }
 
       logSimpleInfo('Verificação de trials concluída!');
+
+      // 3. Alerta: broken trials (trial_ends_at ≈ created_at, indica bug de trialDays=0)
+      const brokenTrials: { count: bigint }[] = await prisma.$queryRaw`
+        SELECT COUNT(*)::bigint AS count
+        FROM subscriptions
+        WHERE is_trial = true
+          AND trial_ends_at IS NOT NULL
+          AND trial_ends_at <= created_at + interval '5 minutes'
+          AND status IN ('TRIAL', 'EXPIRED')
+      `;
+      const brokenCount = Number(brokenTrials[0]?.count ?? 0);
+      if (brokenCount > 0) {
+        logError('[TRIAL] ALERT: broken trials detectados (trial_ends_at ≈ created_at)', {
+          brokenCount,
+          action: 'Executar script fix-free-plan-trial-days.ts',
+        });
+      }
+
     }, {
       retries: 3,
       delayMs: 1000,

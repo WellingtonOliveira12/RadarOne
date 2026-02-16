@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
-import { startTrialForUser } from '../services/billingService';
+import { startTrialForUser, TrialBusinessError } from '../services/billingService';
 import { generateCheckoutUrl } from '../services/kiwifyService';
 import { getCurrentSubscriptionForUser } from '../services/subscriptionService';
 import { logInfo, logError } from '../utils/loggerHelpers';
@@ -139,45 +139,35 @@ export class SubscriptionController {
         return;
       }
 
-      // Usar função canônica para verificar assinatura válida (respeita datas)
-      const existingSubscription = await getCurrentSubscriptionForUser(userId);
+      // Toda lógica de dedup/validação está no service (transacional)
+      const result = await startTrialForUser(userId, planSlug);
 
-      if (existingSubscription) {
-        // Idempotência: se já tem trial ativo no mesmo plano, retornar 200 com a assinatura existente
-        if (existingSubscription.status === 'TRIAL' && existingSubscription.plan.slug === planSlug) {
-          logInfo('[TRIAL] Trial já ativo, retornando existente (idempotente)', { userId, planSlug });
-          res.status(200).json({
-            message: 'Seu trial já está ativo',
-            errorCode: ErrorCodes.TRIAL_ALREADY_ACTIVE,
-            subscription: existingSubscription
-          });
-          return;
-        }
-
-        // Assinatura ativa de outro tipo (paga ou trial de outro plano)
-        logInfo('[TRIAL] Bloqueado: usuário já possui assinatura ativa', {
-          userId,
-          existingStatus: existingSubscription.status,
-          existingPlan: existingSubscription.plan.slug
-        });
-        res.status(409).json({
-          error: 'Você já possui uma assinatura ativa.',
-          errorCode: ErrorCodes.SUBSCRIPTION_ALREADY_ACTIVE,
-          subscription: existingSubscription
+      if (result.isExisting) {
+        // Idempotente: trial já existia
+        logInfo('[TRIAL] Trial já ativo, retornando existente (idempotente)', { userId, planSlug });
+        res.status(200).json({
+          message: 'Seu trial já está ativo',
+          errorCode: ErrorCodes.TRIAL_ALREADY_ACTIVE,
+          subscription: result.subscription,
         });
         return;
       }
 
-      // Sem assinatura válida — criar trial
-      const subscription = await startTrialForUser(userId, planSlug);
-
       logInfo('[TRIAL] Trial iniciado com sucesso', { userId, planSlug });
-
       res.status(201).json({
         message: 'Trial iniciado com sucesso',
-        subscription
+        subscription: result.subscription,
       });
     } catch (error) {
+      // Erros de negócio lançados pelo service
+      if (error instanceof TrialBusinessError) {
+        res.status(409).json({
+          error: error.message,
+          errorCode: error.errorCode,
+        });
+        return;
+      }
+
       logError('Erro ao iniciar trial', { err: error });
       res.status(500).json({ error: 'Erro ao iniciar trial' });
     }
