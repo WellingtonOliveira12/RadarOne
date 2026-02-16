@@ -4,6 +4,7 @@ import { startTrialForUser } from '../services/billingService';
 import { generateCheckoutUrl } from '../services/kiwifyService';
 import { getCurrentSubscriptionForUser } from '../services/subscriptionService';
 import { logInfo, logError } from '../utils/loggerHelpers';
+import { ErrorCodes } from '../constants/errorCodes';
 
 /**
  * Controller de Assinaturas
@@ -183,24 +184,39 @@ export class SubscriptionController {
         return;
       }
 
-      // Verificar se já tem trial ativo
-      const existingTrial = await prisma.subscription.findFirst({
-        where: {
-          userId,
-          status: { in: ['ACTIVE', 'TRIAL'] }
-        }
-      });
+      // Usar função canônica para verificar assinatura válida (respeita datas)
+      const existingSubscription = await getCurrentSubscriptionForUser(userId);
 
-      if (existingTrial) {
+      if (existingSubscription) {
+        // Idempotência: se já tem trial ativo no mesmo plano, retornar 200 com a assinatura existente
+        if (existingSubscription.status === 'TRIAL' && existingSubscription.plan.slug === planSlug) {
+          logInfo('[TRIAL] Trial já ativo, retornando existente (idempotente)', { userId, planSlug });
+          res.status(200).json({
+            message: 'Seu trial já está ativo',
+            errorCode: ErrorCodes.TRIAL_ALREADY_ACTIVE,
+            subscription: existingSubscription
+          });
+          return;
+        }
+
+        // Assinatura ativa de outro tipo (paga ou trial de outro plano)
+        logInfo('[TRIAL] Bloqueado: usuário já possui assinatura ativa', {
+          userId,
+          existingStatus: existingSubscription.status,
+          existingPlan: existingSubscription.plan.slug
+        });
         res.status(409).json({
-          error: 'Você já possui uma assinatura ativa',
-          subscription: existingTrial
+          error: 'Você já possui uma assinatura ativa.',
+          errorCode: ErrorCodes.SUBSCRIPTION_ALREADY_ACTIVE,
+          subscription: existingSubscription
         });
         return;
       }
 
-      // Criar trial
+      // Sem assinatura válida — criar trial
       const subscription = await startTrialForUser(userId, planSlug);
+
+      logInfo('[TRIAL] Trial iniciado com sucesso', { userId, planSlug });
 
       res.status(201).json({
         message: 'Trial iniciado com sucesso',

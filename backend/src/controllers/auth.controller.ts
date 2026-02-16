@@ -220,7 +220,7 @@ export class AuthController {
         include: {
           subscriptions: {
             where: {
-              status: 'ACTIVE'
+              status: { in: ['ACTIVE', 'TRIAL'] }
             },
             include: {
               plan: true

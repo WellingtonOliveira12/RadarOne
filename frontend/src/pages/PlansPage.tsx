@@ -48,6 +48,7 @@ export const PlansPage: React.FC = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [trialLoading, setTrialLoading] = useState(false);
   const { user, refetchUser } = useAuth();
   const navigate = useNavigate();
 
@@ -313,6 +314,10 @@ export const PlansPage: React.FC = () => {
     }
 
     // Se está logado E não tem checkoutUrl, iniciar trial interno
+    if (trialLoading) return; // Bloquear duplo clique
+    setTrialLoading(true);
+    setError('');
+
     try {
       const token = getToken();
       const response = await fetch(`${API_BASE_URL}/api/subscriptions/start-trial`, {
@@ -324,15 +329,32 @@ export const PlansPage: React.FC = () => {
         body: JSON.stringify({ planSlug })
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao iniciar trial');
+      const data = await response.json();
+
+      // Trial já ativo (idempotente) — redirecionar para dashboard
+      if (data.errorCode === 'TRIAL_ALREADY_ACTIVE') {
+        await refetchUser();
+        navigate('/dashboard');
+        return;
       }
 
-      // Redirecionar para dashboard (usuário verá trial ativo lá)
+      if (!response.ok) {
+        if (data.errorCode === 'SUBSCRIPTION_ALREADY_ACTIVE') {
+          // Usuário já tem assinatura paga ativa — atualizar dados e ir ao dashboard
+          await refetchUser();
+          navigate('/dashboard');
+          return;
+        }
+        throw new Error(data.error || 'Erro ao iniciar trial');
+      }
+
+      // Trial criado com sucesso — atualizar dados do usuário e redirecionar
+      await refetchUser();
       navigate('/dashboard');
     } catch (err: any) {
       setError('Erro ao iniciar trial: ' + err.message);
+    } finally {
+      setTrialLoading(false);
     }
   };
 
@@ -499,12 +521,16 @@ export const PlansPage: React.FC = () => {
 
               <button
                 onClick={() => handleChoosePlan(plan.slug, discountCouponData?.code)}
+                disabled={trialLoading && plan.priceCents === 0}
                 style={{
                   ...styles.planButton,
                   ...(plan.isRecommended ? styles.planButtonRecommended : {}),
+                  ...(trialLoading && plan.priceCents === 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}),
                 }}
               >
-                {plan.priceCents === 0
+                {trialLoading && plan.priceCents === 0
+                  ? 'Iniciando trial...'
+                  : plan.priceCents === 0
                   ? 'Usar grátis por 7 dias'
                   : discountCouponData
                   ? `Assinar com ${discountCouponData.discountType === 'PERCENTAGE' ? discountCouponData.discountValue + '% OFF' : 'desconto'}`
