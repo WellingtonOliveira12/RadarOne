@@ -2,6 +2,7 @@ import http from 'http';
 import { prisma } from './lib/prisma';
 import { isHealthy as isRedisHealthy } from './services/queue-manager';
 import { circuitBreaker } from './utils/circuit-breaker';
+import { browserManager } from './engine/browser-manager';
 
 /**
  * Health Check HTTP Server
@@ -23,6 +24,22 @@ interface HealthStatus {
     database: boolean;
     redis?: boolean;
     circuitBreakers?: Record<string, any>;
+  };
+  browser: {
+    connected: boolean;
+    activeContexts: number;
+    pendingAcquires: number;
+    rssMB: number;
+    heapUsedMB: number;
+  };
+  memory: {
+    rssMB: number;
+    heapUsedMB: number;
+    heapTotalMB: number;
+  };
+  contexts: {
+    active: number;
+    pending: number;
   };
 }
 
@@ -71,6 +88,17 @@ async function checkHealth(): Promise<HealthStatus> {
     // Ignore
   }
 
+  // Browser metrics
+  const bm = browserManager.getMetrics();
+
+  // Process memory
+  const mem = process.memoryUsage();
+  const memory = {
+    rssMB: Math.round(mem.rss / 1024 / 1024),
+    heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+    heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+  };
+
   // Overall status
   const isHealthy = checks.database && (checks.redis === undefined || checks.redis === true);
 
@@ -79,6 +107,12 @@ async function checkHealth(): Promise<HealthStatus> {
     timestamp: new Date().toISOString(),
     uptime: Date.now() - startTime,
     checks,
+    browser: bm,
+    memory,
+    contexts: {
+      active: bm.activeContexts,
+      pending: bm.pendingAcquires,
+    },
   };
 }
 

@@ -437,7 +437,6 @@ class UserSessionService {
 
     try {
       browser = await browserManager.getOrLaunch();
-      browserManager.trackContextOpen();
 
       context = await browser.newContext({
         storageState,
@@ -467,7 +466,7 @@ class UserSessionService {
           try {
             await context?.close();
           } catch {}
-          browserManager.trackContextClose();
+          // Context tracking now handled by acquireContext/release in caller
           // NOTE: Do NOT close browser — it's shared
         },
       };
@@ -476,7 +475,7 @@ class UserSessionService {
       try {
         await context?.close();
       } catch {}
-      browserManager.trackContextClose();
+      // Context tracking now handled by acquireContext/release in caller
 
       logger.error({ error: error.message }, 'USER_SESSION_CONTEXT_ERROR');
       return {

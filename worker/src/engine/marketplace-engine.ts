@@ -7,8 +7,9 @@ import {
   MonitorWithFilters,
   AuthContextResult,
 } from './types';
+import { browserManager } from './browser-manager';
 import { rateLimiter } from '../utils/rate-limiter';
-import { retry, retryPresets, isAuthenticationError } from '../utils/retry-helper';
+import { retry, retryPresets, isAuthenticationError, isBrowserCrashError } from '../utils/retry-helper';
 import { captchaSolver } from '../utils/captcha-solver';
 import { diagnosePage, collectForensics } from './page-diagnoser';
 import { waitForContainer } from './container-waiter';
@@ -53,28 +54,51 @@ export class MarketplaceEngine {
     // 2. Rate limiter
     await rateLimiter.acquire(this.config.site);
 
-    // 3. Retry with error classification
-    try {
-      return await retry(
-        () => this.scrapeInternal(monitor),
-        {
-          ...retryPresets.scraping,
-          onRetry: (error, attempt) => {
-            // Don't retry auth errors
-            if (isAuthenticationError(error)) {
-              throw error;
-            }
-            console.warn(
-              `ENGINE_RETRY: ${this.config.site} attempt ${attempt}: ${error.message}`
-            );
-          },
+    // 3. Retry with error classification + crash recovery
+    let crashRetries = 0;
+    const MAX_CRASH_RETRIES = 2;
+
+    const attempt = async (): Promise<ExtractionResult> => {
+      try {
+        return await retry(
+          () => this.scrapeInternal(monitor),
+          {
+            ...retryPresets.scraping,
+            onRetry: (error, attemptNum) => {
+              if (isAuthenticationError(error)) {
+                throw error;
+              }
+              console.warn(
+                `ENGINE_RETRY: ${this.config.site} attempt ${attemptNum}: ${error.message}`
+              );
+            },
+          }
+        );
+      } catch (error: any) {
+        // Browser crash: relaunch and retry immediately (no long backoff)
+        if (isBrowserCrashError(error) && crashRetries < MAX_CRASH_RETRIES) {
+          crashRetries++;
+          console.warn(
+            `ENGINE_CRASH_RECOVERY: ${this.config.site} crash detected (retry ${crashRetries}/${MAX_CRASH_RETRIES}): ${error.message}`
+          );
+          await browserManager.ensureAlive({ forceRelaunch: true });
+          return attempt();
         }
-      );
-    } catch (error: any) {
-      // Return ExtractionResult even on total failure
-      const pageType = isAuthenticationError(error) ? 'LOGIN_REQUIRED' : 'UNKNOWN';
-      return this.buildErrorResult(monitor, pageType, error.message);
-    }
+
+        // Log observability on final failure
+        const metrics = browserManager.getMetrics();
+        console.error(
+          `ENGINE_FAILED: ${this.config.site} rssMB=${metrics.rssMB} heapUsedMB=${metrics.heapUsedMB} ` +
+            `connected=${metrics.connected} activeContexts=${metrics.activeContexts} ` +
+            `crashDetected=${isBrowserCrashError(error)} crashRetries=${crashRetries}`
+        );
+
+        const pageType = isAuthenticationError(error) ? 'LOGIN_REQUIRED' : 'UNKNOWN';
+        return this.buildErrorResult(monitor, pageType, error.message);
+      }
+    };
+
+    return attempt();
   }
 
   /**
@@ -87,15 +111,19 @@ export class MarketplaceEngine {
     let authResult: AuthContextResult | null = null;
     let scrollsDone = 0;
 
+    // Acquire browser context slot (semaphore)
+    const { browser, release } = await browserManager.acquireContext();
+
     try {
-      // 1. Get auth context
+      // 1. Get auth context (pass browser so it doesn't call getOrLaunch)
       authResult = await getAuthContext(
         monitor.userId,
         this.config.site,
         this.config.domain,
         this.config.authMode,
         this.config.antiDetection,
-        this.config.customAuthProvider
+        this.config.customAuthProvider,
+        browser
       );
 
       const { context, page } = authResult;
@@ -259,7 +287,7 @@ export class MarketplaceEngine {
 
       return this.buildResult(extractionResult.ads, diagnosis, metrics);
     } finally {
-      // Cleanup
+      // Cleanup auth context
       if (authResult) {
         try {
           await authResult.cleanup();
@@ -267,6 +295,17 @@ export class MarketplaceEngine {
           console.error(`ENGINE_CLEANUP_ERROR: ${this.config.site}`, e);
         }
       }
+
+      // Release browser semaphore slot (idempotent)
+      release();
+
+      // Log observability
+      const m = browserManager.getMetrics();
+      console.log(
+        `ENGINE_METRICS: ${this.config.site} rssMB=${m.rssMB} heapUsedMB=${m.heapUsedMB} ` +
+          `connected=${m.connected} activeContexts=${m.activeContexts} ` +
+          `durationMs=${Date.now() - startTime}`
+      );
     }
   }
 

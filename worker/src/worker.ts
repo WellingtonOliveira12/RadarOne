@@ -20,6 +20,7 @@ import {
 } from './services/queue-manager';
 import { initSentry, captureException } from './monitoring/sentry';
 import { startHealthServer } from './health-server';
+import { browserManager } from './engine/browser-manager';
 
 // Inicializa Sentry para monitoramento de erros
 initSentry();
@@ -226,10 +227,12 @@ class Worker {
     console.log('\n⏳ Encerrando worker...');
     this.isRunning = false;
 
+    // 1. Stop scheduler
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
     }
 
+    // 2. Await jobs / close queue workers
     if (this.worker) {
       await this.worker.close();
     }
@@ -238,6 +241,10 @@ class Worker {
       await shutdownQueue();
     }
 
+    // 3. Graceful browser shutdown (waits for active contexts)
+    await browserManager.shutdown();
+
+    // 4. Disconnect database
     await prisma.$disconnect();
     console.log('✅ Worker encerrado');
   }
@@ -254,16 +261,22 @@ class Worker {
 // Inicializa worker
 const worker = new Worker();
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  await worker.stop();
+// Unified graceful shutdown (single handler for both signals)
+let shuttingDown = false;
+const gracefulShutdown = async (signal: string) => {
+  if (shuttingDown) return; // Prevent double shutdown
+  shuttingDown = true;
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  try {
+    await worker.stop();
+  } catch (e) {
+    console.error('Shutdown error:', e);
+  }
   process.exit(0);
-});
+};
 
-process.on('SIGTERM', async () => {
-  await worker.stop();
-  process.exit(0);
-});
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Inicia worker
 worker.start().catch((error) => {

@@ -2,7 +2,6 @@ import { Browser, BrowserContext, Page } from 'playwright';
 import { AuthContextResult, AuthMode, CustomAuthProvider, AntiDetectionConfig } from './types';
 import { randomUA } from '../utils/user-agents';
 import { getRandomViewport } from './anti-detection';
-import { browserManager } from './browser-manager';
 
 /**
  * Generic auth strategy.
@@ -19,7 +18,8 @@ export async function getAuthContext(
   domain: string,
   authMode: AuthMode,
   antiDetection: AntiDetectionConfig,
-  customAuthProvider?: CustomAuthProvider
+  customAuthProvider?: CustomAuthProvider,
+  browser?: Browser
 ): Promise<AuthContextResult> {
   // 1. Custom auth provider (ML uses this for its 5-priority cascade)
   if (customAuthProvider) {
@@ -60,8 +60,8 @@ export async function getAuthContext(
     );
   }
 
-  // 4. Anonymous context
-  return createAnonymousContext(antiDetection);
+  // 4. Anonymous context (use provided browser if available)
+  return createAnonymousContext(antiDetection, browser);
 }
 
 /**
@@ -110,19 +110,22 @@ async function tryDatabaseAuth(
 
 /**
  * Creates an anonymous (unauthenticated) browser context.
- * Uses shared BrowserManager singleton — does NOT launch a new browser.
+ * Receives browser via parameter from acquireContext (preferred)
+ * or falls back to browserManager.getOrLaunch().
  */
 async function createAnonymousContext(
-  antiDetection: AntiDetectionConfig
+  antiDetection: AntiDetectionConfig,
+  browser?: Browser
 ): Promise<AuthContextResult> {
   const viewport = antiDetection.randomizeViewport
     ? getRandomViewport()
     : { width: 1920, height: 1080 };
 
-  const browser = await browserManager.getOrLaunch();
-  browserManager.trackContextOpen();
+  // Use provided browser (from acquireContext) or fall back to getOrLaunch
+  const { browserManager } = await import('./browser-manager');
+  const resolvedBrowser = browser ?? await browserManager.getOrLaunch();
 
-  const context = await browser.newContext({
+  const context = await resolvedBrowser.newContext({
     userAgent: randomUA(),
     locale: 'pt-BR',
     viewport,
@@ -132,7 +135,7 @@ async function createAnonymousContext(
   const page = await context.newPage();
 
   return {
-    browser,
+    browser: resolvedBrowser,
     context,
     page,
     authenticated: false,
@@ -140,8 +143,7 @@ async function createAnonymousContext(
     cleanup: async () => {
       try { await page.close(); } catch {}
       try { await context.close(); } catch {}
-      browserManager.trackContextClose();
-      // NOTE: Do NOT close browser — it's shared
+      // NOTE: Do NOT close browser — it's shared. Release is handled by acquireContext caller.
     },
   };
 }

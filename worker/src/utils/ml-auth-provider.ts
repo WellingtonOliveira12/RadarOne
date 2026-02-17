@@ -429,9 +429,9 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
     }
   }
 
-  // Usa browser compartilhado (singleton) para economizar memória
-  const browser = await browserManager.getOrLaunch();
-  browserManager.trackContextOpen();
+  // Acquire browser through acquireContext (semaphore-controlled)
+  const acquired = await browserManager.acquireContext();
+  const browser = acquired.browser;
 
   const userAgent = randomUA();
   console.log(`ML_USER_AGENT: ${userAgent.slice(0, 60)}...`);
@@ -512,7 +512,7 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
       try {
         await context.close();
       } catch {}
-      browserManager.trackContextClose();
+      acquired.release();
       // NOTE: Do NOT close browser — it's shared via BrowserManager
     },
   };

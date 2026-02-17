@@ -80,8 +80,8 @@ export async function retry<T>(
         onRetry(error, attempt);
       }
 
-      // Aguarda antes da próxima tentativa
-      await sleep(currentDelay);
+      // Aguarda antes da próxima tentativa (com jitter)
+      await sleep(addJitter(currentDelay));
 
       // Aumenta delay para próxima tentativa
       delay = delay * backoffFactor;
@@ -141,7 +141,7 @@ export async function retryWithResult<T>(
         onRetry(error, attempt);
       }
 
-      await sleep(currentDelay);
+      await sleep(addJitter(currentDelay));
       delay = delay * backoffFactor;
     }
   }
@@ -188,13 +188,23 @@ export const retryPresets = {
   },
 
   /**
-   * Configuração para scrapers: 7 tentativas, delays progressivos
+   * Configuração para scrapers: 3 tentativas, delays moderados
    */
   scraping: {
-    maxAttempts: 7,
-    initialDelay: 3000,
-    maxDelay: 30000,
+    maxAttempts: 3,
+    initialDelay: 2000,
+    maxDelay: 15000,
     backoffFactor: 2,
+  },
+
+  /**
+   * Browser crash recovery: 2 tentativas, delay curto
+   */
+  browserCrash: {
+    maxAttempts: 2,
+    initialDelay: 1000,
+    maxDelay: 3000,
+    backoffFactor: 1.5,
   },
 };
 
@@ -272,6 +282,32 @@ export async function retryIfRecoverable<T>(
       throw error; // Lança para que o retry tente novamente
     }
   }, options);
+}
+
+/**
+ * Detects browser crash/disconnect errors from Playwright.
+ * These require a browser relaunch, not just a retry.
+ */
+const CRASH_PATTERNS = [
+  'target page, context or browser has been closed',
+  'browser has been closed',
+  'context has been closed',
+  'target closed',
+  'protocol error',
+  'browser disconnected',
+];
+
+export function isBrowserCrashError(error: any): boolean {
+  const message = (error?.message || '').toLowerCase();
+  return CRASH_PATTERNS.some((p) => message.includes(p));
+}
+
+/**
+ * Adds jitter to a delay: delay * (0.5 + Math.random())
+ * Range: [delay*0.5, delay*1.5]
+ */
+function addJitter(delay: number): number {
+  return Math.round(delay * (0.5 + Math.random()));
 }
 
 /**
