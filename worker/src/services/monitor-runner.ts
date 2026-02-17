@@ -88,7 +88,7 @@ export class MonitorRunner {
           return;
         }
 
-        // Se sessão precisa de ação do usuário → SKIPPED
+        // Se sessão precisa de ação do usuário → SKIPPED + re-notifica com cooldown
         if (sessionStatus.needsAction) {
           log.info('MONITOR_SKIPPED: Sessão precisa ser reconectada', {
             monitorId: monitor.id,
@@ -96,6 +96,17 @@ export class MonitorRunner {
             status: sessionStatus.status,
             reason: 'NEEDS_REAUTH',
           });
+
+          // Re-notifica com cooldown de 6h (idempotente: não muda status se já NEEDS_REAUTH)
+          const { notified } = await userSessionService.markNeedsReauth(
+            monitor.userId,
+            monitor.site,
+            `Sessão ${sessionStatus.status} — monitor SKIPado`
+          );
+
+          if (notified) {
+            await this.sendReauthNotification(monitor);
+          }
 
           await this.logExecution(monitor.id, {
             status: 'SKIPPED',
@@ -211,7 +222,8 @@ export class MonitorRunner {
   }
 
   /**
-   * Envia notificação ao usuário quando sessão precisa ser reconectada
+   * Envia notificação ao usuário quando sessão precisa ser reconectada.
+   * Cooldown de 6h é gerenciado por markNeedsReauth — este método só é chamado quando deve notificar.
    */
   private static async sendReauthNotification(monitor: any): Promise<void> {
     const telegramChatId =
@@ -219,17 +231,26 @@ export class MonitorRunner {
       monitor.user.telegramAccounts?.[0]?.chatId ||
       null;
 
-    const message = `⚠️ *Sessão Expirada*\n\n` +
-      `O monitor "${monitor.name}" precisa que você reconecte sua conta do ${monitor.site}.\n\n` +
-      `Acesse as configurações do RadarOne para reconectar.`;
+    const siteName = this.formatSiteName(monitor.site);
+    const connectionsUrl = 'https://radarone.com.br/dashboard/connections';
+
+    const telegramMessage =
+      `⚠️ <b>Sessão Expirada — ${siteName}</b>\n\n` +
+      `O monitor "<b>${monitor.name}</b>" está pausado porque sua sessão do ${siteName} expirou.\n\n` +
+      `<b>O que fazer:</b>\n` +
+      `1. Acesse <a href="${connectionsUrl}">Connections</a>\n` +
+      `2. Localize ${siteName} e reconecte seus cookies\n` +
+      `3. Seus monitores voltarão a funcionar automaticamente\n\n` +
+      `Sem reconexão, os monitores do ${siteName} ficam pausados.`;
 
     // Envia por Telegram se disponível
     if (telegramChatId) {
       try {
-        await TelegramService.sendMessage(telegramChatId, message);
+        await TelegramService.sendMessage(telegramChatId, telegramMessage);
         log.info('REAUTH_NOTIFICATION: Enviado por Telegram', {
           monitorId: monitor.id,
           userId: monitor.userId,
+          site: monitor.site,
         });
       } catch (e) {
         // Ignora erro de notificação
@@ -241,22 +262,43 @@ export class MonitorRunner {
       try {
         await emailService.sendAdAlert({
           to: monitor.user.email,
-          monitorName: `[AÇÃO NECESSÁRIA] ${monitor.name}`,
+          monitorName: `[RECONEXÃO NECESSÁRIA] ${siteName}`,
           ad: {
-            title: 'Sua sessão expirou',
-            description: `O monitor "${monitor.name}" precisa que você reconecte sua conta do ${monitor.site}. Acesse as configurações do RadarOne.`,
-            url: 'https://radarone.com.br/dashboard/settings',
+            title: `Sua sessão do ${siteName} expirou`,
+            description:
+              `O monitor "${monitor.name}" está pausado. ` +
+              `Acesse Connections e reconecte seus cookies do ${siteName} para reativar.`,
+            url: connectionsUrl,
             price: undefined,
           },
         });
         log.info('REAUTH_NOTIFICATION: Enviado por Email', {
           monitorId: monitor.id,
           userId: monitor.userId,
+          site: monitor.site,
         });
       } catch (e) {
         // Ignora erro de notificação
       }
     }
+  }
+
+  /**
+   * Formata nome do site para exibição (MERCADO_LIVRE → Mercado Livre)
+   */
+  private static formatSiteName(site: string): string {
+    const names: Record<string, string> = {
+      MERCADO_LIVRE: 'Mercado Livre',
+      OLX: 'OLX',
+      FACEBOOK_MARKETPLACE: 'Facebook Marketplace',
+      WEBMOTORS: 'Webmotors',
+      ICARROS: 'iCarros',
+      ZAP_IMOVEIS: 'Zap Imóveis',
+      VIVA_REAL: 'Viva Real',
+      IMOVELWEB: 'ImovelWeb',
+      LEILAO: 'Leilão',
+    };
+    return names[site] || site;
   }
 
   /**
