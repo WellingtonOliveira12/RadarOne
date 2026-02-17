@@ -13,11 +13,12 @@
  * Fallback: contexto anonimo
  */
 
-import { chromium, Browser, BrowserContext, Page } from 'playwright';
+import { Browser, BrowserContext, Page } from 'playwright';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUA } from './user-agents';
 import { userSessionService } from '../services/user-session-service';
+import { browserManager } from '../engine/browser-manager';
 
 // ============================================================
 // CONFIGURACOES
@@ -428,20 +429,9 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
     }
   }
 
-  // Lanca browser
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu',
-      '--disable-blink-features=AutomationControlled',
-    ],
-  });
+  // Usa browser compartilhado (singleton) para economizar memória
+  const browser = await browserManager.getOrLaunch();
+  browserManager.trackContextOpen();
 
   const userAgent = randomUA();
   console.log(`ML_USER_AGENT: ${userAgent.slice(0, 60)}...`);
@@ -522,9 +512,8 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
       try {
         await context.close();
       } catch {}
-      try {
-        await browser.close();
-      } catch {}
+      browserManager.trackContextClose();
+      // NOTE: Do NOT close browser — it's shared via BrowserManager
     },
   };
 }

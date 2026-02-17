@@ -233,10 +233,11 @@ export class MonitorRunner {
 
     const siteName = this.formatSiteName(monitor.site);
     const connectionsUrl = 'https://radarone.com.br/dashboard/connections';
+    const safeName = TelegramService.escapeHtml(monitor.name);
 
     const telegramMessage =
       `⚠️ <b>Sessão Expirada — ${siteName}</b>\n\n` +
-      `O monitor "<b>${monitor.name}</b>" está pausado porque sua sessão do ${siteName} expirou.\n\n` +
+      `O monitor "<b>${safeName}</b>" está pausado porque sua sessão do ${siteName} expirou.\n\n` +
       `<b>O que fazer:</b>\n` +
       `1. Acesse <a href="${connectionsUrl}">Connections</a>\n` +
       `2. Localize ${siteName} e reconecte seus cookies\n` +

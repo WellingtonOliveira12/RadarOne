@@ -27,6 +27,17 @@ interface AdAlert {
 
 export class TelegramService {
   /**
+   * Escapa caracteres especiais HTML para Telegram.
+   * Telegram HTML mode requer que <, >, & sejam escapados fora de tags.
+   */
+  static escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /**
    * Envia alerta de novo anúncio
    */
   static async sendAdAlert(chatId: string, data: AdAlert): Promise<void> {
@@ -36,17 +47,20 @@ export class TelegramService {
     }
 
     try {
+      const safeName = this.escapeHtml(data.monitorName);
+      const safeTitle = this.escapeHtml(data.ad.title);
+
       // Formata mensagem em português
       let message = `🔔 <b>Novo anúncio encontrado!</b>\n\n`;
-      message += `📌 <b>Monitor:</b> ${data.monitorName}\n\n`;
-      message += `📝 <b>${data.ad.title}</b>\n`;
+      message += `📌 <b>Monitor:</b> ${safeName}\n\n`;
+      message += `📝 <b>${safeTitle}</b>\n`;
 
       if (data.ad.price) {
         message += `💰 ${this.formatPrice(data.ad.price)}\n`;
       }
 
       if (data.ad.location) {
-        message += `📍 ${data.ad.location}\n`;
+        message += `📍 ${this.escapeHtml(data.ad.location)}\n`;
       }
 
       if (data.ad.description) {
@@ -55,7 +69,7 @@ export class TelegramService {
           data.ad.description.length > 200
             ? data.ad.description.substring(0, 200) + '...'
             : data.ad.description;
-        message += `\n${desc}\n`;
+        message += `\n${this.escapeHtml(desc)}\n`;
       }
 
       message += `\n🔗 <a href="${data.ad.url}">Ver anúncio</a>`;
@@ -83,7 +97,8 @@ export class TelegramService {
   }
 
   /**
-   * Envia mensagem genérica
+   * Envia mensagem genérica (com HTML).
+   * Desabilita preview de links (útil para mensagens de sistema como NEEDS_REAUTH).
    */
   static async sendMessage(chatId: string, text: string): Promise<void> {
     if (!bot) {
@@ -92,7 +107,10 @@ export class TelegramService {
     }
 
     try {
-      await bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
+      await bot.sendMessage(chatId, text, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      });
     } catch (error) {
       console.error('❌ Erro ao enviar mensagem Telegram:', error);
       throw error;
