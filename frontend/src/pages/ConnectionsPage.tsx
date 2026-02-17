@@ -840,6 +840,11 @@ const FALLBACK_SUPPORTED_SITES: SupportedSite[] = [
     name: 'Mercado Livre',
     domains: ['mercadolivre.com.br', 'mercadolibre.com'],
   },
+  {
+    id: 'FACEBOOK_MARKETPLACE',
+    name: 'Facebook Marketplace',
+    domains: ['facebook.com'],
+  },
 ];
 
 export default function ConnectionsPage() {
@@ -1002,7 +1007,7 @@ export default function ConnectionsPage() {
         {/* Site Cards */}
         <VStack spacing={4} align="stretch">
           {effectiveSites
-            .filter((site) => ['MERCADO_LIVRE'].includes(site.id))
+            .filter((site) => ['MERCADO_LIVRE', 'FACEBOOK_MARKETPLACE'].includes(site.id))
             .map((site) => (
               <SiteCard
                 key={site.id}

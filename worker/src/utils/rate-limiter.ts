@@ -31,6 +31,11 @@ const SITE_CONFIGS: Record<string, RateLimitConfig> = {
     interval: 60000, // 15 requests per minute
     maxTokens: 30,
   },
+  FACEBOOK_MARKETPLACE: {
+    tokensPerInterval: 5,
+    interval: 60000, // 5 requests per minute (conservative for FB)
+    maxTokens: 10,
+  },
   LEILAO: {
     tokensPerInterval: 5,
     interval: 60000, // 5 requests per minute (mais conservador)

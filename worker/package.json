@@ -23,7 +23,10 @@
     "auth:accounts:add": "npx ts-node scripts/auth/manage-accounts.ts add",
     "ml:login": "npx ts-node scripts/ml-login.ts",
     "ml:state:encode": "npx ts-node scripts/ml-state-encode.ts",
-    "test:email": "npx ts-node scripts/test-email.ts"
+    "test:email": "npx ts-node scripts/test-email.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -46,8 +49,10 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@types/pg": "^8.16.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "prisma": "^7.2.0",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

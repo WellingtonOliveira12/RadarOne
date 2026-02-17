@@ -70,6 +70,12 @@ const SITE_CONFIGS: Record<SiteId, AuthGateConfig> = {
     envVarPath: 'OLX_STORAGE_STATE_PATH',
     secretFilePaths: ['/etc/secrets/olx-storage-state.json'],
   },
+  FACEBOOK_MARKETPLACE: {
+    site: 'FACEBOOK_MARKETPLACE',
+    envVarBase64: 'FB_STORAGE_STATE_B64',
+    envVarPath: 'FB_STORAGE_STATE_PATH',
+    secretFilePaths: ['/etc/secrets/facebook-storage-state.json'],
+  },
   WEBMOTORS: {
     site: 'WEBMOTORS',
     envVarBase64: 'WEBMOTORS_STORAGE_STATE_B64',

@@ -398,6 +398,7 @@ model MonitorLog {
   alertsSent    Int       @default(0) @map("alerts_sent")
   error         String?
   executionTime Int?      @map("execution_time")
+  diagnosis     Json?     // DiagnosisRecord structured diagnosis
   createdAt     DateTime  @default(now()) @map("created_at")
 
   // Relações

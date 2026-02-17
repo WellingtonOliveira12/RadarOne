@@ -17,7 +17,7 @@ import { logger } from './logger';
 // TIPOS
 // ============================================================
 
-export type SiteId = 'MERCADO_LIVRE' | 'OLX' | 'WEBMOTORS' | 'ICARROS' | 'ZAP_IMOVEIS' | 'VIVA_REAL' | 'IMOVELWEB' | 'LEILAO';
+export type SiteId = 'MERCADO_LIVRE' | 'OLX' | 'FACEBOOK_MARKETPLACE' | 'WEBMOTORS' | 'ICARROS' | 'ZAP_IMOVEIS' | 'VIVA_REAL' | 'IMOVELWEB' | 'LEILAO';
 
 export type SessionStatus = 'ok' | 'needs_reauth' | 'expired' | 'blocked' | 'error' | 'unknown';
 

@@ -81,6 +81,12 @@ const SITE_CONFIGS: Record<string, SiteConfig> = {
     loginUrl: 'https://www.mercadolivre.com.br/login',
     validationUrl: 'https://www.mercadolivre.com.br/',
   },
+  FACEBOOK_MARKETPLACE: {
+    domain: 'facebook.com',
+    requiresAuth: true,
+    loginUrl: 'https://www.facebook.com/login',
+    validationUrl: 'https://www.facebook.com/marketplace/',
+  },
   SUPERBID: {
     domain: 'superbid.net',
     requiresAuth: true,

@@ -2,6 +2,7 @@ import { Monitor, MonitorSite, LogStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { scrapeMercadoLivre } from '../scrapers/mercadolivre-scraper';
 import { scrapeOLX } from '../scrapers/olx-scraper';
+import { scrapeFacebook } from '../scrapers/facebook-scraper';
 import { scrapeWebmotors } from '../scrapers/webmotors-scraper';
 import { scrapeIcarros } from '../scrapers/icarros-scraper';
 import { scrapeZapImoveis } from '../scrapers/zapimoveis-scraper';
@@ -131,6 +132,9 @@ export class MonitorRunner {
         },
       });
 
+      // Extract diagnosis from monitor if engine attached it
+      const diagnosis = (monitor as any).__lastDiagnosis || undefined;
+
       // Registra log de sucesso
       await this.logExecution(monitor.id, {
         status: 'SUCCESS',
@@ -138,6 +142,7 @@ export class MonitorRunner {
         newAds: newAds.length,
         alertsSent,
         executionTime: Date.now() - startTime,
+        diagnosis,
       });
 
       // Atualiza lastCheckedAt
@@ -192,11 +197,15 @@ export class MonitorRunner {
       // Erro normal → comportamento existente
       log.monitorError(monitor.id, error, duration);
 
+      // Extract diagnosis from monitor if engine attached it
+      const errorDiagnosis = (monitor as any).__lastDiagnosis || undefined;
+
       // Registra log de erro
       await this.logExecution(monitor.id, {
         status: 'ERROR',
         error: error.message,
         executionTime: duration,
+        diagnosis: errorDiagnosis,
       });
     }
   }
@@ -261,6 +270,9 @@ export class MonitorRunner {
 
       case MonitorSite.OLX:
         return await scrapeOLX(monitor);
+
+      case MonitorSite.FACEBOOK_MARKETPLACE:
+        return await scrapeFacebook(monitor);
 
       case MonitorSite.WEBMOTORS:
         return await scrapeWebmotors(monitor);
@@ -454,6 +466,7 @@ export class MonitorRunner {
       alertsSent?: number;
       error?: string;
       executionTime?: number;
+      diagnosis?: any;
     }
   ) {
     // Mapeia para o enum do Prisma
@@ -472,6 +485,7 @@ export class MonitorRunner {
         alertsSent: data.alertsSent || 0,
         error: data.error,
         executionTime: data.executionTime,
+        diagnosis: data.diagnosis || undefined,
       },
     });
 

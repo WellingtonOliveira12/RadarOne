@@ -18,7 +18,7 @@ type MonitorSite =
   | 'ZAP_IMOVEIS'
   | 'VIVA_REAL'
   | 'IMOVELWEB'
-  | 'OUTRO';
+  | 'LEILAO';
 
 type MonitorMode = 'URL_ONLY' | 'STRUCTURED_FILTERS';
 
@@ -52,13 +52,13 @@ interface MonitorsResponse {
 const SITE_OPTIONS: { value: MonitorSite; label: string; requiresLogin: boolean }[] = [
   { value: 'MERCADO_LIVRE', label: 'Mercado Livre', requiresLogin: true },
   { value: 'OLX', label: 'OLX', requiresLogin: false },
-  { value: 'FACEBOOK_MARKETPLACE', label: 'Facebook Marketplace', requiresLogin: false },
+  { value: 'FACEBOOK_MARKETPLACE', label: 'Facebook Marketplace', requiresLogin: true },
   { value: 'WEBMOTORS', label: 'Webmotors', requiresLogin: false },
   { value: 'ICARROS', label: 'iCarros', requiresLogin: false },
   { value: 'ZAP_IMOVEIS', label: 'ZAP Imóveis', requiresLogin: false },
   { value: 'VIVA_REAL', label: 'VivaReal', requiresLogin: false },
   { value: 'IMOVELWEB', label: 'ImovelWeb', requiresLogin: false },
-  { value: 'OUTRO', label: 'Outro', requiresLogin: false },
+  { value: 'LEILAO', label: 'Leilão', requiresLogin: false },
 ];
 
 // Sites que requerem login
