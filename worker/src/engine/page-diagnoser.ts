@@ -181,7 +181,8 @@ export async function collectForensics(
   try {
     await fs.mkdir(FORENSIC_DIR, { recursive: true });
     screenshotPath = path.join(FORENSIC_DIR, `engine-${safeName}-${timestamp}.png`);
-    await page.screenshot({ path: screenshotPath, fullPage: true, timeout: 15000 });
+    // Viewport-only screenshot to save memory (fullPage can OOM on long pages)
+    await page.screenshot({ path: screenshotPath, fullPage: false, timeout: 10000 });
   } catch {
     screenshotPath = null;
   }

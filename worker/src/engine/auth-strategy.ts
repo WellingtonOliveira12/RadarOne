@@ -1,7 +1,8 @@
-import { chromium, Browser, BrowserContext, Page } from 'playwright';
+import { Browser, BrowserContext, Page } from 'playwright';
 import { AuthContextResult, AuthMode, CustomAuthProvider, AntiDetectionConfig } from './types';
 import { randomUA } from '../utils/user-agents';
 import { getRandomViewport } from './anti-detection';
+import { browserManager } from './browser-manager';
 
 /**
  * Generic auth strategy.
@@ -109,6 +110,7 @@ async function tryDatabaseAuth(
 
 /**
  * Creates an anonymous (unauthenticated) browser context.
+ * Uses shared BrowserManager singleton — does NOT launch a new browser.
  */
 async function createAnonymousContext(
   antiDetection: AntiDetectionConfig
@@ -117,15 +119,8 @@ async function createAnonymousContext(
     ? getRandomViewport()
     : { width: 1920, height: 1080 };
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-blink-features=AutomationControlled',
-    ],
-  });
+  const browser = await browserManager.getOrLaunch();
+  browserManager.trackContextOpen();
 
   const context = await browser.newContext({
     userAgent: randomUA(),
@@ -145,7 +140,8 @@ async function createAnonymousContext(
     cleanup: async () => {
       try { await page.close(); } catch {}
       try { await context.close(); } catch {}
-      try { await browser.close(); } catch {}
+      browserManager.trackContextClose();
+      // NOTE: Do NOT close browser — it's shared
     },
   };
 }

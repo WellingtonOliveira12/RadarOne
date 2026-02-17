@@ -15,10 +15,11 @@
 
 import { prisma } from '../lib/prisma';
 import { UserSessionStatus } from '@prisma/client';
-import { chromium, BrowserContext, Browser } from 'playwright';
+import { BrowserContext, Browser } from 'playwright';
 import { cryptoManager } from '../auth/crypto-manager';
 import { randomUA } from '../utils/user-agents';
 import { logger } from '../utils/logger';
+import { browserManager } from '../engine/browser-manager';
 
 // ============================================================
 // TIPOS
@@ -430,20 +431,13 @@ class UserSessionService {
       };
     }
 
-    // 5. Cria browser e contexto com storageState
+    // 5. Cria contexto com storageState (usando BrowserManager singleton)
     let browser: Browser | undefined;
     let context: BrowserContext | undefined;
 
     try {
-      browser = await chromium.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-blink-features=AutomationControlled',
-        ],
-      });
+      browser = await browserManager.getOrLaunch();
+      browserManager.trackContextOpen();
 
       context = await browser.newContext({
         storageState,
@@ -473,9 +467,8 @@ class UserSessionService {
           try {
             await context?.close();
           } catch {}
-          try {
-            await browser?.close();
-          } catch {}
+          browserManager.trackContextClose();
+          // NOTE: Do NOT close browser — it's shared
         },
       };
     } catch (error: any) {
@@ -483,9 +476,7 @@ class UserSessionService {
       try {
         await context?.close();
       } catch {}
-      try {
-        await browser?.close();
-      } catch {}
+      browserManager.trackContextClose();
 
       logger.error({ error: error.message }, 'USER_SESSION_CONTEXT_ERROR');
       return {

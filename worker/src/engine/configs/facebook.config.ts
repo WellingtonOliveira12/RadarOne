@@ -61,8 +61,8 @@ export const facebookConfig: SiteConfig = {
   },
   antiDetection: {
     stealthLevel: 'aggressive',
-    blockImages: false,
-    blockFonts: false,
+    blockImages: true,
+    blockFonts: true,
     blockCSS: false,
     blockMedia: true,
     injectStealthScripts: true,
