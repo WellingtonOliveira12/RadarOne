@@ -22,4 +22,6 @@ export interface MonitorWithFilters {
   priceMin?: number | null;
   priceMax?: number | null;
   active: boolean;
+  mode?: string;        // 'URL_ONLY' | 'STRUCTURED_FILTERS' — optional for backward compat
+  filtersJson?: unknown; // For future use with STRUCTURED_FILTERS URL builder
 }

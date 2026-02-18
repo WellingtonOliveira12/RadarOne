@@ -50,6 +50,18 @@ export class MonitorRunner {
 
       const subscription = monitor.user.subscriptions[0];
 
+      // Guard: STRUCTURED_FILTERS sem URL builder implementado → skip gracioso
+      const monitorMode = (monitor as any).mode as string | undefined;
+      if (monitorMode === 'STRUCTURED_FILTERS' && !monitor.searchUrl) {
+        log.info('MONITOR_SKIPPED: STRUCTURED_FILTERS sem searchUrl', { monitorId: monitor.id });
+        await this.logExecution(monitor.id, {
+          status: 'SKIPPED',
+          error: 'STRUCTURED_FILTERS: URL builder not implemented',
+          executionTime: Date.now() - startTime,
+        });
+        return;
+      }
+
       // Verifica se usuário tem consultas disponíveis
       if (subscription.queriesUsed >= subscription.queriesLimit) {
         log.warn('Limite de consultas atingido', {
