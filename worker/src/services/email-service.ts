@@ -205,12 +205,18 @@ class EmailService {
         const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
         const errorMessage = errorData.message || `HTTP ${response.status}`;
 
+        logger.warn({
+          httpStatus: response.status,
+          errorMessage,
+          errorData,
+        }, 'EMAIL_API_ERROR: Resend retornou erro');
+
         // Detecta erros fatais que devem desabilitar o servico
         if (errorMessage.toLowerCase().includes('api key is invalid') ||
             errorMessage.toLowerCase().includes('invalid api key') ||
             response.status === 401) {
           this.status = 'DISABLED_INVALID_KEY';
-          logger.error('EMAIL_FATAL: API key invalida - servico desabilitado. Verifique RESEND_API_KEY no Render.');
+          logger.error({ httpStatus: response.status, errorMessage }, 'EMAIL_FATAL: API key invalida - servico desabilitado. Verifique RESEND_API_KEY no Render.');
           return {
             success: false,
             error: 'API key invalida - email desabilitado',
@@ -225,6 +231,8 @@ class EmailService {
           this.status = 'DISABLED_DOMAIN_ERROR';
           logger.error({
             from: this.fromEmail,
+            httpStatus: response.status,
+            errorMessage,
           }, 'EMAIL_FATAL: Dominio nao verificado no Resend. Use EMAIL_FROM=onboarding@resend.dev para teste.');
           return {
             success: false,
