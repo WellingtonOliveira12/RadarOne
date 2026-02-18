@@ -1,9 +1,72 @@
 # RadarOne - Status do Projeto
 
-> **Última atualização**: 2026-02-18 19:55 UTC
+> **Última atualização**: 2026-02-18 22:00 UTC
 > **Branch**: `main`
-> **Último commit**: `942681d` docs: update SESSION_STATUS — email service operational, env vars documented
+> **Último commit**: pendente (PR em construção)
 > **Deploy Render**: Live (worker + backend)
+
+---
+
+## PR: Email Opcional + Default URL + Filtro Localização Global (2026-02-18)
+
+### Resumo
+
+3 features implementadas em 4 commits lógicos:
+
+| # | Feature | Arquivos | Migration | Risco |
+|---|---------|----------|-----------|-------|
+| 1 | **Email opcional** — toggle para desabilitar email (requer Telegram ativo) | 3 modificados | Não | Baixo |
+| 2 | **Default URL** — fallback defensivo por plataforma no worker | 1 novo + 1 mod | Não | Baixo |
+| 3 | **Localização global** — filtro country/state/city por monitor (best-effort) | 2 novos + 5 mod | Sim (ADD COLUMN) | Médio |
+| 4 | **Testes** — location-matcher.test.ts (14 testes) | 1 novo | Não | Nenhum |
+
+### Arquivos novos
+
+```
+worker/src/engine/default-urls.ts              # URLs default por plataforma
+worker/src/engine/location-matcher.ts          # Matcher de localização (country/state/city)
+worker/tests/engine/location-matcher.test.ts   # 14 testes do location matcher
+backend/prisma/migrations/20260218190000_add_location_fields_to_monitor/migration.sql
+```
+
+### Arquivos modificados
+
+```
+frontend/src/pages/NotificationSettingsPage.tsx  # Toggle email (era "Sempre ativo")
+frontend/src/pages/MonitorsPage.tsx              # Placeholder dinâmico + seção localização
+backend/src/controllers/notification.controller.ts # emailEnabled no PUT + validação
+backend/src/controllers/monitorController.ts     # country/stateRegion/city no create/update
+backend/src/services/monitorService.ts           # Types + prisma create/update
+backend/prisma/schema.prisma                     # +country, +state_region, +city no Monitor
+worker/src/services/monitor-runner.ts            # emailEnabled check + default URL fallback
+worker/src/engine/ad-extractor.ts                # Filtro de localização pós-preço
+worker/src/types/scraper.ts                      # MonitorWithFilters + location fields
+```
+
+### Validação
+
+```
+worker: tsc --noEmit ✅ zero erros
+backend: tsc --noEmit ✅ zero erros
+frontend: tsc -b ✅ zero erros
+worker: vitest run ✅ 9 suites, 81 testes (incluindo 14 novos do location-matcher)
+backend: vitest run — 5 suites pass, 4 fail (pré-existente: DB não mockado)
+```
+
+### Produção (deploy)
+
+```bash
+# Migration (Render release command):
+npx prisma migrate deploy
+# Resultado: ADD COLUMN com DEFAULT — safe, sem downtime
+```
+
+### Decisões de design
+
+- **country como string enum** (WORLDWIDE/BR/US), não tipo livre
+- **Siglas ambíguas** (AL/PA/MA/SC/MT/MS) excluídas dos patterns de ambos países → conservador (KEEP)
+- **searchUrl continua obrigatório** na API para URL_ONLY; default URL é apenas fallback defensivo no worker
+- **Location filter é best-effort**: depende do site expor `ad.location`; se vazio → anúncio NÃO é excluído
 
 ---
 
@@ -194,7 +257,7 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 
 ## Testes
 
-### Worker: 8 suites, 66 testes passando
+### Worker: 9 suites, 81 testes passando
 
 | Suite | Testes |
 |-------|--------|
@@ -206,6 +269,7 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 | `scroller.test.ts` | 4 |
 | `marketplace-engine.test.ts` | 3 |
 | `facebook-integration.test.ts` | 21 |
+| `location-matcher.test.ts` | 14 |
 
 ### Backend: 5 suites, 40 testes passando (+ 34 pré-existentes falhando — DB não mockado)
 
