@@ -19,6 +19,12 @@ import { getAuthContext } from './auth-strategy';
 import { scrollPage } from './scroller';
 import { sessionPool } from './session-pool';
 
+/** Applies ±15% jitter to a base delay to avoid bot-detectable patterns. */
+function applyJitter(baseMs: number): number {
+  const factor = 0.85 + Math.random() * 0.3; // [0.85, 1.15]
+  return Math.round(baseMs * factor);
+}
+
 /**
  * MarketplaceEngine — universal scraper engine.
  *
@@ -137,8 +143,8 @@ export class MarketplaceEngine {
         timeout: this.config.navigationTimeout,
       });
 
-      // 4. Wait for render
-      await page.waitForTimeout(this.config.renderDelay);
+      // 4. Wait for render (with jitter to avoid bot detection)
+      await page.waitForTimeout(applyJitter(this.config.renderDelay));
       if (this.config.renderWaitSelector) {
         try {
           await page.waitForSelector(this.config.renderWaitSelector, {

@@ -1,6 +1,12 @@
 import { Page } from 'playwright';
 import { ScrollConfig } from './types';
 
+/** Applies ±20% jitter to a base delay to avoid bot-detectable patterns. */
+function applyJitter(baseMs: number): number {
+  const factor = 0.8 + Math.random() * 0.4; // [0.8, 1.2]
+  return Math.round(baseMs * factor);
+}
+
 /**
  * Scrolls the page according to the scroll strategy.
  * Returns the number of scrolls performed.
@@ -31,7 +37,7 @@ async function scrollFixed(
       const height = document.body.scrollHeight;
       window.scrollTo(0, (height / (step.total)) * (step.current + 1));
     }, { current: i, total: steps });
-    await page.waitForTimeout(delayMs);
+    await page.waitForTimeout(applyJitter(delayMs));
   }
   return steps;
 }
@@ -59,7 +65,7 @@ async function scrollAdaptive(
     });
     scrollsDone++;
 
-    await page.waitForTimeout(delayMs);
+    await page.waitForTimeout(applyJitter(delayMs));
 
     const currentCount = await countVisibleItems(page);
 
