@@ -39,6 +39,17 @@ export async function extractAds(
             const h2 = el.querySelector('h2, h3');
             title = h2?.textContent?.trim() || '';
           }
+          // Fallback for <a> containers (e.g. Facebook): grab first meaningful span
+          if (!title && el.tagName === 'A') {
+            const spans = Array.from(el.querySelectorAll('span'));
+            for (let si = 0; si < spans.length; si++) {
+              const t = spans[si].textContent?.trim() || '';
+              if (t.length > 3 && t.length < 200 && !/^\d/.test(t) && !t.includes('R$')) {
+                title = t;
+                break;
+              }
+            }
+          }
 
           // Price text (raw)
           let priceText = '';
@@ -47,15 +58,19 @@ export async function extractAds(
             priceText = priceEl?.textContent?.trim() || '';
           }
 
-          // URL
+          // URL — handle case where container element IS the <a> tag
           let url = '';
-          if (linkSel) {
-            const linkEl = el.querySelector(linkSel);
-            url = linkEl?.getAttribute('href') || '';
-          }
-          if (!url) {
-            const firstLink = el.querySelector('a');
-            url = firstLink?.getAttribute('href') || '';
+          if (el.tagName === 'A') {
+            url = el.getAttribute('href') || '';
+          } else {
+            if (linkSel) {
+              const linkEl = el.querySelector(linkSel);
+              url = linkEl?.getAttribute('href') || '';
+            }
+            if (!url) {
+              const firstLink = el.querySelector('a');
+              url = firstLink?.getAttribute('href') || '';
+            }
           }
 
           // Image

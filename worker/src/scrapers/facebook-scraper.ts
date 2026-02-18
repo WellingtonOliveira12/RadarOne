@@ -25,7 +25,7 @@ export async function scrapeFacebook(monitor: MonitorWithFilters): Promise<Scrap
   console.log(
     `FB_ENGINE: ads=${result.ads.length} raw=${m.adsRaw} auth=${m.authenticated}(${m.authSource}) ` +
       `selector=${m.selectorUsed || 'NONE'} scrolls=${m.scrollsDone} duration=${m.durationMs}ms ` +
-      `pageType=${result.diagnosis.pageType}`
+      `pageType=${result.diagnosis.pageType} skipped=${JSON.stringify(m.skippedReasons)}`
   );
 
   // If 0 ads due to auth issues, throw for circuit breaker handling
