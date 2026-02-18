@@ -3,6 +3,7 @@ import { prisma } from './lib/prisma';
 import { isHealthy as isRedisHealthy } from './services/queue-manager';
 import { circuitBreaker } from './utils/circuit-breaker';
 import { browserManager } from './engine/browser-manager';
+import { emailService } from './services/email-service';
 
 /**
  * Health Check HTTP Server
@@ -24,6 +25,11 @@ interface HealthStatus {
     database: boolean;
     redis?: boolean;
     circuitBreakers?: Record<string, any>;
+  };
+  email: {
+    status: string;
+    reason: string;
+    backoffUntil?: Date;
   };
   browser: {
     connected: boolean;
@@ -88,6 +94,9 @@ async function checkHealth(): Promise<HealthStatus> {
     // Ignore
   }
 
+  // Email service status
+  const emailStatus = emailService.getStatus();
+
   // Browser metrics
   const bm = browserManager.getMetrics();
 
@@ -107,6 +116,7 @@ async function checkHealth(): Promise<HealthStatus> {
     timestamp: new Date().toISOString(),
     uptime: Date.now() - startTime,
     checks,
+    email: emailStatus,
     browser: bm,
     memory,
     contexts: {
