@@ -16,6 +16,7 @@ import { log } from '../utils/logger';
 import { userSessionService } from './user-session-service';
 import { isAuthError } from './session-provider';
 import { StatsRecorder, mapPageType } from './stats-recorder';
+import { getDefaultUrl } from '../engine/default-urls';
 
 /**
  * MonitorRunner
@@ -49,6 +50,15 @@ export class MonitorRunner {
       }
 
       const subscription = monitor.user.subscriptions[0];
+
+      // Fallback defensivo: URL default por plataforma (edge case: searchUrl vazio no DB)
+      if (!monitor.searchUrl) {
+        const defaultUrl = getDefaultUrl(monitor.site);
+        if (defaultUrl) {
+          (monitor as any).searchUrl = defaultUrl;
+          log.info('MONITOR_DEFAULT_URL', { monitorId: monitor.id, site: monitor.site, url: defaultUrl });
+        }
+      }
 
       // Guard: STRUCTURED_FILTERS sem URL builder implementado → skip gracioso
       const monitorMode = (monitor as any).mode as string | undefined;
@@ -454,7 +464,8 @@ export class MonitorRunner {
 
     const telegramEnabled = monitor.user.notificationSettings?.telegramEnabled !== false;
     const hasTelegram = !!(telegramChatId && telegramEnabled);
-    const hasEmail = !!monitor.user.email;
+    const emailEnabled = monitor.user.notificationSettings?.emailEnabled !== false;
+    const hasEmail = !!(monitor.user.email && emailEnabled);
 
     // Log para debug
     log.info('📋 Canais de notificação do usuário', {
@@ -462,6 +473,7 @@ export class MonitorRunner {
       userId: monitor.user.id,
       hasTelegram,
       hasEmail,
+      emailEnabled,
       telegramChatId: telegramChatId ? '***' + telegramChatId.slice(-4) : null,
     });
 

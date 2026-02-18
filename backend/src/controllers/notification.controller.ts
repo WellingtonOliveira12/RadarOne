@@ -67,14 +67,30 @@ export class NotificationController {
   static async updateSettings(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.userId;
-      const { telegramUsername } = req.body;
+      const { telegramUsername, emailEnabled } = req.body;
 
       if (!userId) {
         res.status(401).json({ error: 'Não autenticado' });
         return;
       }
 
-      logInfo('Atualizando configurações de notificação', { userId, telegramUsername });
+      const newEmailEnabled = emailEnabled !== undefined ? Boolean(emailEnabled) : true;
+
+      logInfo('Atualizando configurações de notificação', { userId, telegramUsername, emailEnabled: newEmailEnabled });
+
+      // Validação server-side: se desabilitar email, precisa ter Telegram ativo
+      if (!newEmailEnabled) {
+        const activeTelegram = await prisma.telegramAccount.findFirst({
+          where: { userId, active: true },
+        });
+        if (!activeTelegram) {
+          res.status(400).json({
+            error: 'Pelo menos 1 canal de notificação deve estar ativo',
+            message: 'Vincule o Telegram antes de desabilitar e-mail.',
+          });
+          return;
+        }
+      }
 
       // Validar e normalizar telegram username
       let normalizedUsername: string | null = null;
@@ -111,7 +127,7 @@ export class NotificationController {
         settings = await prisma.notificationSettings.update({
           where: { userId },
           data: {
-            emailEnabled: true, // Email sempre true
+            emailEnabled: newEmailEnabled,
             telegramEnabled,
             telegramUsername: normalizedUsername,
             // Se telegram desabilitado, limpar chatId também
@@ -123,7 +139,7 @@ export class NotificationController {
         settings = await prisma.notificationSettings.create({
           data: {
             userId,
-            emailEnabled: true,
+            emailEnabled: newEmailEnabled,
             telegramEnabled,
             telegramUsername: normalizedUsername,
             telegramChatId: null

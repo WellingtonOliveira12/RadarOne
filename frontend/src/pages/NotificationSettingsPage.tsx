@@ -34,6 +34,7 @@ export const NotificationSettingsPage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [emailEnabled, setEmailEnabled] = useState(true);
   const [telegramUsername, setTelegramUsername] = useState('');
   const [showLinkCodeModal, setShowLinkCodeModal] = useState(false);
   const [linkCodeData, setLinkCodeData] = useState<LinkCodeData | null>(null);
@@ -51,6 +52,7 @@ export const NotificationSettingsPage: React.FC = () => {
         skipAutoLogout: true,
       });
       setSettings(data);
+      setEmailEnabled(data.emailEnabled !== false);
       setTelegramUsername(data.telegramUsername || '');
     } catch (err: any) {
       const isDev = import.meta.env.DEV;
@@ -74,9 +76,17 @@ export const NotificationSettingsPage: React.FC = () => {
     setError('');
     setSuccess('');
 
+    // Validação client-side: pelo menos 1 canal deve estar ativo
+    if (!emailEnabled && !settings?.telegramChatId) {
+      setError('Vincule o Telegram antes de desabilitar e-mail. Pelo menos 1 canal de notificação deve estar ativo.');
+      setSaving(false);
+      return;
+    }
+
     try {
       await api.put('/api/notifications/settings', {
-        telegramUsername: telegramUsername.trim() || null
+        telegramUsername: telegramUsername.trim() || null,
+        emailEnabled,
       });
 
       setSuccess('Configurações salvas com sucesso!');
@@ -178,13 +188,23 @@ export const NotificationSettingsPage: React.FC = () => {
           <div style={styles.section}>
             <h2 style={styles.sectionTitle}>Canal de notificação</h2>
 
-            {/* Email - Sempre ativo */}
+            {/* Email - Toggle */}
             <div style={styles.infoRow}>
               <div>
                 <div style={styles.channelTitle}>E-mail</div>
                 <div style={styles.channelSubtitle}>{user?.email}</div>
               </div>
-              <span style={styles.badgeActive}>Sempre ativo</span>
+              <label style={styles.toggleLabel}>
+                <input
+                  type="checkbox"
+                  checked={emailEnabled}
+                  onChange={(e) => setEmailEnabled(e.target.checked)}
+                  style={styles.toggleCheckbox}
+                />
+                <span style={emailEnabled ? styles.badgeActive : styles.badgeInactive}>
+                  {emailEnabled ? 'Ativo' : 'Desativado'}
+                </span>
+              </label>
             </div>
 
             {/* Telegram - Opcional */}
@@ -390,9 +410,30 @@ const styles = {
   channelSubtitle: {
     ...responsive.typography.small,
   },
+  toggleLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: responsive.spacing.xs,
+    cursor: 'pointer',
+  },
+  toggleCheckbox: {
+    width: '18px',
+    height: '18px',
+    cursor: 'pointer',
+    accentColor: '#10b981',
+  },
   badgeActive: {
     backgroundColor: '#d1fae5',
     color: '#065f46',
+    padding: `${responsive.spacing.xs} ${responsive.spacing.sm}`,
+    borderRadius: '6px',
+    fontSize: 'clamp(12px, 2vw, 13px)',
+    fontWeight: '600' as const,
+    whiteSpace: 'nowrap' as const,
+  },
+  badgeInactive: {
+    backgroundColor: '#f3f4f6',
+    color: '#6b7280',
     padding: `${responsive.spacing.xs} ${responsive.spacing.sm}`,
     borderRadius: '6px',
     fontSize: 'clamp(12px, 2vw, 13px)',
