@@ -112,6 +112,7 @@ export async function cancelOldSubscriptions(userId: string): Promise<number> {
     where: {
       userId,
       status: { in: ['ACTIVE', 'TRIAL'] },
+      isLifetime: false, // Nunca cancelar vitalícias
     },
     data: { status: 'CANCELLED' },
   });

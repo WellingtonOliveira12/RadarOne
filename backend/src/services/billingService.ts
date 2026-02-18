@@ -292,9 +292,9 @@ export async function activatePaidSubscription(
     throw new Error('Plano não encontrado: ' + planSlug);
   }
 
-  // Cancela assinaturas antigas
+  // Cancela assinaturas antigas (preserva vitalícias)
   await prisma.subscription.updateMany({
-    where: { userId, status: { in: ['ACTIVE', 'TRIAL'] } },
+    where: { userId, status: { in: ['ACTIVE', 'TRIAL'] }, isLifetime: false },
     data: { status: 'CANCELLED' }
   });
 
@@ -350,6 +350,7 @@ export async function sendPreExpiryNotifications(daysBeforeExpiry: number = 3): 
   const subscriptions = await prisma.subscription.findMany({
     where: {
       status: { in: ['ACTIVE', 'TRIAL'] },
+      isLifetime: false, // Vitalícias não expiram — não notificar
       validUntil: {
         gte: now,
         lte: futureDate

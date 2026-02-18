@@ -29,7 +29,7 @@ Auditoria completa de 32 arquivos em 6 camadas (schema, services, controllers, j
 
 ### Riscos identificados (baixo, sem ação imediata)
 
-1. **Dead code em billingService.ts** — 3 funções não chamadas (`cancelOldSubscriptions`, `activatePaidSubscription`, `sendPreExpiryNotifications`) cancelariam vitalícias se ativadas. Sem risco atual.
+1. ~~Dead code em billingService.ts~~ ✅ CORRIGIDO — `isLifetime: false` adicionado nas 3 funções (hardening preventivo)
 2. **Admin updateSubscription** não permite setar `isLifetime` (apenas status/validUntil). Intencional.
 3. **Falta de testes** para `redeemTrialUpgrade` (controller). Lógica verificada manualmente.
 
@@ -318,7 +318,7 @@ O `email-service.ts` agora loga `EMAIL_API_ERROR` com `httpStatus`, `errorMessag
 - Alertas automáticos via AdminAlert quando site entra em CRITICAL
 
 ### Cupons/Vitalícios (identificados na auditoria)
-- Adicionar `isLifetime: false` nas funções dead-code de `billingService.ts` (cancelOldSubscriptions, activatePaidSubscription, sendPreExpiryNotifications)
+- ~~Adicionar `isLifetime: false` nas funções dead-code~~ ✅ FEITO (commit hardening preventivo)
 - Testes unitários para `redeemTrialUpgrade` (vitalício + temporário)
 - Permitir admin setar `isLifetime` via updateSubscription (se necessário)
 
