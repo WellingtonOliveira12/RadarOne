@@ -1,32 +1,69 @@
 # RadarOne - Status do Projeto
 
-> **Última atualização**: 2026-02-17 22:30 UTC
+> **Última atualização**: 2026-02-18 13:10 UTC
 > **Branch**: `main`
-> **Último commit**: `28ba145 fix(deploy): move NODE_OPTIONS to startCommand only — fix tsc OOM during build`
-> **Deploy Render**: **LIVE** desde 21:15 UTC — estável +1h, zero crashes
+> **Último commit**: `2b131ad feat: add Site Health dashboard — real-time observability per marketplace`
+> **Deploy Render**: Pendente push (commit feito e pushado)
 
 ---
 
-## Produção — Status Atual
+## Feature mais recente: Painel de Saúde por Site
+
+Dashboard admin de observabilidade em tempo real por marketplace. Mostra status (HEALTHY/WARNING/CRITICAL/NO_DATA), taxa de sucesso, falhas consecutivas, tempo médio e monitores ativos por site.
+
+### Arquitetura
+
+| Componente | Descrição |
+|------------|-----------|
+| **SiteExecutionStats** (tabela) | Denormalizada, sem JOIN na MonitorLog. Índices em `site`, `success`, `createdAt` |
+| **StatsRecorder** (worker) | `await` + `try/catch` isolado — NUNCA propaga erro, NUNCA impacta scraping |
+| **mapPageType()** | Função centralizada: diagnosis.pageType → enum PageType do Prisma |
+| **SiteHealthService** (backend) | Agrega métricas por site: successRate, consecutiveFailures, avgDuration, etc. |
+| **GET /api/admin/site-health** | Endpoint admin (requireAdmin) |
+| **AdminSiteHealthPage** (frontend) | Grid de cards Chakra UI, auto-refresh 60s, ordenação por criticidade |
+
+### Arquivos criados/modificados
+
+```
+# Novos (4)
+worker/src/services/stats-recorder.ts          # StatsRecorder + mapPageType()
+backend/src/services/siteHealthService.ts       # SiteHealthService.getSiteHealthSummary()
+frontend/src/pages/AdminSiteHealthPage.tsx       # Dashboard admin
+backend/tests/services/siteHealthService.test.ts # 7 testes unitários
+
+# Modificados (7)
+backend/prisma/schema.prisma                     # +PageType enum, +SiteExecutionStats model
+worker/prisma/schema.prisma                      # Espelhado (para prisma generate)
+worker/src/services/monitor-runner.ts            # +3 pontos de instrumentação StatsRecorder
+backend/src/controllers/admin.controller.ts      # +getSiteHealth()
+backend/src/routes/admin.routes.ts               # +GET /site-health
+frontend/src/router.tsx                          # +rota lazy /admin/site-health
+frontend/src/components/AdminLayout.tsx          # +link "Saúde dos Sites" na sidebar
+```
+
+### Lógica de Status
+
+```
+NO_DATA    → totalRunsLast24h === 0
+HEALTHY    → successRate >= 85 AND consecutiveFailures < 3
+WARNING    → successRate >= 60 (e não HEALTHY)
+CRITICAL   → successRate < 60 OR consecutiveFailures >= 5
+```
+
+### Nota sobre Prisma Migration
+
+A migração foi aplicada via `prisma db push` (não `prisma migrate dev`) porque o banco remoto tinha uma migration local ausente (`20260201140000_reset_admin_2fa`). O schema está sincronizado.
+
+---
+
+## Produção — Status Anterior
 
 ### Deploy ativo
 
 | Item | Valor |
 |------|-------|
-| Commit live | `28ba145` |
-| Instância | `srv-d5jv813e5dus73a8rv8g-tjm8m` |
-| Uptime confirmado | +1h09min sem crash, OOM ou restart |
-| Erro "Target page, context or browser has been closed" | **ELIMINADO** (0 ocorrências) |
-
-### Métricas de runtime (16 samples, +1h)
-
-| Métrica | Min | Max | Média |
-|---------|-----|-----|-------|
-| RSS (MB) | 165 | 172 | **168** |
-| Heap Used (MB) | 43 | 54 | **49** |
-| Scrape duration (ms) | 7458 | 10475 | **8753** |
-| activeContexts | 0 | 0 | 0 |
-| Crashes | 0 | 0 | **0** |
+| Commit live anterior | `f638b14` |
+| Uptime confirmado | Estável |
 
 ### Env vars no Render (Worker)
 
@@ -38,26 +75,6 @@
 
 **Build command**: `npm install && npm run build` (sem NODE_OPTIONS → tsc usa heap default)
 **Start command**: `NODE_OPTIONS=--max-old-space-size=256 npm start`
-
-### Problema resolvido: Build OOM
-
-`NODE_OPTIONS=--max-old-space-size=384` como env var limitava o `tsc` durante build, causando OOM.
-Fix: moveu para `startCommand` inline. Build usa heap default (~4GB), runtime usa 256MB.
-
-### Rollback plan
-
-| Cenário | Ação |
-|---------|------|
-| Worker instável | Render → Deploys → Rollback para `4b87544` |
-| Build falha | Verificar se `NODE_OPTIONS` não voltou como env var |
-| Git revert | `git revert 28ba145 && git push` |
-
-### Se houver OOM futuro — redução em camadas
-
-1. `MAX_BROWSER_CONTEXTS=2` → aguardar 15min
-2. `NODE_OPTIONS=--max-old-space-size=192` (no startCommand) → aguardar 15min
-3. `MAX_BROWSER_CONTEXTS=1` → processamento sequencial
-4. Upgrade Render para Standard (2GB)
 
 ---
 
@@ -97,16 +114,27 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 
 ## Testes
 
-6 suites, 40 testes passando:
+### Worker: 7 suites, 61 testes passando
 
 | Suite | Testes |
 |-------|--------|
-| `browser-manager.test.ts` | 13 (crash detection, semáforo, metrics, ensureAlive) |
+| `browser-manager.test.ts` | 13 |
 | `needs-reauth.test.ts` | 8 |
 | `page-diagnoser.test.ts` | 7 |
 | `telegram-service.test.ts` | 5 |
 | `scroller.test.ts` | 4 |
 | `marketplace-engine.test.ts` | 3 |
+| `facebook-integration.test.ts` | 21 |
+
+### Backend: 5 suites, 47 testes passando (+ 34 pré-existentes falhando em telegramService)
+
+| Suite | Testes |
+|-------|--------|
+| `siteHealthService.test.ts` | 7 |
+| `billingService.test.ts` | 8 |
+| `planBootValidation.test.ts` | 4 |
+| `subscriptionService.test.ts` | 5 |
+| `auth.test.ts` | 23 |
 
 ---
 
@@ -121,6 +149,7 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 | Memory bloqueou | `BROWSER_MEMORY_HIGH:` |
 | Shutdown limpo | `BROWSER_MANAGER: Shutdown complete` |
 | OOM-kill (ruim) | Log corta sem `Shutdown complete` + worker reinicia |
+| **Stats gravando** | `STATS_RECORDER: Falha ao persistir` (só aparece se ERRO) |
 
 ---
 
@@ -134,11 +163,14 @@ worker/src/engine/auth-strategy.ts         # Cascade de auth (recebe browser par
 worker/src/engine/site-registry.ts         # Registry (onde registrar novos sites)
 worker/src/engine/configs/                 # Diretório de configs
 worker/src/scrapers/                       # Scrapers migrados
+worker/src/services/stats-recorder.ts      # StatsRecorder + mapPageType()
+worker/src/services/monitor-runner.ts      # Orquestrador (instrumentado)
 worker/src/utils/retry-helper.ts           # Retry + isBrowserCrashError
 worker/src/utils/ml-auth-provider.ts       # Auth ML (usa acquireContext)
 worker/src/health-server.ts                # Health com browser/memory metrics
 worker/src/worker.ts                       # Shutdown unificado
-worker/tests/engine/browser-manager.test.ts # Testes BrowserManager
+backend/src/services/siteHealthService.ts  # Agregação de métricas por site
+frontend/src/pages/AdminSiteHealthPage.tsx # Dashboard de saúde
 render.yaml                                # Config Render (buildCommand, startCommand, envVars)
 ```
 
@@ -147,8 +179,11 @@ render.yaml                                # Config Render (buildCommand, startC
 ## Validação
 
 ```bash
-cd worker && npx tsc --noEmit     # zero erros
-cd worker && npx vitest run       # 6 suites, 40 testes passando
+cd backend && npx tsc --noEmit     # zero erros
+cd worker && npx tsc --noEmit      # zero erros
+cd frontend && npx tsc -b          # zero erros
+cd worker && npx vitest run        # 7 suites, 61 testes
+cd backend && npx vitest run tests/services/siteHealthService.test.ts  # 7 testes
 ```
 
 ---
@@ -156,14 +191,21 @@ cd worker && npx vitest run       # 6 suites, 40 testes passando
 ## Histórico de commits recentes
 
 ```
+2b131ad feat: add Site Health dashboard — real-time observability per marketplace
+f638b14 feat(worker): add Facebook Marketplace to auth-sites + integration tests (61/61 pass)
+33668eb fix(connections): make cookie validation and modal provider-aware — fix Facebook using ML rules
+1976d47 docs: update SESSION_STATUS with production metrics and deploy config
 28ba145 fix(deploy): move NODE_OPTIONS to startCommand only — fix tsc OOM during build
 a1e31cc fix(deploy): build OOM — override NODE_OPTIONS during build, tune runtime for 512MB
 4b87544 feat(worker): harden browser lifecycle with semaphore, crash recovery and memory limits
-52d6f82 fix(audit): ML browser leak, Telegram HTML safety, NEEDS_REAUTH tests
-3b322fe fix(notifications): re-notify user on NEEDS_REAUTH with 6h cooldown
-408d93e fix(worker): resolve OOM by sharing single Chromium instance
-95aa2c0 feat(engine): migrate all 9 scrapers to MarketplaceEngine architecture
 ```
+
+---
+
+## TODO Futuro (Fase 7 — NÃO implementar agora)
+
+- Suspensão automática de sites com successRate < 40% por 10 execuções consecutivas
+- Alertas automáticos via AdminAlert quando site entra em CRITICAL
 
 ---
 
