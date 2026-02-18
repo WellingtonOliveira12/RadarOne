@@ -95,7 +95,7 @@ export async function createMonitor(
 ): Promise<void> {
   try {
     const userId = req.userId;
-    const { name, site, searchUrl, priceMin, priceMax } = req.body;
+    const { name, site, searchUrl, priceMin, priceMax, country: rawCountry, stateRegion: rawState, city: rawCity } = req.body;
 
     if (!userId) {
       res.status(401).json({ error: 'Não autorizado' });
@@ -137,6 +137,18 @@ export async function createMonitor(
       return;
     }
 
+    // Validação de localização
+    const VALID_COUNTRIES = ['WORLDWIDE', 'BR', 'US'];
+    const country = rawCountry && VALID_COUNTRIES.includes(rawCountry) ? rawCountry : 'BR';
+    const stateRegion = country === 'WORLDWIDE' ? null
+      : (rawState && typeof rawState === 'string' && rawState.trim().length >= 2 && rawState.trim().length <= 40)
+        ? rawState.trim().toUpperCase()
+        : null;
+    const city = country === 'WORLDWIDE' ? null
+      : (rawCity && typeof rawCity === 'string' && rawCity.trim().length >= 2 && rawCity.trim().length <= 80)
+        ? rawCity.trim()
+        : null;
+
     // Cria o monitor (validações de plano são feitas no service)
     const monitor = await monitorService.createMonitor(userId, {
       name,
@@ -144,6 +156,9 @@ export async function createMonitor(
       searchUrl,
       priceMin,
       priceMax,
+      country,
+      stateRegion,
+      city,
     });
 
     res.status(201).json({
@@ -195,7 +210,7 @@ export async function updateMonitor(
   try {
     const userId = req.userId;
     const { id } = req.params;
-    const { name, site, searchUrl, priceMin, priceMax, active } = req.body;
+    const { name, site, searchUrl, priceMin, priceMax, active, country: rawCountry, stateRegion: rawState, city: rawCity } = req.body;
 
     if (!userId) {
       res.status(401).json({ error: 'Não autorizado' });
@@ -233,6 +248,25 @@ export async function updateMonitor(
       return;
     }
 
+    // Validação de localização (se fornecidos)
+    const VALID_COUNTRIES = ['WORLDWIDE', 'BR', 'US'];
+    const country = rawCountry !== undefined
+      ? (VALID_COUNTRIES.includes(rawCountry) ? rawCountry : 'BR')
+      : undefined;
+    const effectiveCountry = country || rawCountry;
+    const stateRegion = effectiveCountry === 'WORLDWIDE' ? null
+      : (rawState !== undefined)
+        ? (typeof rawState === 'string' && rawState.trim().length >= 2 && rawState.trim().length <= 40
+            ? rawState.trim().toUpperCase()
+            : null)
+        : undefined;
+    const city = effectiveCountry === 'WORLDWIDE' ? null
+      : (rawCity !== undefined)
+        ? (typeof rawCity === 'string' && rawCity.trim().length >= 2 && rawCity.trim().length <= 80
+            ? rawCity.trim()
+            : null)
+        : undefined;
+
     // Atualiza o monitor
     const monitor = await monitorService.updateMonitor(userId, id, {
       name,
@@ -241,6 +275,9 @@ export async function updateMonitor(
       priceMin,
       priceMax,
       active,
+      country,
+      stateRegion,
+      city,
     });
 
     res.json({

@@ -354,6 +354,11 @@ model Monitor {
   priceMin Float? @map("price_min")
   priceMax Float? @map("price_max")
 
+  // Filtros de Localização (globais)
+  country     String  @default("BR")              // Enum: WORLDWIDE | BR | US (ISO-2)
+  stateRegion String? @map("state_region")         // "SP", "NY", etc.
+  city        String?                              // "São Paulo", "New York"
+
   // Campos adicionais (compatibilidade com worker)
   keywords        String[] @default([])
   excludeKeywords String[] @default([]) @map("exclude_keywords")

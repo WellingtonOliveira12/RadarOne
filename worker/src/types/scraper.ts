@@ -24,4 +24,7 @@ export interface MonitorWithFilters {
   active: boolean;
   mode?: string;        // 'URL_ONLY' | 'STRUCTURED_FILTERS' — optional for backward compat
   filtersJson?: unknown; // For future use with STRUCTURED_FILTERS URL builder
+  country?: string;         // 'WORLDWIDE' | 'BR' | 'US'
+  stateRegion?: string | null;
+  city?: string | null;
 }

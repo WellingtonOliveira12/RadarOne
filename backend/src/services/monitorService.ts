@@ -18,6 +18,9 @@ export interface CreateMonitorInput {
   searchUrl: string;
   priceMin?: number;
   priceMax?: number;
+  country?: string;
+  stateRegion?: string | null;
+  city?: string | null;
 }
 
 export interface UpdateMonitorInput {
@@ -27,6 +30,9 @@ export interface UpdateMonitorInput {
   priceMin?: number;
   priceMax?: number;
   active?: boolean;
+  country?: string;
+  stateRegion?: string | null;
+  city?: string | null;
 }
 
 // ============================================
@@ -120,6 +126,9 @@ export async function createMonitor(
         searchUrl: data.searchUrl,
         priceMin: data.priceMin,
         priceMax: data.priceMax,
+        country: data.country || 'BR',
+        stateRegion: data.stateRegion,
+        city: data.city,
         active: true, // Novo monitor inicia ativo
       },
     });
@@ -190,6 +199,9 @@ export async function updateMonitor(
         priceMin: data.priceMin,
         priceMax: data.priceMax,
         active: data.active,
+        country: data.country,
+        stateRegion: data.stateRegion,
+        city: data.city,
       },
     });
 

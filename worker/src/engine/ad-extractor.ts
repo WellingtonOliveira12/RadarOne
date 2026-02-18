@@ -1,6 +1,7 @@
 import { Page } from 'playwright';
 import { ScrapedAd, SiteConfig, MonitorWithFilters } from './types';
 import { findSelector } from './container-waiter';
+import { matchLocation } from './location-matcher';
 
 /**
  * Extracts ads from the page using the site config selectors.
@@ -152,6 +153,19 @@ export async function extractAds(
     if (monitor.priceMax && price > 0 && price > monitor.priceMax) {
       skip('price_above_max');
       continue;
+    }
+
+    // Location filter (best-effort: depends on site exposing ad.location)
+    if (monitor.country && monitor.country !== 'WORLDWIDE') {
+      const locResult = matchLocation(raw.location, {
+        country: monitor.country,
+        stateRegion: monitor.stateRegion,
+        city: monitor.city,
+      });
+      if (!locResult.match) {
+        skip((locResult as { match: false; reason: string }).reason);
+        continue;
+      }
     }
 
     ads.push({
