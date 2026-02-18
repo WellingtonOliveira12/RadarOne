@@ -15,6 +15,7 @@ import { circuitBreaker } from '../utils/circuit-breaker';
 import { log } from '../utils/logger';
 import { userSessionService } from './user-session-service';
 import { isAuthError } from './session-provider';
+import { StatsRecorder, mapPageType } from './stats-recorder';
 
 /**
  * MonitorRunner
@@ -156,6 +157,21 @@ export class MonitorRunner {
         diagnosis,
       });
 
+      // Registra metricas de execucao (best-effort)
+      const now = new Date();
+      const durationMs = Date.now() - startTime;
+      await StatsRecorder.record({
+        site: monitor.site,
+        monitorId: monitor.id,
+        userId: monitor.userId,
+        startedAt: new Date(startTime),
+        finishedAt: now,
+        durationMs,
+        pageType: mapPageType(diagnosis?.pageType),
+        adsFound: ads.length,
+        success: true,
+      });
+
       // Atualiza lastCheckedAt
       await prisma.monitor.update({
         where: { id: monitor.id },
@@ -199,6 +215,20 @@ export class MonitorRunner {
           executionTime: duration,
         });
 
+        // Registra metricas de execucao (best-effort)
+        await StatsRecorder.record({
+          site: monitor.site,
+          monitorId: monitor.id,
+          userId: monitor.userId,
+          startedAt: new Date(startTime),
+          finishedAt: new Date(),
+          durationMs: duration,
+          pageType: 'LOGIN_REQUIRED',
+          adsFound: 0,
+          success: false,
+          errorCode: 'AUTH_ERROR',
+        });
+
         // NÃO alimenta circuit breaker!
         // O circuit breaker só deve abrir para falhas reais (timeout, crash, etc.)
         return;
@@ -217,6 +247,20 @@ export class MonitorRunner {
         error: error.message,
         executionTime: duration,
         diagnosis: errorDiagnosis,
+      });
+
+      // Registra metricas de execucao (best-effort)
+      await StatsRecorder.record({
+        site: monitor.site,
+        monitorId: monitor.id,
+        userId: monitor.userId,
+        startedAt: new Date(startTime),
+        finishedAt: new Date(),
+        durationMs: duration,
+        pageType: mapPageType(errorDiagnosis?.pageType) || 'ERROR',
+        adsFound: 0,
+        success: false,
+        errorCode: error.message?.slice(0, 200),
       });
     }
   }

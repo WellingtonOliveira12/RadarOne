@@ -53,6 +53,7 @@ model User {
   notificationSettings NotificationSettings?
   userSessions         UserSession[]
   refreshTokens        RefreshToken[]
+  siteExecutionStats   SiteExecutionStats[]
 
   @@map("users")
 }
@@ -369,9 +370,10 @@ model Monitor {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relações
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  adsSeen AdSeen[]
-  logs    MonitorLog[]
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adsSeen            AdSeen[]
+  logs               MonitorLog[]
+  siteExecutionStats SiteExecutionStats[]
 
   @@index([userId])
   @@index([active])
@@ -870,4 +872,44 @@ model ScraperAuthLog {
   @@index([event])
   @@index([createdAt])
   @@map("scraper_auth_logs")
+}
+
+// ============================================
+// SITE EXECUTION STATS (Observabilidade)
+// ============================================
+
+enum PageType {
+  CONTENT
+  BLOCKED
+  CAPTCHA
+  LOGIN_REQUIRED
+  CHECKPOINT
+  NO_RESULTS
+  EMPTY
+  UNKNOWN
+  ERROR
+}
+
+model SiteExecutionStats {
+  id          String      @id @default(cuid())
+  site        MonitorSite
+  monitorId   String      @map("monitor_id")
+  userId      String      @map("user_id")
+  startedAt   DateTime    @map("started_at")
+  finishedAt  DateTime    @map("finished_at")
+  durationMs  Int         @map("duration_ms")
+  pageType    PageType    @map("page_type")
+  adsFound    Int         @default(0) @map("ads_found")
+  success     Boolean     @default(false)
+  errorCode   String?     @map("error_code")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  monitor     Monitor     @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([site])
+  @@index([createdAt])
+  @@index([success])
+  @@index([site, createdAt])
+  @@map("site_execution_stats")
 }

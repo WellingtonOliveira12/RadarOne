@@ -41,6 +41,7 @@ const AdminMonitorsPage = lazy(() => import('./pages/AdminMonitorsPage').then(m 
 const AdminWebhooksPage = lazy(() => import('./pages/AdminWebhooksPage').then(m => ({ default: m.AdminWebhooksPage })));
 const AdminCouponsPage = lazy(() => import('./pages/AdminCouponsPage').then(m => ({ default: m.AdminCouponsPage })));
 const AdminAlertsPage = lazy(() => import('./pages/AdminAlertsPage').then(m => ({ default: m.AdminAlertsPage })));
+const AdminSiteHealthPage = lazy(() => import('./pages/AdminSiteHealthPage').then(m => ({ default: m.AdminSiteHealthPage })));
 const Security2FAPage = lazy(() => import('./pages/Security2FAPage').then(m => ({ default: m.Security2FAPage })));
 
 // Páginas de teste/debug
@@ -264,6 +265,16 @@ export function AppRouter() {
               <AdminProtectedRoute>
                 <Suspense fallback={<PageLoader />}>
                   <AdminAlertsPage />
+                </Suspense>
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/site-health"
+            element={
+              <AdminProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <AdminSiteHealthPage />
                 </Suspense>
               </AdminProtectedRoute>
             }

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { logAdminAction, AuditAction, AuditTargetType, getClientIp } from '../utils/auditLog';
 import { logInfo, logError } from '../utils/loggerHelpers';
+import { SiteHealthService } from '../services/siteHealthService';
 
 /**
  * Retorna nome amigável do job
@@ -3503,6 +3504,20 @@ export class AdminController {
     } catch (error) {
       logError('Erro ao buscar estatísticas detalhadas do cupom', { err: error });
       return res.status(500).json({ error: 'Erro ao buscar estatísticas detalhadas do cupom' });
+    }
+  }
+
+  /**
+   * GET /api/admin/site-health
+   * Retorna resumo de saude por site (observabilidade)
+   */
+  static async getSiteHealth(req: Request, res: Response) {
+    try {
+      const summary = await SiteHealthService.getSiteHealthSummary();
+      return res.json(summary);
+    } catch (error) {
+      logError('Erro ao buscar saude dos sites', { err: error });
+      return res.status(500).json({ error: 'Erro ao buscar saude dos sites' });
     }
   }
 }

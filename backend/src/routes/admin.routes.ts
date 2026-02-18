@@ -46,6 +46,9 @@ router.get('/monitors', requireAdmin, AdminController.listMonitors);
 // Jobs
 router.get('/jobs', requireAdmin, AdminController.listJobRuns);
 
+// Site Health (Observabilidade)
+router.get('/site-health', requireAdmin, AdminController.getSiteHealth);
+
 // Audit Logs (FASE 3.1)
 router.get('/audit-logs/export', requireAdmin, AdminController.exportAuditLogs); // IMPORTANTE: Vem ANTES de outros
 router.get('/audit-logs', requireAdmin, AdminController.listAuditLogs); // Todos os admins podem visualizar
