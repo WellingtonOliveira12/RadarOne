@@ -93,6 +93,42 @@ export const AUTH_SITES: Record<string, SiteAuthConfig> = {
     ],
   },
 
+  FACEBOOK_MARKETPLACE: {
+    siteId: 'FACEBOOK_MARKETPLACE',
+    displayName: 'Facebook Marketplace',
+    loginUrl: 'https://www.facebook.com/login',
+    validationUrl: 'https://www.facebook.com/marketplace/',
+    domain: 'facebook.com',
+    loggedInSelectors: [
+      '[aria-label="Facebook"]',
+      '[data-pagelet="ProfileActions"]',
+      'div[role="banner"]',
+    ],
+    loginPageSelectors: [
+      'input[name="email"]',
+      'input[name="pass"]',
+      'form[action*="login"]',
+    ],
+    loginRequiredTexts: [
+      'log in to continue',
+      'you must log in',
+      'faça login',
+      'create an account',
+    ],
+    sessionExpiryDays: 7,
+    mayRequireMFA: true,
+    mfaSelectors: [
+      'input[name="approvals_code"]',
+      'input[id="approvals_code"]',
+    ],
+    mfaTexts: [
+      'two-factor authentication',
+      'autenticação de dois fatores',
+      'enter the code',
+      'digite o código',
+    ],
+  },
+
   SUPERBID: {
     siteId: 'SUPERBID',
     displayName: 'Superbid',
