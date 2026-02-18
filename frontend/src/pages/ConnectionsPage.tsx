@@ -73,7 +73,39 @@ function getDaysUntilExpiration(expiresAt: string | null): number | null {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
-const PLAYWRIGHT_COMMAND = 'npx playwright codegen mercadolivre.com.br --save-storage=sessao.json';
+// ============================================================
+// CONFIGURAÇÃO POR PROVIDER
+// ============================================================
+
+export interface ProviderConfig {
+  providerKey: string;
+  displayName: string;
+  requiredDomains: string[];       // domínios esperados nos cookies
+  loginUrl: string;                // URL onde o usuário faz login
+  playwrightCommand: string;       // comando Playwright para gerar sessão
+}
+
+export const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
+  MERCADO_LIVRE: {
+    providerKey: 'MERCADO_LIVRE',
+    displayName: 'Mercado Livre',
+    requiredDomains: ['mercadolivre', 'mercadolibre'],
+    loginUrl: 'mercadolivre.com.br',
+    playwrightCommand: 'npx playwright codegen mercadolivre.com.br --save-storage=sessao.json',
+  },
+  FACEBOOK_MARKETPLACE: {
+    providerKey: 'FACEBOOK_MARKETPLACE',
+    displayName: 'Facebook Marketplace',
+    requiredDomains: ['facebook.com'],
+    loginUrl: 'facebook.com',
+    playwrightCommand: 'npx playwright codegen facebook.com --save-storage=sessao.json',
+  },
+};
+
+/** Helper: retorna config do provider ou fallback para ML (compatibilidade) */
+function getProviderConfig(siteId: string): ProviderConfig {
+  return PROVIDER_CONFIGS[siteId] || PROVIDER_CONFIGS.MERCADO_LIVRE;
+}
 
 /**
  * Valida e normaliza o arquivo de sessão.
@@ -81,13 +113,28 @@ const PLAYWRIGHT_COMMAND = 'npx playwright codegen mercadolivre.com.br --save-st
  *   1) Playwright storageState: { cookies: [...], origins: [...] }
  *   2) Cookie dump (array puro): [ { domain, name, value, ... }, ... ]
  * Retorna o JSON normalizado para storageState (o formato que o backend aceita).
+ *
+ * @param content - conteúdo do arquivo JSON
+ * @param requiredDomains - substrings de domínio exigidas (ex: ['mercadolivre', 'mercadolibre'])
+ * @param providerDisplayName - nome do provider para mensagens de erro (ex: 'Mercado Livre')
+ * @param loginUrl - URL de login para mensagens de erro (ex: 'mercadolivre.com.br')
  */
-export function validateAndNormalizeSessionFile(content: string): {
+export function validateAndNormalizeSessionFile(
+  content: string,
+  requiredDomains?: string[],
+  providerDisplayName?: string,
+  loginUrl?: string,
+): {
   valid: boolean;
   error?: string;
   cookiesCount?: number;
   normalized?: string;
 } {
+  // Defaults para compatibilidade (ML) — caso chamado sem params
+  const domains = requiredDomains || ['mercadolivre', 'mercadolibre'];
+  const displayName = providerDisplayName || 'Mercado Livre';
+  const url = loginUrl || 'mercadolivre.com.br';
+
   let data: any;
   try {
     data = JSON.parse(content);
@@ -95,18 +142,19 @@ export function validateAndNormalizeSessionFile(content: string): {
     return { valid: false, error: 'Este arquivo não é um JSON válido. Verifique se exportou corretamente.' };
   }
 
+  const matchesDomain = (cookieDomain: string | undefined) =>
+    cookieDomain ? domains.some(d => cookieDomain.includes(d)) : false;
+
   // Formato 2: cookie dump (array puro) → normalizar para storageState
   if (Array.isArray(data)) {
     if (data.length === 0) {
-      return { valid: false, error: 'O arquivo está vazio (nenhum cookie encontrado). Faça login no Mercado Livre primeiro.' };
+      return { valid: false, error: `O arquivo está vazio (nenhum cookie encontrado). Faça login no ${displayName} primeiro.` };
     }
-    const hasMl = data.some((c: any) =>
-      c.domain?.includes('mercadolivre') || c.domain?.includes('mercadolibre')
-    );
-    if (!hasMl) {
+    const hasProvider = data.some((c: any) => matchesDomain(c.domain));
+    if (!hasProvider) {
       return {
         valid: false,
-        error: 'Nenhum cookie do Mercado Livre encontrado neste arquivo. Certifique-se de exportar após fazer login no mercadolivre.com.br.',
+        error: `Nenhum cookie do ${displayName} encontrado neste arquivo. Certifique-se de exportar após fazer login no ${url}.`,
       };
     }
     const normalized = JSON.stringify({ cookies: data, origins: [] });
@@ -128,17 +176,15 @@ export function validateAndNormalizeSessionFile(content: string): {
   }
 
   if (data.cookies.length === 0) {
-    return { valid: false, error: 'Nenhum cookie encontrado no arquivo. Faça login no Mercado Livre antes de exportar.' };
+    return { valid: false, error: `Nenhum cookie encontrado no arquivo. Faça login no ${displayName} antes de exportar.` };
   }
 
-  const mlCookies = data.cookies.filter((c: any) =>
-    c.domain?.includes('mercadolivre') || c.domain?.includes('mercadolibre')
-  );
+  const providerCookies = data.cookies.filter((c: any) => matchesDomain(c.domain));
 
-  if (mlCookies.length === 0) {
+  if (providerCookies.length === 0) {
     return {
       valid: false,
-      error: 'Nenhum cookie do Mercado Livre encontrado neste arquivo. Certifique-se de exportar após fazer login no mercadolivre.com.br.',
+      error: `Nenhum cookie do ${displayName} encontrado neste arquivo. Certifique-se de exportar após fazer login no ${url}.`,
     };
   }
 
@@ -263,7 +309,8 @@ function ConnectionWizard({
   onUploadSuccess: () => void;
   serverUnavailable: boolean;
 }) {
-  const { onCopy, hasCopied } = useClipboard(PLAYWRIGHT_COMMAND);
+  const providerConfig = getProviderConfig(siteId);
+  const { onCopy, hasCopied } = useClipboard(providerConfig.playwrightCommand);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -309,7 +356,12 @@ function ConnectionWizard({
       return;
     }
     const content = await file.text();
-    const result = validateAndNormalizeSessionFile(content);
+    const result = validateAndNormalizeSessionFile(
+      content,
+      providerConfig.requiredDomains,
+      providerConfig.displayName,
+      providerConfig.loginUrl,
+    );
     setSelectedFile(file);
     setValidationResult(result);
   };
@@ -479,7 +531,7 @@ function ConnectionWizard({
                     </Box>
 
                     <Box>
-                      <Text fontWeight="medium" fontSize="sm">2. Faça login no mercadolivre.com.br.</Text>
+                      <Text fontWeight="medium" fontSize="sm">2. Faça login no {providerConfig.loginUrl}.</Text>
                     </Box>
 
                     <Box>
@@ -511,7 +563,7 @@ function ConnectionWizard({
                         justify="space-between"
                       >
                         <Code fontSize="xs" bg="transparent" wordBreak="break-all" data-testid="playwright-command">
-                          {PLAYWRIGHT_COMMAND}
+                          {providerConfig.playwrightCommand}
                         </Code>
                         <Button
                           size="xs"
@@ -527,7 +579,7 @@ function ConnectionWizard({
                     </Box>
 
                     <Box>
-                      <Text fontWeight="medium" fontSize="sm">2. Faça login no Mercado Livre na janela que abrir.</Text>
+                      <Text fontWeight="medium" fontSize="sm">2. Faça login no {providerConfig.displayName} na janela que abrir.</Text>
                       <Text fontSize="xs" color="gray.500">Depois feche a janela do navegador.</Text>
                     </Box>
 

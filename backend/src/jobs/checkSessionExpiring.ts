@@ -256,6 +256,7 @@ export async function checkSessionExpiring(): Promise<JobRunResult> {
 function getSiteName(site: string): string {
   const siteNames: Record<string, string> = {
     MERCADO_LIVRE: 'Mercado Livre',
+    FACEBOOK_MARKETPLACE: 'Facebook Marketplace',
     OLX: 'OLX',
     WEBMOTORS: 'Webmotors',
     ICARROS: 'iCarros',

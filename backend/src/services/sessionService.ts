@@ -63,6 +63,10 @@ export const SUPPORTED_SITES: Record<string, { domains: string[]; displayName: s
     domains: ['mercadolivre.com.br', 'mercadolibre.com'],
     displayName: 'Mercado Livre',
   },
+  FACEBOOK_MARKETPLACE: {
+    domains: ['facebook.com', 'www.facebook.com'],
+    displayName: 'Facebook Marketplace',
+  },
   SUPERBID: {
     domains: ['superbid.net', 'www.superbid.net'],
     displayName: 'Superbid',

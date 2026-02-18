@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { ChakraProvider } from '@chakra-ui/react';
-import ConnectionsPage, { validateAndNormalizeSessionFile } from '../ConnectionsPage';
+import ConnectionsPage, { validateAndNormalizeSessionFile, PROVIDER_CONFIGS } from '../ConnectionsPage';
 
 // Mock api module
 vi.mock('../../services/api', () => ({
@@ -30,6 +30,7 @@ const mockSessionsSuccess = () => {
     sessions: [],
     supportedSites: [
       { id: 'MERCADO_LIVRE', name: 'Mercado Livre', domains: ['mercadolivre.com.br'] },
+      { id: 'FACEBOOK_MARKETPLACE', name: 'Facebook Marketplace', domains: ['facebook.com'] },
     ],
   });
 };
@@ -47,10 +48,10 @@ describe('ConnectionsPage', () => {
       expect(screen.getByText('Conexões')).toBeInTheDocument();
     });
     expect(screen.getByText('Mercado Livre')).toBeInTheDocument();
-    expect(screen.getByText('Conectar conta')).toBeInTheDocument();
+    expect(screen.getByText('Facebook Marketplace')).toBeInTheDocument();
   });
 
-  it('renderiza card do Mercado Livre via fallback quando API falha', async () => {
+  it('renderiza cards via fallback quando API falha', async () => {
     (api.requestWithRetry as any).mockRejectedValue(new Error('Network error'));
 
     renderPage();
@@ -59,7 +60,7 @@ describe('ConnectionsPage', () => {
       expect(screen.getByText('Conexões')).toBeInTheDocument();
     });
     expect(screen.getByText('Mercado Livre')).toBeInTheDocument();
-    expect(screen.getByText('Conectar conta')).toBeInTheDocument();
+    expect(screen.getByText('Facebook Marketplace')).toBeInTheDocument();
     expect(screen.getByText('Erro ao carregar conexões')).toBeInTheDocument();
     expect(screen.getByText('Tentar novamente')).toBeInTheDocument();
   });
@@ -79,7 +80,9 @@ describe('ConnectionsPage', () => {
       expect(screen.getByText('Mercado Livre')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Conectar conta'));
+    // Click first "Conectar conta" (ML)
+    const connectButtons = screen.getAllByText('Conectar conta');
+    fireEvent.click(connectButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByText(/Conectar conta .+ Mercado Livre/)).toBeInTheDocument();
@@ -97,7 +100,8 @@ describe('ConnectionsPage', () => {
       expect(screen.getByText('Mercado Livre')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Conectar conta'));
+    const connectButtons = screen.getAllByText('Conectar conta');
+    fireEvent.click(connectButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByTestId('playwright-command')).toBeInTheDocument();
@@ -114,7 +118,8 @@ describe('ConnectionsPage', () => {
       expect(screen.getByText('Mercado Livre')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Conectar conta'));
+    const connectButtons = screen.getAllByText('Conectar conta');
+    fireEvent.click(connectButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByText('Enviar Arquivo de Sessão')).toBeInTheDocument();
@@ -130,7 +135,8 @@ describe('ConnectionsPage', () => {
       expect(screen.getByText('Mercado Livre')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Conectar conta'));
+    const connectButtons = screen.getAllByText('Conectar conta');
+    fireEvent.click(connectButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByTestId('server-warning')).toBeInTheDocument();
@@ -146,7 +152,8 @@ describe('ConnectionsPage', () => {
       expect(screen.getByText('Mercado Livre')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Conectar conta'));
+    const connectButtons = screen.getAllByText('Conectar conta');
+    fireEvent.click(connectButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByTestId('submit-upload-btn')).toBeInTheDocument();
@@ -180,7 +187,8 @@ describe('ConnectionsPage', () => {
     });
 
     // Open wizard
-    fireEvent.click(screen.getByText('Conectar conta'));
+    const connectButtons = screen.getAllByText('Conectar conta');
+    fireEvent.click(connectButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByTestId('tab-extensao')).toBeInTheDocument();
@@ -192,45 +200,20 @@ describe('ConnectionsPage', () => {
   });
 });
 
+// ============================================================
+// VALIDAÇÃO POR PROVIDER
+// ============================================================
+
 describe('validateAndNormalizeSessionFile', () => {
+  const ML = PROVIDER_CONFIGS.MERCADO_LIVRE;
+  const FB = PROVIDER_CONFIGS.FACEBOOK_MARKETPLACE;
+
+  // ------ Testes genéricos (sem provider = fallback ML) ------
+
   it('rejeita JSON inválido', () => {
     const result = validateAndNormalizeSessionFile('not json');
     expect(result.valid).toBe(false);
     expect(result.error).toContain('JSON válido');
-  });
-
-  it('aceita storageState Playwright válido', () => {
-    const storageState = JSON.stringify({
-      cookies: [{ domain: '.mercadolivre.com.br', name: 'sid', value: 'abc' }],
-      origins: [],
-    });
-    const result = validateAndNormalizeSessionFile(storageState);
-    expect(result.valid).toBe(true);
-    expect(result.cookiesCount).toBe(1);
-    expect(result.normalized).toBeTruthy();
-  });
-
-  it('aceita cookie dump (array puro) e normaliza', () => {
-    const cookies = JSON.stringify([
-      { domain: '.mercadolivre.com.br', name: 'sid', value: 'abc' },
-    ]);
-    const result = validateAndNormalizeSessionFile(cookies);
-    expect(result.valid).toBe(true);
-    expect(result.cookiesCount).toBe(1);
-    // Deve ser normalizado para storageState
-    const parsed = JSON.parse(result.normalized!);
-    expect(parsed.cookies).toHaveLength(1);
-    expect(parsed.origins).toEqual([]);
-  });
-
-  it('rejeita storageState sem cookies do ML', () => {
-    const storageState = JSON.stringify({
-      cookies: [{ domain: '.google.com', name: 'NID', value: 'xyz' }],
-      origins: [],
-    });
-    const result = validateAndNormalizeSessionFile(storageState);
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('Mercado Livre');
   });
 
   it('rejeita array vazio', () => {
@@ -245,13 +228,182 @@ describe('validateAndNormalizeSessionFile', () => {
     expect(result.error).toContain('Nenhum cookie');
   });
 
-  it('tolera storageState sem origins (adiciona vazio)', () => {
-    const storageState = JSON.stringify({
-      cookies: [{ domain: '.mercadolivre.com.br', name: 'sid', value: 'abc' }],
+  // ------ Mercado Livre ------
+
+  describe('Mercado Livre', () => {
+    it('aceita storageState Playwright válido com cookies do ML', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: '.mercadolivre.com.br', name: 'sid', value: 'abc' }],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(
+        storageState, ML.requiredDomains, ML.displayName, ML.loginUrl,
+      );
+      expect(result.valid).toBe(true);
+      expect(result.cookiesCount).toBe(1);
+      expect(result.normalized).toBeTruthy();
     });
-    const result = validateAndNormalizeSessionFile(storageState);
-    expect(result.valid).toBe(true);
-    const parsed = JSON.parse(result.normalized!);
-    expect(parsed.origins).toEqual([]);
+
+    it('aceita cookie dump (array puro) do ML e normaliza', () => {
+      const cookies = JSON.stringify([
+        { domain: '.mercadolivre.com.br', name: 'sid', value: 'abc' },
+      ]);
+      const result = validateAndNormalizeSessionFile(
+        cookies, ML.requiredDomains, ML.displayName, ML.loginUrl,
+      );
+      expect(result.valid).toBe(true);
+      expect(result.cookiesCount).toBe(1);
+      const parsed = JSON.parse(result.normalized!);
+      expect(parsed.cookies).toHaveLength(1);
+      expect(parsed.origins).toEqual([]);
+    });
+
+    it('aceita cookies do mercadolibre.com (variante espanhol)', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: '.mercadolibre.com', name: 'sid', value: 'abc' }],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(
+        storageState, ML.requiredDomains, ML.displayName, ML.loginUrl,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejeita cookies do Facebook no contexto do ML', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: '.facebook.com', name: 'c_user', value: '123' }],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(
+        storageState, ML.requiredDomains, ML.displayName, ML.loginUrl,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Mercado Livre');
+      expect(result.error).toContain('mercadolivre.com.br');
+    });
+
+    it('rejeita storageState sem cookies do ML (domain genérico)', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: '.google.com', name: 'NID', value: 'xyz' }],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(
+        storageState, ML.requiredDomains, ML.displayName, ML.loginUrl,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Mercado Livre');
+    });
+
+    it('tolera storageState sem origins (adiciona vazio)', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: '.mercadolivre.com.br', name: 'sid', value: 'abc' }],
+      });
+      const result = validateAndNormalizeSessionFile(
+        storageState, ML.requiredDomains, ML.displayName, ML.loginUrl,
+      );
+      expect(result.valid).toBe(true);
+      const parsed = JSON.parse(result.normalized!);
+      expect(parsed.origins).toEqual([]);
+    });
+  });
+
+  // ------ Facebook Marketplace ------
+
+  describe('Facebook Marketplace', () => {
+    it('aceita storageState com cookies do Facebook', () => {
+      const storageState = JSON.stringify({
+        cookies: [
+          { domain: '.facebook.com', name: 'c_user', value: '100001' },
+          { domain: '.facebook.com', name: 'xs', value: 'token123' },
+        ],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(
+        storageState, FB.requiredDomains, FB.displayName, FB.loginUrl,
+      );
+      expect(result.valid).toBe(true);
+      expect(result.cookiesCount).toBe(2);
+    });
+
+    it('aceita cookie dump (array) do Facebook', () => {
+      const cookies = JSON.stringify([
+        { domain: '.facebook.com', name: 'c_user', value: '100001' },
+      ]);
+      const result = validateAndNormalizeSessionFile(
+        cookies, FB.requiredDomains, FB.displayName, FB.loginUrl,
+      );
+      expect(result.valid).toBe(true);
+      expect(result.cookiesCount).toBe(1);
+      const parsed = JSON.parse(result.normalized!);
+      expect(parsed.cookies).toHaveLength(1);
+      expect(parsed.origins).toEqual([]);
+    });
+
+    it('aceita www.facebook.com como domínio válido', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: 'www.facebook.com', name: 'c_user', value: '100001' }],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(
+        storageState, FB.requiredDomains, FB.displayName, FB.loginUrl,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejeita cookies do ML no contexto do Facebook', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: '.mercadolivre.com.br', name: 'sid', value: 'abc' }],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(
+        storageState, FB.requiredDomains, FB.displayName, FB.loginUrl,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Facebook Marketplace');
+      expect(result.error).toContain('facebook.com');
+    });
+
+    it('rejeita cookies genéricos no contexto do Facebook', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: '.google.com', name: 'NID', value: 'xyz' }],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(
+        storageState, FB.requiredDomains, FB.displayName, FB.loginUrl,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Facebook Marketplace');
+    });
+
+    it('rejeita array vazio no contexto do Facebook', () => {
+      const result = validateAndNormalizeSessionFile(
+        '[]', FB.requiredDomains, FB.displayName, FB.loginUrl,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Facebook Marketplace');
+    });
+  });
+
+  // ------ Compatibilidade: sem params = fallback ML ------
+
+  describe('Compatibilidade (sem provider params)', () => {
+    it('aceita cookies do ML quando chamado sem params (backward compat)', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: '.mercadolivre.com.br', name: 'sid', value: 'abc' }],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(storageState);
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejeita cookies do Facebook quando chamado sem params (default = ML)', () => {
+      const storageState = JSON.stringify({
+        cookies: [{ domain: '.facebook.com', name: 'c_user', value: '123' }],
+        origins: [],
+      });
+      const result = validateAndNormalizeSessionFile(storageState);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Mercado Livre');
+    });
   });
 });
