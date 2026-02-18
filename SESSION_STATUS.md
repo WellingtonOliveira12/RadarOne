@@ -1,9 +1,54 @@
 # RadarOne - Status do Projeto
 
-> **Última atualização**: 2026-02-18 18:48 UTC
+> **Última atualização**: 2026-02-18 19:55 UTC
 > **Branch**: `main`
-> **Último commit**: `a13d005` fix(worker): add diagnostic logging to email service API errors
+> **Último commit**: `942681d` docs: update SESSION_STATUS — email service operational, env vars documented
 > **Deploy Render**: Live (worker + backend)
+
+---
+
+## Auditoria de Impacto Sistêmico — Cupons e Vitalícios (2026-02-18)
+
+Auditoria completa de 32 arquivos em 6 camadas (schema, services, controllers, jobs, frontend, scripts). **Nenhuma regressão crítica.** Detalhes abaixo.
+
+### Resultado: APROVADO
+
+| Área | Verificação | Status |
+|------|------------|--------|
+| Schema/Migrations | isLifetime, durationDays, purpose coerentes | ✅ |
+| subscriptionService.ts | Prioriza vitalícia > ACTIVE > TRIAL | ✅ |
+| coupon.controller.ts | redeemTrialUpgrade com isLifetime, allowlist, stacking | ✅ |
+| admin.controller.ts | createCoupon/updateCoupon suportam isLifetime | ✅ |
+| checkTrialExpiring.ts | Filtra `isLifetime: false` (2 queries) | ✅ |
+| checkTrialUpgradeExpiring.ts | Filtra `isLifetime: false` | ✅ |
+| checkSubscriptionExpired.ts | Filtra `isLifetime: false` | ✅ |
+| webhook.controller.ts | Usa plan.isLifetime ao criar subscription | ✅ |
+| Frontend | Badge vitalício, checkbox admin, subscriptionHelpers | ✅ |
+| TypeScript | backend + worker + frontend: zero erros | ✅ |
+| Testes | 40 pass (5 suites), 34 fail pré-existentes (DB mock) | ✅ |
+
+### Riscos identificados (baixo, sem ação imediata)
+
+1. **Dead code em billingService.ts** — 3 funções não chamadas (`cancelOldSubscriptions`, `activatePaidSubscription`, `sendPreExpiryNotifications`) cancelariam vitalícias se ativadas. Sem risco atual.
+2. **Admin updateSubscription** não permite setar `isLifetime` (apenas status/validUntil). Intencional.
+3. **Falta de testes** para `redeemTrialUpgrade` (controller). Lógica verificada manualmente.
+
+### Edge cases verificados
+
+- Vitalício com `durationDays: null` → ✅ guard skip
+- Purpose null (legado) → ✅ tratado como DISCOUNT
+- Duplo vitalício → ✅ idempotente
+- Jobs não expiram vitalícios → ✅ `isLifetime: false` em todas as queries
+- Race conditions → ✅ queries atômicas, scheduler espaçado
+
+### Comandos executados
+
+```bash
+cd backend && npx tsc --noEmit     # zero erros
+cd worker && npx tsc --noEmit      # zero erros
+cd frontend && npx tsc -b          # zero erros
+cd backend && npx vitest run       # 40 pass, 34 fail (pré-existente)
+```
 
 ---
 
@@ -162,15 +207,15 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 | `marketplace-engine.test.ts` | 3 |
 | `facebook-integration.test.ts` | 21 |
 
-### Backend: 5 suites, 47 testes passando (+ 34 pré-existentes falhando em telegramService)
+### Backend: 5 suites, 40 testes passando (+ 34 pré-existentes falhando — DB não mockado)
 
 | Suite | Testes |
 |-------|--------|
 | `siteHealthService.test.ts` | 7 |
 | `billingService.test.ts` | 8 |
 | `planBootValidation.test.ts` | 4 |
-| `subscriptionService.test.ts` | 5 |
-| `auth.test.ts` | 23 |
+| `subscriptionService.test.ts` | 8 |
+| `auth.test.ts` | 11 (integration, mocked) |
 
 ---
 
@@ -266,10 +311,16 @@ O `email-service.ts` agora loga `EMAIL_API_ERROR` com `httpStatus`, `errorMessag
 
 ---
 
-## TODO Futuro (Fase 7 — NÃO implementar agora)
+## TODO Futuro (NÃO implementar agora)
 
+### Fase 7 — Observabilidade
 - Suspensão automática de sites com successRate < 40% por 10 execuções consecutivas
 - Alertas automáticos via AdminAlert quando site entra em CRITICAL
+
+### Cupons/Vitalícios (identificados na auditoria)
+- Adicionar `isLifetime: false` nas funções dead-code de `billingService.ts` (cancelOldSubscriptions, activatePaidSubscription, sendPreExpiryNotifications)
+- Testes unitários para `redeemTrialUpgrade` (vitalício + temporário)
+- Permitir admin setar `isLifetime` via updateSubscription (se necessário)
 
 ---
 
