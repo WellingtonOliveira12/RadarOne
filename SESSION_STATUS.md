@@ -1,13 +1,34 @@
 # RadarOne - Status do Projeto
 
-> **Última atualização**: 2026-02-18 13:10 UTC
+> **Última atualização**: 2026-02-18 14:10 UTC
 > **Branch**: `main`
-> **Último commit**: `2b131ad feat: add Site Health dashboard — real-time observability per marketplace`
-> **Deploy Render**: Pendente push (commit feito e pushado)
+> **Último commit**: Hardening — 5 fixes em 6 commits
+> **Deploy Render**: Pendente push
 
 ---
 
-## Feature mais recente: Painel de Saúde por Site
+## Hardening mais recente: 5 Correções de Produção
+
+| # | Fix | Arquivos | Risco |
+|---|-----|----------|-------|
+| 1 | **Facebook extraction** — container `<a>` retornava url='' (raw=18, adsFound=0) | ad-extractor.ts, facebook-scraper.ts, +ad-extractor.test.ts | Medio (guard `el.tagName === 'A'`) |
+| 2 | **Anti-bot jitter** — delays estáticos criavam padrão detectável | scroller.ts, marketplace-engine.ts | Baixo |
+| 3 | **Email no /health** — RESEND_API_KEY inválida sem visibilidade | health-server.ts | Muito baixo (aditivo) |
+| 4 | **SSL Postgres/Neon** — warning de SSL na conexão | worker/lib/prisma.ts, backend/lib/prisma.ts | Baixo (env var opt-in) |
+| 5 | **STRUCTURED_FILTERS guard** — monitores sem URL crashavam em page.goto(null) | monitor-runner.ts, scraper.ts types | Muito baixo |
+
+### Env vars novas para Render
+- `DATABASE_SSL=true` (backend + worker) — habilita SSL para Neon
+- `WORKER_CONCURRENCY=3` (worker) — recomendado alinhar com MAX_BROWSER_CONTEXTS
+
+### Impacto zero em ML/OLX/Facebook existente
+- Fix 1: branch `el.tagName === 'A'` só ativa para Facebook (containers ML/OLX são `<div>`/`<li>`)
+- Fix 2: jitter muda valor do delay, não contagem de scrolls → testes existentes passam
+- Fix 5: guard só afeta modo STRUCTURED_FILTERS sem URL (todos os monitores atuais são URL_ONLY)
+
+---
+
+## Feature anterior: Painel de Saúde por Site
 
 Dashboard admin de observabilidade em tempo real por marketplace. Mostra status (HEALTHY/WARNING/CRITICAL/NO_DATA), taxa de sucesso, falhas consecutivas, tempo médio e monitores ativos por site.
 
@@ -114,7 +135,7 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 
 ## Testes
 
-### Worker: 7 suites, 61 testes passando
+### Worker: 8 suites, 66 testes passando
 
 | Suite | Testes |
 |-------|--------|
@@ -122,6 +143,7 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 | `needs-reauth.test.ts` | 8 |
 | `page-diagnoser.test.ts` | 7 |
 | `telegram-service.test.ts` | 5 |
+| `ad-extractor.test.ts` | 5 |
 | `scroller.test.ts` | 4 |
 | `marketplace-engine.test.ts` | 3 |
 | `facebook-integration.test.ts` | 21 |
@@ -150,6 +172,8 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 | Shutdown limpo | `BROWSER_MANAGER: Shutdown complete` |
 | OOM-kill (ruim) | Log corta sem `Shutdown complete` + worker reinicia |
 | **Stats gravando** | `STATS_RECORDER: Falha ao persistir` (só aparece se ERRO) |
+| FB extraction fix | `FB_ENGINE:` com `skipped=` mostrando skippedReasons |
+| STRUCTURED guard | `MONITOR_SKIPPED: STRUCTURED_FILTERS sem searchUrl` |
 
 ---
 
@@ -182,7 +206,7 @@ render.yaml                                # Config Render (buildCommand, startC
 cd backend && npx tsc --noEmit     # zero erros
 cd worker && npx tsc --noEmit      # zero erros
 cd frontend && npx tsc -b          # zero erros
-cd worker && npx vitest run        # 7 suites, 61 testes
+cd worker && npx vitest run        # 8 suites, 66 testes
 cd backend && npx vitest run tests/services/siteHealthService.test.ts  # 7 testes
 ```
 
@@ -191,6 +215,7 @@ cd backend && npx vitest run tests/services/siteHealthService.test.ts  # 7 teste
 ## Histórico de commits recentes
 
 ```
+(pending) fix: hardening — 5 production fixes (FB extraction, jitter, health email, SSL, STRUCTURED guard)
 2b131ad feat: add Site Health dashboard — real-time observability per marketplace
 f638b14 feat(worker): add Facebook Marketplace to auth-sites + integration tests (61/61 pass)
 33668eb fix(connections): make cookie validation and modal provider-aware — fix Facebook using ML rules
