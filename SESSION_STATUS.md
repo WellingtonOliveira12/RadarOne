@@ -1,9 +1,9 @@
 # RadarOne - Status do Projeto
 
-> **Última atualização**: 2026-02-18 14:10 UTC
+> **Última atualização**: 2026-02-18 18:48 UTC
 > **Branch**: `main`
-> **Último commit**: Hardening — 5 fixes em 6 commits
-> **Deploy Render**: Pendente push
+> **Último commit**: `a13d005` fix(worker): add diagnostic logging to email service API errors
+> **Deploy Render**: Live (worker + backend)
 
 ---
 
@@ -17,9 +17,10 @@
 | 4 | **SSL Postgres/Neon** — warning de SSL na conexão | worker/lib/prisma.ts, backend/lib/prisma.ts | Baixo (env var opt-in) |
 | 5 | **STRUCTURED_FILTERS guard** — monitores sem URL crashavam em page.goto(null) | monitor-runner.ts, scraper.ts types | Muito baixo |
 
-### Env vars novas para Render
-- `DATABASE_SSL=true` (backend + worker) — habilita SSL para Neon
-- `WORKER_CONCURRENCY=3` (worker) — recomendado alinhar com MAX_BROWSER_CONTEXTS
+### Env vars configuradas no Render
+- `DATABASE_SSL=true` (backend + worker) — habilita SSL para Neon ✅
+- `RESEND_API_KEY=re_i7BBP...` (worker) — key válida do Resend ✅
+- `EMAIL_FROM=noreply@radarone.com.br` (worker) — domínio verificado no Resend (DKIM+SPF+MX) ✅
 
 ### Impacto zero em ML/OLX/Facebook existente
 - Fix 1: branch `el.tagName === 'A'` só ativa para Facebook (containers ML/OLX são `<div>`/`<li>`)
@@ -83,16 +84,29 @@ A migração foi aplicada via `prisma db push` (não `prisma migrate dev`) porqu
 
 | Item | Valor |
 |------|-------|
-| Commit live anterior | `f638b14` |
+| Commit live | `a13d005` |
 | Uptime confirmado | Estável |
 
-### Env vars no Render (Worker)
+### Env vars no Render (Worker — 16 vars)
 
-| Variável | Valor | Onde |
-|----------|-------|------|
-| `MAX_BROWSER_CONTEXTS` | `3` | Env var |
-| `PW_RENDERER_LIMIT` | `3` | Env var |
-| `NODE_OPTIONS` | `--max-old-space-size=256` | **startCommand** (NÃO env var) |
+| Variável | Valor | Notas |
+|----------|-------|-------|
+| `NODE_ENV` | `production` | |
+| `DATABASE_URL` | `postgresql://...neon.tech/radarone_prod` | Neon pooler |
+| `DATABASE_SSL` | `true` | SSL para Neon |
+| `TELEGRAM_BOT_TOKEN` | `8559...` | Shared com backend |
+| `RESEND_API_KEY` | `re_i7BBP...` | Domínio verificado |
+| `EMAIL_FROM` | `noreply@radarone.com.br` | DKIM+SPF+MX OK |
+| `SESSION_ENCRYPTION_KEY` | `6d216...` | 32 chars |
+| `PLAYWRIGHT_BROWSERS_PATH` | `./pw-browsers` | |
+| `MAX_BROWSER_CONTEXTS` | `3` | Alinhado com Starter 512MB |
+| `PW_RENDERER_LIMIT` | `3` | |
+| `CHECK_INTERVAL_MINUTES` | `1` | Tick 1min, filtrado por plano |
+| `MONITOR_DELAY_MS` | `2000` | |
+| `REQUEST_DELAY_MS` | `3000` | |
+| `REQUEST_TIMEOUT_MS` | `30000` | |
+| `MAX_RETRIES` | `3` | |
+| `LOG_LEVEL` | `info` | |
 
 **Build command**: `npm install && npm run build` (sem NODE_OPTIONS → tsc usa heap default)
 **Start command**: `NODE_OPTIONS=--max-old-space-size=256 npm start`
@@ -174,6 +188,9 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 | **Stats gravando** | `STATS_RECORDER: Falha ao persistir` (só aparece se ERRO) |
 | FB extraction fix | `FB_ENGINE:` com `skipped=` mostrando skippedReasons |
 | STRUCTURED guard | `MONITOR_SKIPPED: STRUCTURED_FILTERS sem searchUrl` |
+| Email enviado | `EMAIL_SENT: Email enviado com sucesso` com messageId |
+| Email API erro | `EMAIL_API_ERROR:` com httpStatus e errorMessage (diagnóstico) |
+| Email fatal | `EMAIL_FATAL:` — servico desabilitado (key ou domínio) |
 
 ---
 
@@ -215,7 +232,13 @@ cd backend && npx vitest run tests/services/siteHealthService.test.ts  # 7 teste
 ## Histórico de commits recentes
 
 ```
-(pending) fix: hardening — 5 production fixes (FB extraction, jitter, health email, SSL, STRUCTURED guard)
+a13d005 fix(worker): add diagnostic logging to email service API errors
+5c94a5e docs: update SESSION_STATUS with hardening fixes and 66 passing tests
+b72ae41 fix(worker): guard STRUCTURED_FILTERS monitors without searchUrl
+f99ce3a fix: add DATABASE_SSL env var for Postgres/Neon SSL connections
+e1b48fa feat(worker): add email service status to /health endpoint
+faf4fc8 fix(worker): add jitter to scroll and render delays for anti-bot evasion
+0464da3 fix(worker): fix Facebook ad extraction when container is <a> tag
 2b131ad feat: add Site Health dashboard — real-time observability per marketplace
 f638b14 feat(worker): add Facebook Marketplace to auth-sites + integration tests (61/61 pass)
 33668eb fix(connections): make cookie validation and modal provider-aware — fix Facebook using ML rules
@@ -224,6 +247,22 @@ f638b14 feat(worker): add Facebook Marketplace to auth-sites + integration tests
 a1e31cc fix(deploy): build OOM — override NODE_OPTIONS during build, tune runtime for 512MB
 4b87544 feat(worker): harden browser lifecycle with semaphore, crash recovery and memory limits
 ```
+
+---
+
+## Email Service — OPERACIONAL
+
+| Item | Status |
+|------|--------|
+| **Resend API key** | Válida, Full access, All domains |
+| **Domínio** | `radarone.com.br` verificado (DKIM + SPF + MX) no Resend |
+| **EMAIL_FROM** | `noreply@radarone.com.br` |
+| **Health endpoint** | `/health` → `email.status: "ENABLED"` |
+| **Primeiro envio** | 2026-02-18 18:47 UTC — `EMAIL_SENT` messageId=4cbc179a |
+| **Canais ativos** | Telegram + Email (multi-canal) |
+
+### Diagnóstico de erros
+O `email-service.ts` agora loga `EMAIL_API_ERROR` com `httpStatus`, `errorMessage` e `errorData` completos antes de desabilitar o serviço, facilitando debug futuro.
 
 ---
 
