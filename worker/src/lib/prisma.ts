@@ -21,7 +21,12 @@ function createPrismaClient(): PrismaClient {
     throw new Error('DATABASE_URL não configurada');
   }
 
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({
+    connectionString,
+    ssl: process.env.DATABASE_SSL === 'true'
+      ? { rejectUnauthorized: false }
+      : undefined,
+  });
   const adapter = new PrismaPg(pool);
 
   return new PrismaClient({ adapter });
