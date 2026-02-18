@@ -41,6 +41,9 @@ interface Monitor {
   mode?: MonitorMode;
   filtersJson?: StructuredFilters;
   active: boolean;
+  country?: string;
+  stateRegion?: string;
+  city?: string;
 }
 
 interface MonitorsResponse {
@@ -68,6 +71,18 @@ function getSiteLabel(site: MonitorSite): string {
   return SITE_OPTIONS.find((opt) => opt.value === site)?.label ?? site;
 }
 
+const URL_PLACEHOLDERS: Record<MonitorSite, string> = {
+  MERCADO_LIVRE: 'https://lista.mercadolivre.com.br/iphone-13',
+  OLX: 'https://www.olx.com.br/eletronicos-e-celulares',
+  FACEBOOK_MARKETPLACE: 'https://www.facebook.com/marketplace/category/...',
+  WEBMOTORS: 'https://www.webmotors.com.br/carros/estoque?...',
+  ICARROS: 'https://www.icarros.com.br/comprar/...',
+  ZAP_IMOVEIS: 'https://www.zapimoveis.com.br/venda/apartamentos/...',
+  VIVA_REAL: 'https://www.vivareal.com.br/venda/...',
+  IMOVELWEB: 'https://www.imovelweb.com.br/apartamentos-venda-...',
+  LEILAO: 'https://www.leilao.com.br/...',
+};
+
 export function MonitorsPage() {
   useAuth(); // Required for protected route
 
@@ -86,6 +101,11 @@ export function MonitorsPage() {
   const [active, setActive] = useState(true);
   const [idSelecionado, setIdSelecionado] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Localização (global)
+  const [country, setCountry] = useState('BR');
+  const [stateRegion, setStateRegion] = useState('');
+  const [city, setCity] = useState('');
 
   // Filtros estruturados
   const [filters, setFilters] = useState<StructuredFilters>({
@@ -207,6 +227,9 @@ export function MonitorsPage() {
         site,
         mode,
         active,
+        country,
+        stateRegion: stateRegion.trim() || null,
+        city: city.trim() || null,
       };
 
       if (mode === 'URL_ONLY') {
@@ -235,6 +258,9 @@ export function MonitorsPage() {
       setSearchUrl('');
       setActive(true);
       setIdSelecionado(null);
+      setCountry('BR');
+      setStateRegion('');
+      setCity('');
       setFilters({
         keywords: '',
         city: '',
@@ -269,6 +295,9 @@ export function MonitorsPage() {
     setSearchUrl(monitor.searchUrl || '');
     setActive(monitor.active);
     setIdSelecionado(monitor.id);
+    setCountry(monitor.country || 'BR');
+    setStateRegion(monitor.stateRegion || '');
+    setCity(monitor.city || '');
 
     if (monitor.mode === 'STRUCTURED_FILTERS' && monitor.filtersJson) {
       setFilters(monitor.filtersJson);
@@ -317,6 +346,9 @@ export function MonitorsPage() {
     setSearchUrl('');
     setActive(true);
     setIdSelecionado(null);
+    setCountry('BR');
+    setStateRegion('');
+    setCity('');
     setFilters({
       keywords: '',
       city: '',
@@ -488,6 +520,56 @@ export function MonitorsPage() {
             </div>
           </div>
 
+          {/* Localização (disponível em ambos os modos) */}
+          <div style={styles.locationBox}>
+            <h3 style={styles.locationTitle}>Localização</h3>
+            <div style={styles.locationGrid}>
+              <div style={styles.field}>
+                <label style={styles.labelSmall}>País</label>
+                <select
+                  value={country}
+                  onChange={(e) => {
+                    setCountry(e.target.value);
+                    if (e.target.value === 'WORLDWIDE') {
+                      setStateRegion('');
+                      setCity('');
+                    }
+                  }}
+                  style={styles.input}
+                >
+                  <option value="BR">Brasil</option>
+                  <option value="US">United States</option>
+                  <option value="WORLDWIDE">Mundial (sem filtro)</option>
+                </select>
+              </div>
+              <div style={styles.field}>
+                <label style={styles.labelSmall}>Estado / Região</label>
+                <input
+                  type="text"
+                  value={stateRegion}
+                  onChange={(e) => setStateRegion(e.target.value)}
+                  disabled={country === 'WORLDWIDE'}
+                  style={styles.input}
+                  placeholder="SP, NY, etc."
+                />
+              </div>
+              <div style={styles.field}>
+                <label style={styles.labelSmall}>Cidade</label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  disabled={country === 'WORLDWIDE'}
+                  style={styles.input}
+                  placeholder="São Paulo, New York..."
+                />
+              </div>
+            </div>
+            <p style={styles.helpText}>
+              Pós-filtro best-effort. Depende do site expor localização nos anúncios.
+            </p>
+          </div>
+
           {mode === 'URL_ONLY' && (
             <div style={styles.field}>
               <label style={styles.label}>URL de busca</label>
@@ -497,7 +579,7 @@ export function MonitorsPage() {
                 onChange={(e) => setSearchUrl(e.target.value)}
                 required
                 style={styles.input}
-                placeholder="https://www.olx.com.br/..."
+                placeholder={URL_PLACEHOLDERS[site] || 'https://...'}
               />
               <p style={styles.helpText}>
                 Cole aqui a URL completa da busca que você quer monitorar.
@@ -840,6 +922,25 @@ const styles = {
   radio: {
     marginTop: '3px',
     cursor: 'pointer',
+  },
+  locationBox: {
+    backgroundColor: '#f0f9ff',
+    padding: '20px',
+    borderRadius: '8px',
+    border: '1px solid #bae6fd',
+    marginBottom: '20px',
+  },
+  locationTitle: {
+    fontSize: '16px',
+    fontWeight: '600' as const,
+    color: '#0369a1',
+    marginTop: 0,
+    marginBottom: '16px',
+  },
+  locationGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))',
+    gap: '16px',
   },
   filtersBox: {
     backgroundColor: '#f9fafb',
