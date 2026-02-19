@@ -19,7 +19,7 @@ import { normalizeCouponCode } from '../utils/couponHelpers';
 import { PublicLayout } from '../components/PublicLayout';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { API_BASE_URL } from '../constants/app';
-import { formatPlanPrice, formatDiscountValue, getPeriodSuffix } from '../utils/currency';
+import { formatPlanPrice, formatDiscountValue } from '../utils/currency';
 import * as responsive from '../styles/responsive';
 
 /**
