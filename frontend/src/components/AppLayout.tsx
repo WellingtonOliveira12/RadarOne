@@ -25,9 +25,11 @@ import {
   Container,
 } from '@chakra-ui/react';
 import { HamburgerIcon, ChevronDownIcon } from '@chakra-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { APP_VERSION } from '../constants/app';
 import { getSubscriptionStatus } from '../utils/subscriptionHelpers';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -40,6 +42,7 @@ interface AppLayoutProps {
  */
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   // Verificar se user tem subscription válida (para mostrar/esconder links internos)
@@ -84,16 +87,16 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               {hasValidSubscription && (
                 <>
                   <Link as={RouterLink} to="/dashboard" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
-                    Dashboard
+                    {t('nav.dashboard')}
                   </Link>
                   <Link as={RouterLink} to="/monitors" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
-                    Monitores
+                    {t('nav.monitors')}
                   </Link>
                   <Link as={RouterLink} to="/telegram/connect" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
-                    Telegram
+                    {t('nav.telegram')}
                   </Link>
                   <Link as={RouterLink} to="/settings/notifications" fontWeight="medium" color="gray.600" _hover={{ color: 'blue.600' }}>
-                    Configurações
+                    {t('nav.settings')}
                   </Link>
                 </>
               )}
@@ -101,7 +104,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               {/* Link para Planos (aparece se subscription inválida) */}
               {!hasValidSubscription && (
                 <Link as={RouterLink} to="/plans" fontWeight="medium" color="blue.600" _hover={{ color: 'blue.700' }}>
-                  Ver Planos
+                  {t('nav.plans')}
                 </Link>
               )}
 
@@ -115,23 +118,25 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   color="gray.600"
                   _hover={{ color: 'blue.600', bg: 'gray.50' }}
                 >
-                  Ajuda
+                  {t('nav.help')}
                 </MenuButton>
                 <MenuList>
                   <MenuItem as={RouterLink} to="/manual">
-                    📖 Manual
+                    📖 {t('nav.manual')}
                   </MenuItem>
                   <MenuItem as={RouterLink} to="/faq">
-                    ❓ FAQ
+                    ❓ {t('nav.faq')}
                   </MenuItem>
                   <MenuItem as={RouterLink} to="/contact">
-                    💬 Fale Conosco
+                    💬 {t('nav.contact')}
                   </MenuItem>
                 </MenuList>
               </Menu>
 
+              <LanguageSwitcher />
+
               <Button onClick={logout} colorScheme="red" size="sm">
-                Sair
+                {t('nav.logout')}
               </Button>
             </HStack>
 
@@ -152,23 +157,25 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         <DrawerOverlay />
         <DrawerContent>
           <DrawerCloseButton />
-          <DrawerHeader>Menu</DrawerHeader>
+          <DrawerHeader>{t('nav.menu')}</DrawerHeader>
           <DrawerBody>
             <VStack align="stretch" spacing={4}>
+              <LanguageSwitcher />
+
               {/* Links internos (só aparecem com subscription válida) */}
               {hasValidSubscription && (
                 <>
                   <Link as={RouterLink} to="/dashboard" onClick={onClose} fontWeight="medium">
-                    Dashboard
+                    {t('nav.dashboard')}
                   </Link>
                   <Link as={RouterLink} to="/monitors" onClick={onClose} fontWeight="medium">
-                    Monitores
+                    {t('nav.monitors')}
                   </Link>
                   <Link as={RouterLink} to="/telegram/connect" onClick={onClose} fontWeight="medium">
-                    Telegram
+                    {t('nav.telegram')}
                   </Link>
                   <Link as={RouterLink} to="/settings/notifications" onClick={onClose} fontWeight="medium">
-                    Configurações
+                    {t('nav.settings')}
                   </Link>
                 </>
               )}
@@ -176,23 +183,23 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               {/* Link para Planos (aparece se subscription inválida) */}
               {!hasValidSubscription && (
                 <Link as={RouterLink} to="/plans" onClick={onClose} fontWeight="medium" color="blue.600">
-                  Ver Planos
+                  {t('nav.plans')}
                 </Link>
               )}
 
               {/* Links de ajuda (sempre visíveis) */}
               <Link as={RouterLink} to="/manual" onClick={onClose} fontWeight="medium">
-                📖 Manual
+                📖 {t('nav.manual')}
               </Link>
               <Link as={RouterLink} to="/faq" onClick={onClose} fontWeight="medium">
-                ❓ FAQ
+                ❓ {t('nav.faq')}
               </Link>
               <Link as={RouterLink} to="/contact" onClick={onClose} fontWeight="medium">
-                💬 Fale Conosco
+                💬 {t('nav.contact')}
               </Link>
 
               <Button onClick={() => { logout(); onClose(); }} colorScheme="red" mt={4}>
-                Sair
+                {t('nav.logout')}
               </Button>
             </VStack>
           </DrawerBody>
@@ -219,19 +226,19 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           <VStack spacing={3}>
             <HStack spacing={3} flexWrap="wrap" justify="center">
               <Link as={RouterLink} to="/manual" fontSize="sm" color="gray.600">
-                Manual
+                {t('footer.manual')}
               </Link>
               <Text color="gray.300">•</Text>
               <Link as={RouterLink} to="/faq" fontSize="sm" color="gray.600">
-                FAQ
+                {t('footer.faq')}
               </Link>
               <Text color="gray.300">•</Text>
               <Link as={RouterLink} to="/contact" fontSize="sm" color="gray.600">
-                Contato
+                {t('footer.contact')}
               </Link>
             </HStack>
             <Text fontSize="xs" color="gray.400" textAlign="center">
-              © 2025 RadarOne. Todos os direitos reservados. • v{APP_VERSION}
+              {t('footer.rights')} • v{APP_VERSION}
             </Text>
           </VStack>
         </Container>
