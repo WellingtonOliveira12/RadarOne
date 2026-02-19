@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { trackSignUp } from '../lib/analytics';
 import { TELEGRAM_BOT_USERNAME, TELEGRAM_BOT_LINK } from '../constants/app';
@@ -13,6 +14,7 @@ import * as responsive from '../styles/responsive';
 export const RegisterPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const selectedPlanFromUrl = searchParams.get('plan') || '';
+  const { t } = useTranslation();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -21,8 +23,8 @@ export const RegisterPage: React.FC = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    notifyEmail: true,  // Email sempre ativo
-    notifyTelegram: false,  // Telegram opcional
+    notifyEmail: true,
+    notifyTelegram: false,
     telegramUsername: '',
   });
   const [error, setError] = useState('');
@@ -75,31 +77,30 @@ export const RegisterPage: React.FC = () => {
     // Validações
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setError('Email inválido');
+      setError(t('auth.invalidEmail'));
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('As senhas não coincidem');
+      setError(t('auth.passwordMismatch'));
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('A senha deve ter no mínimo 6 caracteres');
+      setError(t('auth.passwordMin6'));
       return;
     }
 
-    // Validação de força da senha (opcional mas recomendado)
     const hasLetter = /[a-zA-Z]/.test(formData.password);
     const hasNumber = /[0-9]/.test(formData.password);
     if (!hasLetter || !hasNumber) {
-      setError('A senha deve conter letras e números');
+      setError(t('auth.passwordLettersNumbers'));
       return;
     }
 
     const cleanCpf = formData.cpf.replace(/\D/g, '');
     if (cleanCpf.length !== 11) {
-      setError('CPF inválido');
+      setError(t('auth.invalidCpf'));
       return;
     }
 
@@ -119,21 +120,17 @@ export const RegisterPage: React.FC = () => {
             : undefined,
       });
 
-      // Track sign up
       trackSignUp('email');
 
-      // Se veio de uma escolha de plano, redirecionar para planos
-      // Caso contrário, ir direto para dashboard
       if (selectedPlanFromUrl) {
         navigate(`/plans?selected=${selectedPlanFromUrl}`);
       } else {
         navigate('/plans');
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || 'Erro ao criar conta. Tente novamente.';
+      const errorMessage = err.response?.data?.error || err.message || t('auth.registerError');
       const errorCode = err.response?.data?.errorCode;
 
-      // Se é erro de usuário já existente, mostrar mensagem especial
       if (errorCode === 'USER_ALREADY_EXISTS' || err.response?.status === 409) {
         setError('user_exists');
       } else {
@@ -149,13 +146,13 @@ export const RegisterPage: React.FC = () => {
       {/* Container do Formulário */}
       <div style={styles.container}>
         <div style={styles.card}>
-          <h1 style={styles.title}>Criar Conta</h1>
-          <p style={styles.subtitle}>Planos com 7 dias de garantia</p>
+          <h1 style={styles.title}>{t('auth.registerTitle')}</h1>
+          <p style={styles.subtitle}>{t('auth.registerSubtitle')}</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           {/* Nome */}
           <div style={styles.field}>
-            <label style={styles.label}>Nome completo</label>
+            <label style={styles.label}>{t('auth.fullName')}</label>
             <input
               type="text"
               name="name"
@@ -163,13 +160,13 @@ export const RegisterPage: React.FC = () => {
               onChange={handleChange}
               required
               style={styles.input}
-              placeholder="Seu nome"
+              placeholder={t('auth.namePlaceholder')}
             />
           </div>
 
           {/* Email */}
           <div style={styles.field}>
-            <label style={styles.label}>Email</label>
+            <label style={styles.label}>{t('auth.email')}</label>
             <input
               type="email"
               name="email"
@@ -177,13 +174,13 @@ export const RegisterPage: React.FC = () => {
               onChange={handleChange}
               required
               style={styles.input}
-              placeholder="seu@email.com"
+              placeholder={t('auth.emailPlaceholder')}
             />
           </div>
 
           {/* CPF */}
           <div style={styles.field}>
-            <label style={styles.label}>CPF</label>
+            <label style={styles.label}>{t('auth.cpf')}</label>
             <input
               type="text"
               name="cpf"
@@ -198,7 +195,7 @@ export const RegisterPage: React.FC = () => {
 
           {/* Telefone */}
           <div style={styles.field}>
-            <label style={styles.label}>Telefone</label>
+            <label style={styles.label}>{t('auth.phone')}</label>
             <input
               type="tel"
               name="phone"
@@ -213,7 +210,7 @@ export const RegisterPage: React.FC = () => {
 
           {/* Senha */}
           <div style={styles.field}>
-            <label style={styles.label}>Senha</label>
+            <label style={styles.label}>{t('auth.password')}</label>
             <input
               type="password"
               name="password"
@@ -227,7 +224,7 @@ export const RegisterPage: React.FC = () => {
 
           {/* Confirmar senha */}
           <div style={styles.field}>
-            <label style={styles.label}>Confirmar senha</label>
+            <label style={styles.label}>{t('auth.confirmPassword')}</label>
             <input
               type="password"
               name="confirmPassword"
@@ -242,7 +239,7 @@ export const RegisterPage: React.FC = () => {
           {/* Notificações */}
           <div style={styles.field}>
             <label style={styles.label}>
-              Como você quer receber as notificações?
+              {t('auth.notificationQuestion')}
             </label>
 
             {/* Email sempre ativo */}
@@ -255,11 +252,11 @@ export const RegisterPage: React.FC = () => {
                   style={styles.checkbox}
                 />
                 <span>
-                  <strong>E-mail</strong> (sempre ativo)
+                  <strong>{t('auth.emailAlwaysActive')}</strong>
                 </span>
               </label>
               <p style={styles.infoTextSmall}>
-                Você sempre receberá alertas por e-mail.
+                {t('auth.emailAlwaysActiveHint')}
               </p>
             </div>
 
@@ -273,7 +270,7 @@ export const RegisterPage: React.FC = () => {
                   style={styles.checkbox}
                 />
                 <span>
-                  <strong>Receber também no Telegram</strong> (recomendado)
+                  <strong>{t('auth.telegramAlso')}</strong>
                 </span>
               </label>
             </div>
@@ -281,14 +278,14 @@ export const RegisterPage: React.FC = () => {
             {/* Instruções para Telegram */}
             {formData.notifyTelegram && (
               <div style={styles.infoBox}>
-                <p style={styles.infoTitle}>✨ Ótima escolha!</p>
+                <p style={styles.infoTitle}>✨ {t('auth.telegramGreat')}</p>
                 <p style={styles.infoText}>
-                  Você receberá alertas em tempo real no Telegram + E-mail.
+                  {t('auth.telegramHint')}
                 </p>
                 <ol style={styles.stepsList}>
-                  <li>Instale o Telegram (se ainda não tiver)</li>
+                  <li>{t('auth.telegramStep1')}</li>
                   <li>
-                    Fale com o{' '}
+                    {t('auth.telegramStep2')}{' '}
                     <a
                       href={TELEGRAM_BOT_LINK}
                       target="_blank"
@@ -297,13 +294,13 @@ export const RegisterPage: React.FC = () => {
                     >
                       @{TELEGRAM_BOT_USERNAME}
                     </a>{' '}
-                    e clique em /start
+                    {t('auth.telegramStep3')}
                   </li>
-                  <li>Vamos conectar automaticamente depois</li>
+                  <li>{t('auth.telegramStep4')}</li>
                 </ol>
                 <div style={styles.field}>
                   <label style={styles.labelSmall}>
-                    Seu @username do Telegram (opcional)
+                    {t('auth.telegramUsername')}
                   </label>
                   <input
                     type="text"
@@ -311,7 +308,7 @@ export const RegisterPage: React.FC = () => {
                     value={formData.telegramUsername}
                     onChange={handleChange}
                     style={styles.input}
-                    placeholder="@seunome"
+                    placeholder={t('auth.telegramUsernamePlaceholder')}
                   />
                 </div>
               </div>
@@ -323,10 +320,10 @@ export const RegisterPage: React.FC = () => {
               {error === 'user_exists' ? (
                 <>
                   <p style={{ margin: '0 0 12px 0' }}>
-                    Você já tem cadastro. Faça login para entrar.
+                    {t('auth.userExists')}
                   </p>
                   <Link to="/login" style={styles.errorLink}>
-                    Ir para login →
+                    {t('auth.goToLogin')}
                   </Link>
                 </>
               ) : (
@@ -336,12 +333,12 @@ export const RegisterPage: React.FC = () => {
           )}
 
           <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Criando conta...' : 'Criar conta e usar 7 dias grátis'}
+            {loading ? t('auth.registering') : t('auth.registerSubmit')}
           </button>
         </form>
 
           <p style={styles.footer}>
-            Já tem conta? <Link to="/login">Entre aqui</Link>
+            {t('auth.alreadyHaveAccount')} <Link to="/login">{t('auth.loginHere')}</Link>
           </p>
         </div>
       </div>

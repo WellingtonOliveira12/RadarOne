@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Button,
@@ -24,6 +25,7 @@ import { PublicLayout } from '../components/PublicLayout';
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -48,25 +50,23 @@ export function ForgotPasswordPage() {
     }
 
     try {
-      // Adicionar timeout de 30 segundos para evitar loading infinito
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Tempo limite excedido. Tente novamente.')), 30000)
+        setTimeout(() => reject(new Error(t('auth.forgotTimeout'))), 30000)
       );
 
       await Promise.race([forgotPassword(email), timeoutPromise]);
 
       setSuccess(true);
-      showSuccess('Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.');
+      showSuccess(t('auth.forgotSuccess'));
       trackEvent('forgot_password_requested', { email: maskEmail(email) });
     } catch (err: any) {
-      // Tratar erro específico de email não cadastrado (apenas em DEV)
       const isEmailNotFound = err.response?.status === 404 && err.response?.data?.errorCode === 'EMAIL_NOT_FOUND';
 
       let errorMessage: string;
       if (isEmailNotFound) {
-        errorMessage = 'E-mail não cadastrado. Verifique se digitou corretamente ou crie uma conta.';
+        errorMessage = t('auth.forgotEmailNotFound');
       } else {
-        errorMessage = err.message || 'Não foi possível enviar o email de redefinição. Tente novamente.';
+        errorMessage = err.message || t('auth.forgotGenericError');
       }
 
       showError(errorMessage);
@@ -82,7 +82,7 @@ export function ForgotPasswordPage() {
       <PublicLayout maxWidth="container.xl">
         <VStack spacing={6} align="stretch">
           <Heading size="lg" textAlign="center">
-            Email Enviado!
+            {t('auth.forgotSuccessTitle')}
           </Heading>
 
           <Alert
@@ -96,20 +96,20 @@ export function ForgotPasswordPage() {
           >
             <AlertIcon boxSize="40px" mr={0} />
             <AlertTitle mt={4} mb={1} fontSize="lg">
-              E-mail de redefinição enviado!
+              {t('auth.forgotSuccessAlert')}
             </AlertTitle>
             <AlertDescription maxWidth="sm">
-              Verifique sua caixa de entrada em <strong>{email}</strong>.
-              Você receberá um link para redefinir sua senha.
+              {t('auth.forgotSuccessMessage')} <strong>{email}</strong>.
+              {' '}{t('auth.forgotSuccessHint')}
             </AlertDescription>
           </Alert>
 
           <Text fontSize="sm" color="gray.600" textAlign="center">
-            Não se esqueça de verificar a pasta de spam.
+            {t('auth.forgotCheckSpam')}
           </Text>
 
           <Button colorScheme="blue" onClick={() => navigate('/login')}>
-            Voltar para Login
+            {t('auth.forgotBackToLogin')}
           </Button>
         </VStack>
       </PublicLayout>
@@ -120,11 +120,11 @@ export function ForgotPasswordPage() {
     <PublicLayout maxWidth="md">
       <VStack spacing={6} align="stretch">
         <Heading size="lg" textAlign="center">
-          Esqueceu a Senha?
+          {t('auth.forgotTitle')}
         </Heading>
 
         <Text fontSize="sm" color="gray.600" textAlign="center">
-          Informe seu email cadastrado e enviaremos um link para redefinir sua senha.
+          {t('auth.forgotSubtitle')}
         </Text>
 
         <Box
@@ -139,12 +139,12 @@ export function ForgotPasswordPage() {
         >
           <VStack spacing={4}>
             <FormControl isInvalid={!!errors.email} isRequired>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>{t('auth.email')}</FormLabel>
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
+                placeholder={t('auth.emailPlaceholder')}
                 size="lg"
               />
               {errors.email && <FormErrorMessage>{errors.email}</FormErrorMessage>}
@@ -156,16 +156,16 @@ export function ForgotPasswordPage() {
               size="lg"
               width="full"
               isLoading={loading}
-              loadingText="Enviando..."
+              loadingText={t('auth.forgotSubmitting')}
             >
-              Enviar Link de Redefinição
+              {t('auth.forgotSubmit')}
             </Button>
           </VStack>
         </Box>
 
         <Text fontSize="sm" textAlign="center">
           <ChakraLink color="blue.500" href="/login">
-            ← Voltar para o Login
+            ← {t('auth.forgotBackToLogin')}
           </ChakraLink>
         </Text>
       </VStack>

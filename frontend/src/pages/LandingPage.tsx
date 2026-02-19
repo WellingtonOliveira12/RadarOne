@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Container,
@@ -17,7 +18,7 @@ import {
   Skeleton,
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
-import { AUTH_LABELS } from '../constants/app';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 /**
  * Landing Page - Página inicial pública do RadarOne
@@ -26,6 +27,7 @@ import { AUTH_LABELS } from '../constants/app';
 
 export const LandingPage: React.FC = () => {
   const { user, loading, logout } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <Box minH="100vh" bg="gray.50">
@@ -58,68 +60,68 @@ export const LandingPage: React.FC = () => {
             </Link>
 
             {/* Navigation - Adapts based on auth state */}
-            {loading ? (
-              // Loading skeleton while checking auth
-              <HStack spacing={{ base: 2, md: 4 }}>
-                <Skeleton height="20px" width="60px" />
-                <Skeleton height="20px" width="60px" />
-                <Skeleton height="32px" width="100px" borderRadius="md" />
-              </HStack>
-            ) : user ? (
-              // Logged in: show Dashboard + Logout
-              <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
-                <Link
-                  as={RouterLink}
-                  to="/dashboard"
-                  fontSize="sm"
-                  fontWeight="medium"
-                  color="gray.600"
-                  _hover={{ color: 'blue.600' }}
-                >
-                  Dashboard
-                </Link>
-                <Button
-                  onClick={logout}
-                  colorScheme="red"
-                  variant="outline"
-                  size="sm"
-                >
-                  Sair
-                </Button>
-              </HStack>
-            ) : (
-              // Logged out: show Plans + Login + Register
-              <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
-                <Link
-                  as={RouterLink}
-                  to="/plans"
-                  fontSize="sm"
-                  fontWeight="medium"
-                  color="gray.600"
-                  _hover={{ color: 'blue.600' }}
-                >
-                  Planos
-                </Link>
-                <Link
-                  as={RouterLink}
-                  to="/login"
-                  fontSize="sm"
-                  fontWeight="medium"
-                  color="gray.600"
-                  _hover={{ color: 'blue.600' }}
-                >
-                  {AUTH_LABELS.LOGIN_CTA}
-                </Link>
-                <Button
-                  as={RouterLink}
-                  to="/register"
-                  colorScheme="blue"
-                  size="sm"
-                >
-                  Criar conta
-                </Button>
-              </HStack>
-            )}
+            <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
+              {loading ? (
+                <>
+                  <Skeleton height="20px" width="60px" />
+                  <Skeleton height="20px" width="60px" />
+                  <Skeleton height="32px" width="100px" borderRadius="md" />
+                </>
+              ) : user ? (
+                <>
+                  <Link
+                    as={RouterLink}
+                    to="/dashboard"
+                    fontSize="sm"
+                    fontWeight="medium"
+                    color="gray.600"
+                    _hover={{ color: 'blue.600' }}
+                  >
+                    {t('public.dashboard')}
+                  </Link>
+                  <Button
+                    onClick={logout}
+                    colorScheme="red"
+                    variant="outline"
+                    size="sm"
+                  >
+                    {t('public.logout')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    as={RouterLink}
+                    to="/plans"
+                    fontSize="sm"
+                    fontWeight="medium"
+                    color="gray.600"
+                    _hover={{ color: 'blue.600' }}
+                  >
+                    {t('public.plans')}
+                  </Link>
+                  <Link
+                    as={RouterLink}
+                    to="/login"
+                    fontSize="sm"
+                    fontWeight="medium"
+                    color="gray.600"
+                    _hover={{ color: 'blue.600' }}
+                  >
+                    {t('public.login')}
+                  </Link>
+                  <Button
+                    as={RouterLink}
+                    to="/register"
+                    colorScheme="blue"
+                    size="sm"
+                  >
+                    {t('public.register')}
+                  </Button>
+                </>
+              )}
+              <LanguageSwitcher />
+            </HStack>
           </Flex>
         </Container>
       </Box>
@@ -146,7 +148,7 @@ export const LandingPage: React.FC = () => {
             mb={4}
             lineHeight="shorter"
           >
-            Encontre as melhores oportunidades antes da concorrência
+            {t('landing.heroTitle')}
           </Heading>
 
           {/* Subheadline */}
@@ -156,8 +158,7 @@ export const LandingPage: React.FC = () => {
             mb={8}
             lineHeight="tall"
           >
-            Monitore anúncios de <strong>iPhone, carros, imóveis e muito mais</strong> no OLX,
-            Mercado Livre e Facebook. Receba alertas em tempo real e seja o primeiro a fechar negócio.
+            {t('landing.heroSubtitle')}
           </Text>
 
           {/* CTAs */}
@@ -169,7 +170,7 @@ export const LandingPage: React.FC = () => {
               size="lg"
               px={8}
             >
-              Começar agora - 7 dias grátis
+              {t('landing.heroCta')}
             </Button>
             <Button
               as={RouterLink}
@@ -179,7 +180,7 @@ export const LandingPage: React.FC = () => {
               size="lg"
               px={8}
             >
-              Ver planos
+              {t('landing.heroViewPlans')}
             </Button>
           </HStack>
         </Container>
@@ -190,7 +191,7 @@ export const LandingPage: React.FC = () => {
         <Container maxW="container.xl">
           <VStack spacing={2} mb={12} textAlign="center">
             <Heading as="h2" size={{ base: 'lg', md: 'xl' }} color="gray.800">
-              Ideal para vendedores e revendedores
+              {t('landing.featuresTitle')}
             </Heading>
           </VStack>
 
@@ -207,11 +208,10 @@ export const LandingPage: React.FC = () => {
             >
               <Text fontSize="5xl" mb={4}>📱</Text>
               <Heading as="h3" size="md" mb={3} color="gray.800">
-                Revenda de iPhone
+                {t('landing.featureIphoneTitle')}
               </Heading>
               <Text fontSize="sm" color="gray.600" lineHeight="tall">
-                Monitore anúncios de iPhone usados, pegue os melhores preços antes
-                da concorrência e revenda com lucro.
+                {t('landing.featureIphoneDesc')}
               </Text>
             </Box>
 
@@ -227,11 +227,10 @@ export const LandingPage: React.FC = () => {
             >
               <Text fontSize="5xl" mb={4}>🚗</Text>
               <Heading as="h3" size="md" mb={3} color="gray.800">
-                Carros e Motos
+                {t('landing.featureCarsTitle')}
               </Heading>
               <Text fontSize="sm" color="gray.600" lineHeight="tall">
-                Acompanhe anúncios de veículos na sua região. Receba alerta
-                instantâneo quando aparecer um bom negócio.
+                {t('landing.featureCarsDesc')}
               </Text>
             </Box>
 
@@ -247,11 +246,10 @@ export const LandingPage: React.FC = () => {
             >
               <Text fontSize="5xl" mb={4}>🏠</Text>
               <Heading as="h3" size="md" mb={3} color="gray.800">
-                Imóveis e Terrenos
+                {t('landing.featureRealEstateTitle')}
               </Heading>
               <Text fontSize="sm" color="gray.600" lineHeight="tall">
-                Encontre imóveis abaixo do preço de mercado. Seja o primeiro
-                a entrar em contato com o vendedor.
+                {t('landing.featureRealEstateDesc')}
               </Text>
             </Box>
           </SimpleGrid>
@@ -263,52 +261,21 @@ export const LandingPage: React.FC = () => {
         <Container maxW="container.md">
           <VStack spacing={2} mb={10} textAlign="center">
             <Heading as="h2" size={{ base: 'lg', md: 'xl' }} color="gray.800">
-              Por que vendedores escolhem o RadarOne?
+              {t('landing.benefitsTitle')}
             </Heading>
           </VStack>
 
           <List spacing={4}>
-            <ListItem display="flex" alignItems="flex-start" gap={3}>
-              <Text fontSize="2xl">⚡</Text>
-              <Text fontSize="md" color="gray.700">
-                <strong>Alertas em segundos</strong> - Receba notificação via Telegram assim que o anúncio for publicado
-              </Text>
-            </ListItem>
-
-            <ListItem display="flex" alignItems="flex-start" gap={3}>
-              <Text fontSize="2xl">📱</Text>
-              <Text fontSize="md" color="gray.700">
-                <strong>Todos os marketplaces</strong> - OLX, Mercado Livre, Facebook Marketplace, Webmotors e mais
-              </Text>
-            </ListItem>
-
-            <ListItem display="flex" alignItems="flex-start" gap={3}>
-              <Text fontSize="2xl">🎯</Text>
-              <Text fontSize="md" color="gray.700">
-                <strong>Filtros inteligentes</strong> - Monitore por cidade, faixa de preço, palavra-chave e muito mais
-              </Text>
-            </ListItem>
-
-            <ListItem display="flex" alignItems="flex-start" gap={3}>
-              <Text fontSize="2xl">💰</Text>
-              <Text fontSize="md" color="gray.700">
-                <strong>Aumente seu lucro</strong> - Chegue primeiro nos melhores negócios e negocie melhor
-              </Text>
-            </ListItem>
-
-            <ListItem display="flex" alignItems="flex-start" gap={3}>
-              <Text fontSize="2xl">✅</Text>
-              <Text fontSize="md" color="gray.700">
-                <strong>7 dias grátis</strong> - Teste sem compromisso. Cancele quando quiser
-              </Text>
-            </ListItem>
-
-            <ListItem display="flex" alignItems="flex-start" gap={3}>
-              <Text fontSize="2xl">🔒</Text>
-              <Text fontSize="md" color="gray.700">
-                <strong>Sem pegadinhas</strong> - Cancele pelo app, sem ligar pra ninguém
-              </Text>
-            </ListItem>
+            {(['benefitAlerts', 'benefitMarketplaces', 'benefitFilters', 'benefitProfit', 'benefitTrial', 'benefitNoCatch'] as const).map((key, i) => (
+              <ListItem key={key} display="flex" alignItems="flex-start" gap={3}>
+                <Text fontSize="2xl">{['⚡', '📱', '🎯', '💰', '✅', '🔒'][i]}</Text>
+                <Text
+                  fontSize="md"
+                  color="gray.700"
+                  dangerouslySetInnerHTML={{ __html: t(`landing.${key}`) }}
+                />
+              </ListItem>
+            ))}
           </List>
         </Container>
       </Box>
@@ -323,12 +290,15 @@ export const LandingPage: React.FC = () => {
       >
         <Container maxW="container.md">
           <Heading as="h2" size={{ base: 'lg', md: 'xl' }} color="white" mb={4}>
-            Comece a vender mais hoje mesmo
+            {t('landing.ctaTitle')}
           </Heading>
-          <Text fontSize={{ base: 'md', md: 'lg' }} color="whiteAlpha.900" mb={8} lineHeight="tall">
-            Junte-se a centenas de vendedores que já usam o RadarOne para encontrar as melhores
-            oportunidades. <strong>7 dias grátis</strong>, sem pedir cartão de crédito.
-          </Text>
+          <Text
+            fontSize={{ base: 'md', md: 'lg' }}
+            color="whiteAlpha.900"
+            mb={8}
+            lineHeight="tall"
+            dangerouslySetInnerHTML={{ __html: t('landing.ctaSubtitle') }}
+          />
           <Button
             as={RouterLink}
             to="/register"
@@ -339,7 +309,7 @@ export const LandingPage: React.FC = () => {
             _hover={{ bg: 'gray.50' }}
             px={10}
           >
-            Criar conta grátis
+            {t('landing.ctaButton')}
           </Button>
         </Container>
       </Box>
@@ -348,7 +318,7 @@ export const LandingPage: React.FC = () => {
       <Box as="footer" bg="gray.900" py={8} px={{ base: 4, md: 6 }}>
         <Container maxW="container.xl">
           <Text fontSize="sm" color="gray.400" textAlign="center">
-            © 2025 RadarOne. Todos os direitos reservados.
+            {t('landing.footerRights')}
           </Text>
         </Container>
       </Box>

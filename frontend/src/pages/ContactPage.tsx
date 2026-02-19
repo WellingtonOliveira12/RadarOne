@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { PublicLayout } from '../components/PublicLayout';
@@ -7,11 +8,12 @@ import { usePageMeta } from '../hooks/usePageMeta';
 
 export const ContactPage: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   // SEO meta
   usePageMeta({
-    title: 'Contato | RadarOne',
-    description: 'Fale com o time do RadarOne para suporte e atendimento.',
+    title: `${t('contact.title')} | RadarOne`,
+    description: t('contact.subtitle'),
   });
   const [category, setCategory] = useState('Suporte');
   const [subject, setSubject] = useState('');
@@ -21,13 +23,19 @@ export const ContactPage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const categories = ['Suporte', 'Sugestão', 'Crítica', 'Financeiro', 'Outro'];
+  const categories = [
+    { value: 'Suporte', label: t('contact.catSupport') },
+    { value: 'Sugestão', label: t('contact.catSuggestion') },
+    { value: 'Crítica', label: t('contact.catCriticism') },
+    { value: 'Financeiro', label: t('contact.catFinancial') },
+    { value: 'Outro', label: t('contact.catOther') },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email || !category || !subject || !message) {
-      setError('Preencha todos os campos obrigatórios');
+      setError(t('contact.fillAll'));
       return;
     }
 
@@ -46,7 +54,7 @@ export const ContactPage: React.FC = () => {
       setSubject('');
       setMessage('');
     } catch (err: any) {
-      setError(err.message || 'Erro ao enviar mensagem');
+      setError(err.message || t('contact.sendError'));
     } finally {
       setSubmitting(false);
     }
@@ -58,20 +66,20 @@ export const ContactPage: React.FC = () => {
         <div style={styles.container}>
           <div style={styles.successCard}>
             <div style={styles.successIcon}>✅</div>
-            <h1 style={styles.successTitle}>Mensagem enviada com sucesso!</h1>
+            <h1 style={styles.successTitle}>{t('contact.successTitle')}</h1>
             <p style={styles.successText}>
-              Recebemos sua mensagem e retornaremos em até 24 horas úteis para
-              o e-mail <strong>{email}</strong>.
+              {t('contact.successMessage')}{' '}
+              <strong>{email}</strong>.
             </p>
             <div style={styles.successButtons}>
               <button
                 onClick={() => setSuccess(false)}
                 style={styles.primaryButton}
               >
-                Enviar outra mensagem
+                {t('contact.sendAnother')}
               </button>
               <Link to="/" style={styles.secondaryButton}>
-                Voltar à página inicial
+                {t('contact.backHome')}
               </Link>
             </div>
           </div>
@@ -83,10 +91,8 @@ export const ContactPage: React.FC = () => {
   return (
     <PublicLayout maxWidth="container.xl">
       <div style={styles.container}>
-        <h1 style={styles.title}>Fale Conosco</h1>
-        <p style={styles.subtitle}>
-          Estamos aqui para ajudar! Envie sua mensagem e responderemos em breve.
-        </p>
+        <h1 style={styles.title}>{t('contact.title')}</h1>
+        <p style={styles.subtitle}>{t('contact.subtitle')}</p>
 
         {error && <div style={styles.error}>{error}</div>}
 
@@ -94,7 +100,7 @@ export const ContactPage: React.FC = () => {
           {/* Categoria */}
           <div style={styles.field}>
             <label style={styles.label}>
-              Categoria <span style={styles.required}>*</span>
+              {t('contact.category')} <span style={styles.required}>*</span>
             </label>
             <select
               value={category}
@@ -102,8 +108,8 @@ export const ContactPage: React.FC = () => {
               style={styles.select}
             >
               {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
+                <option key={cat.value} value={cat.value}>
+                  {cat.label}
                 </option>
               ))}
             </select>
@@ -112,32 +118,32 @@ export const ContactPage: React.FC = () => {
           {/* Email */}
           <div style={styles.field}>
             <label style={styles.label}>
-              Seu E-mail <span style={styles.required}>*</span>
+              {t('contact.email')} <span style={styles.required}>*</span>
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={styles.input}
-              placeholder="seu@email.com"
+              placeholder={t('auth.emailPlaceholder')}
               required
             />
             <p style={styles.hint}>
-              Usaremos este e-mail para responder sua mensagem
+              {t('contact.emailHint')}
             </p>
           </div>
 
           {/* Assunto */}
           <div style={styles.field}>
             <label style={styles.label}>
-              Assunto <span style={styles.required}>*</span>
+              {t('contact.subject')} <span style={styles.required}>*</span>
             </label>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               style={styles.input}
-              placeholder="Ex: Não recebo alertas no Telegram"
+              placeholder={t('contact.subjectPlaceholder')}
               required
             />
           </div>
@@ -145,18 +151,18 @@ export const ContactPage: React.FC = () => {
           {/* Mensagem */}
           <div style={styles.field}>
             <label style={styles.label}>
-              Mensagem <span style={styles.required}>*</span>
+              {t('contact.message')} <span style={styles.required}>*</span>
             </label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               style={styles.textarea}
-              placeholder="Descreva sua dúvida, problema ou sugestão com o máximo de detalhes possível..."
+              placeholder={t('contact.messagePlaceholder')}
               rows={6}
               required
             />
             <p style={styles.hint}>
-              Quanto mais detalhes, melhor poderemos ajudar
+              {t('contact.messageHint')}
             </p>
           </div>
 
@@ -167,39 +173,38 @@ export const ContactPage: React.FC = () => {
               disabled={submitting}
               style={styles.submitButton}
             >
-              {submitting ? 'Enviando...' : 'Enviar Mensagem'}
+              {submitting ? t('contact.submitting') : t('contact.submit')}
             </button>
           </div>
         </form>
 
         {/* Links Úteis */}
         <div style={styles.helpSection}>
-          <h3 style={styles.helpTitle}>Antes de enviar, já conferiu?</h3>
+          <h3 style={styles.helpTitle}>{t('contact.beforeSending')}</h3>
           <div style={styles.helpLinks}>
             <Link to="/faq" style={styles.helpLink}>
-              📋 Perguntas Frequentes (FAQ)
+              📋 {t('contact.faqLink')}
             </Link>
             <Link to="/manual" style={styles.helpLink}>
-              📖 Manual do Usuário
+              📖 {t('contact.manualLink')}
             </Link>
           </div>
         </div>
 
         {/* Informações de Contato */}
         <div style={styles.infoSection}>
-          <h3 style={styles.infoTitle}>Outras formas de contato</h3>
+          <h3 style={styles.infoTitle}>{t('contact.otherContact')}</h3>
           <p style={styles.infoText}>
-            <strong>E-mail direto:</strong>{' '}
+            <strong>{t('contact.directEmail')}</strong>{' '}
             <a href="mailto:contato@radarone.com.br" style={styles.link}>
               contato@radarone.com.br
             </a>
           </p>
           <p style={styles.infoText}>
-            <strong>Horário de atendimento:</strong> Segunda a Sexta, 9h às 18h
-            (Brasília)
+            <strong>{t('contact.hours')}</strong> {t('contact.hoursValue')}
           </p>
           <p style={styles.infoText}>
-            <strong>Tempo de resposta:</strong> Até 24 horas úteis
+            <strong>{t('contact.responseTime')}</strong> {t('contact.responseTimeValue')}
           </p>
         </div>
       </div>

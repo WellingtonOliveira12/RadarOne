@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams, Link as RouterLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Button,
@@ -19,51 +20,51 @@ import { showSuccess, showError, showInfo } from '../lib/toast';
 import { trackLogin } from '../lib/analytics';
 import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 import { PublicLayout } from '../components/PublicLayout';
-import { AUTH_LABELS } from '../constants/app';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const reason = searchParams.get('reason');
+  const { t } = useTranslation();
 
   const { login: loginAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [loadingText, setLoadingText] = useState('Entrando...');
+  const [loadingText, setLoadingText] = useState(t('auth.loggingIn'));
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setLoadingText('Entrando...');
+    setLoadingText(t('auth.loggingIn'));
 
     // Validações básicas
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      setError('Email inválido');
-      showError('Email inválido');
+      setError(t('auth.invalidEmail'));
+      showError(t('auth.invalidEmail'));
       setLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setError('A senha deve ter no mínimo 6 caracteres');
-      showError('A senha deve ter no mínimo 6 caracteres');
+      setError(t('auth.passwordMin6'));
+      showError(t('auth.passwordMin6'));
       setLoading(false);
       return;
     }
 
     // Timer para mostrar mensagem de cold start se demorar mais de 5s
     const coldStartTimer = setTimeout(() => {
-      setLoadingText('Aguarde, servidor iniciando...');
+      setLoadingText(t('auth.serverStarting'));
     }, 5000);
 
     try {
       await loginAuth(email, password);
       clearTimeout(coldStartTimer);
-      showSuccess('Login realizado com sucesso!');
+      showSuccess(t('auth.loginSuccess'));
       trackLogin('email');
 
       // Redirecionar para returnUrl (se salvo) ou /dashboard
@@ -79,8 +80,7 @@ export function LoginPage() {
 
       // Verificar se é erro de 2FA necessário
       if (err instanceof TwoFactorRequiredError) {
-        showInfo('Verificação em duas etapas necessária');
-        // Redirecionar para página de verificação 2FA com dados necessários
+        showInfo(t('auth.2faRequired'));
         navigate('/2fa/verify', {
           replace: true,
           state: {
@@ -94,14 +94,14 @@ export function LoginPage() {
       // Verificar se é erro de cold start para mensagem mais amigável
       const isColdStartError = err.isColdStart || err.errorCode === 'NETWORK_TIMEOUT';
       const errorMessage = isColdStartError
-        ? 'O servidor está iniciando. Por favor, tente novamente em alguns segundos.'
-        : (err.message || 'Erro ao fazer login');
+        ? t('auth.coldStartError')
+        : (err.message || t('auth.loginError'));
 
       setError(errorMessage);
       showError(errorMessage);
     } finally {
       setLoading(false);
-      setLoadingText('Entrando...');
+      setLoadingText(t('auth.loggingIn'));
     }
   }
 
@@ -109,7 +109,7 @@ export function LoginPage() {
     <PublicLayout maxWidth="container.xl">
       <VStack spacing={6} align="stretch">
         <Heading size="lg" textAlign="center">
-          {AUTH_LABELS.LOGIN_PAGE_TITLE}
+          {t('auth.loginTitle')}
         </Heading>
 
         {/* Banner informando motivo do redirect (se houver) */}
@@ -134,23 +134,23 @@ export function LoginPage() {
         >
           <VStack spacing={4}>
             <FormControl isRequired>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>{t('auth.email')}</FormLabel>
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
+                placeholder={t('auth.emailPlaceholder')}
                 size="lg"
               />
             </FormControl>
 
             <FormControl isRequired>
-              <FormLabel>Senha</FormLabel>
+              <FormLabel>{t('auth.password')}</FormLabel>
               <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Sua senha"
+                placeholder={t('auth.passwordPlaceholder')}
                 size="lg"
               />
             </FormControl>
@@ -163,19 +163,19 @@ export function LoginPage() {
               isLoading={loading}
               loadingText={loadingText}
             >
-              {AUTH_LABELS.LOGIN_CTA}
+              {t('auth.loginCta')}
             </Button>
 
             <Text fontSize="sm" textAlign="center">
               <ChakraLink color="blue.500" href="/forgot-password">
-                Esqueceu a senha?
+                {t('auth.forgotPassword')}
               </ChakraLink>
             </Text>
 
             <Text fontSize="sm" textAlign="center" color="gray.600">
-              Não tem uma conta?{' '}
+              {t('auth.noAccount')}{' '}
               <ChakraLink as={RouterLink} to="/register" color="blue.500">
-                Criar conta
+                {t('auth.createAccount')}
               </ChakraLink>
             </Text>
           </VStack>

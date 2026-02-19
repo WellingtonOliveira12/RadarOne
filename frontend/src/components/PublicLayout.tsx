@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Container,
@@ -13,8 +14,9 @@ import {
   Button,
   Skeleton,
 } from '@chakra-ui/react';
-import { APP_VERSION, AUTH_LABELS } from '../constants/app';
+import { APP_VERSION } from '../constants/app';
 import { useAuth } from '../context/AuthContext';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -28,7 +30,7 @@ interface PublicLayoutProps {
  * Layout padrão para páginas públicas (não autenticadas)
  *
  * Inclui:
- * - Header com logo RadarOne
+ * - Header com logo RadarOne + LanguageSwitcher
  * - Container centralizado e responsivo
  * - Footer simples
  *
@@ -42,6 +44,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
   const location = useLocation();
   const currentPath = location.pathname;
   const { user, loading, logout } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <Box minH="100vh" bg="gray.50" display="flex" flexDirection="column">
@@ -73,83 +76,83 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
               </HStack>
             </Link>
 
-            {/* Navigation - Adapts based on auth state when showNav is true */}
-            {showNav && (
-              loading ? (
-                // Loading skeleton while checking auth
-                <HStack spacing={{ base: 2, md: 4 }}>
-                  <Skeleton height="20px" width="60px" />
-                  <Skeleton height="20px" width="60px" />
-                  <Skeleton height="32px" width="100px" borderRadius="md" />
-                </HStack>
-              ) : user ? (
-                // Logged in: show Dashboard + Logout
-                <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
-                  <Link
-                    as={RouterLink}
-                    to="/dashboard"
-                    fontSize="sm"
-                    fontWeight="medium"
-                    color="gray.600"
-                    _hover={{ color: 'blue.600' }}
-                  >
-                    Dashboard
-                  </Link>
-                  <Button
-                    onClick={logout}
-                    colorScheme="red"
-                    variant="outline"
-                    size="sm"
-                  >
-                    Sair
-                  </Button>
-                </HStack>
-              ) : (
-                // Logged out: show default nav
-                <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
-                  <Link
-                    as={RouterLink}
-                    to="/plans"
-                    fontSize="sm"
-                    fontWeight="medium"
-                    color={currentPath === '/plans' ? 'blue.600' : 'gray.600'}
-                    borderBottom={currentPath === '/plans' ? '2px solid' : 'none'}
-                    borderColor="blue.600"
-                    pb={currentPath === '/plans' ? 0.5 : 0}
-                    _hover={{ color: 'blue.600' }}
-                  >
-                    Planos
-                  </Link>
-                  <Link
-                    as={RouterLink}
-                    to="/login"
-                    fontSize="sm"
-                    fontWeight="medium"
-                    color={currentPath === '/login' ? 'blue.600' : 'gray.600'}
-                    borderBottom={currentPath === '/login' ? '2px solid' : 'none'}
-                    borderColor="blue.600"
-                    pb={currentPath === '/login' ? 0.5 : 0}
-                    _hover={{ color: 'blue.600' }}
-                  >
-                    {AUTH_LABELS.LOGIN_CTA}
-                  </Link>
-                  <Link
-                    as={RouterLink}
-                    to="/register"
-                    fontSize="sm"
-                    fontWeight="medium"
-                    color="white"
-                    bg={currentPath === '/register' ? 'blue.600' : 'blue.500'}
-                    px={3}
-                    py={1.5}
-                    borderRadius="md"
-                    _hover={{ bg: 'blue.600', textDecoration: 'none' }}
-                  >
-                    Criar conta
-                  </Link>
-                </HStack>
-              )
-            )}
+            {/* Right side: Nav + Language */}
+            <HStack spacing={{ base: 2, md: 4 }} flexWrap="wrap">
+              {showNav && (
+                loading ? (
+                  <>
+                    <Skeleton height="20px" width="60px" />
+                    <Skeleton height="20px" width="60px" />
+                    <Skeleton height="32px" width="100px" borderRadius="md" />
+                  </>
+                ) : user ? (
+                  <>
+                    <Link
+                      as={RouterLink}
+                      to="/dashboard"
+                      fontSize="sm"
+                      fontWeight="medium"
+                      color="gray.600"
+                      _hover={{ color: 'blue.600' }}
+                    >
+                      {t('public.dashboard')}
+                    </Link>
+                    <Button
+                      onClick={logout}
+                      colorScheme="red"
+                      variant="outline"
+                      size="sm"
+                    >
+                      {t('public.logout')}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      as={RouterLink}
+                      to="/plans"
+                      fontSize="sm"
+                      fontWeight="medium"
+                      color={currentPath === '/plans' ? 'blue.600' : 'gray.600'}
+                      borderBottom={currentPath === '/plans' ? '2px solid' : 'none'}
+                      borderColor="blue.600"
+                      pb={currentPath === '/plans' ? 0.5 : 0}
+                      _hover={{ color: 'blue.600' }}
+                    >
+                      {t('public.plans')}
+                    </Link>
+                    <Link
+                      as={RouterLink}
+                      to="/login"
+                      fontSize="sm"
+                      fontWeight="medium"
+                      color={currentPath === '/login' ? 'blue.600' : 'gray.600'}
+                      borderBottom={currentPath === '/login' ? '2px solid' : 'none'}
+                      borderColor="blue.600"
+                      pb={currentPath === '/login' ? 0.5 : 0}
+                      _hover={{ color: 'blue.600' }}
+                    >
+                      {t('public.login')}
+                    </Link>
+                    <Link
+                      as={RouterLink}
+                      to="/register"
+                      fontSize="sm"
+                      fontWeight="medium"
+                      color="white"
+                      bg={currentPath === '/register' ? 'blue.600' : 'blue.500'}
+                      px={3}
+                      py={1.5}
+                      borderRadius="md"
+                      _hover={{ bg: 'blue.600', textDecoration: 'none' }}
+                    >
+                      {t('public.register')}
+                    </Link>
+                  </>
+                )
+              )}
+              <LanguageSwitcher />
+            </HStack>
           </Flex>
         </Container>
       </Box>
@@ -161,7 +164,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
         </Container>
       </Box>
 
-      {/* Footer - Centralizado e consistente com AppLayout */}
+      {/* Footer */}
       <Box
         as="footer"
         bg="white"
@@ -174,19 +177,19 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
           <VStack spacing={3}>
             <HStack spacing={3} flexWrap="wrap" justify="center">
               <Link as={RouterLink} to="/manual" fontSize="sm" color="gray.600">
-                Manual
+                {t('footer.manual')}
               </Link>
               <Text color="gray.300">•</Text>
               <Link as={RouterLink} to="/faq" fontSize="sm" color="gray.600">
-                FAQ
+                {t('footer.faq')}
               </Link>
               <Text color="gray.300">•</Text>
               <Link as={RouterLink} to="/contact" fontSize="sm" color="gray.600">
-                Contato
+                {t('footer.contact')}
               </Link>
             </HStack>
             <Text fontSize="xs" color="gray.400" textAlign="center">
-              © 2025 RadarOne. Todos os direitos reservados. • v{APP_VERSION}
+              {t('footer.rights')} • v{APP_VERSION}
             </Text>
           </VStack>
         </Container>
