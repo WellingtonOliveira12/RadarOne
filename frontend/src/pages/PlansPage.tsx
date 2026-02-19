@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import {
   trackViewPlans,
@@ -17,7 +18,8 @@ import { getSubscriptionMessage } from '../utils/subscriptionHelpers';
 import { normalizeCouponCode } from '../utils/couponHelpers';
 import { PublicLayout } from '../components/PublicLayout';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { API_BASE_URL, AUTH_LABELS } from '../constants/app';
+import { API_BASE_URL } from '../constants/app';
+import { formatPlanPrice, formatDiscountValue, getPeriodSuffix } from '../utils/currency';
 import * as responsive from '../styles/responsive';
 
 /**
@@ -44,6 +46,7 @@ interface Plan {
 export const PlansPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const reason = searchParams.get('reason');
+  const { t, i18n } = useTranslation();
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,14 +82,13 @@ export const PlansPage: React.FC = () => {
 
   // SEO meta
   usePageMeta({
-    title: 'Planos | RadarOne',
-    description: 'Conheça os planos do RadarOne e escolha a opção ideal para monitorar sites e produtos.',
+    title: `${t('public.plans')} | RadarOne`,
+    description: t('plans.subtitle'),
   });
 
   useEffect(() => {
     loadPlans();
 
-    // Track A/B variant shown para cupons (uma vez por sessão)
     if (!sessionStorage.getItem('coupon_ab_tracked')) {
       trackABVariantShown('couponUpgradeTitle', 'plans_page');
       trackABVariantShown('couponDiscountTitle', 'plans_page');
@@ -94,19 +96,13 @@ export const PlansPage: React.FC = () => {
     }
   }, []);
 
-  // Mostrar toast ao redirecionar por TRIAL_EXPIRED
   useEffect(() => {
     if (reason === 'trial_expired') {
-      // Verificar se já mostrou o toast nesta sessão (evitar mostrar múltiplas vezes)
       const toastShown = sessionStorage.getItem('trial_expired_toast_shown');
-
       if (!toastShown) {
-        // Obter mensagem via A/B testing
         const message = getABMessage('trialExpiredToast');
         showInfo(message);
         sessionStorage.setItem('trial_expired_toast_shown', 'true');
-
-        // Track toast shown para analytics + variante
         trackTrialExpiredToastShown();
         trackABVariantShown('trialExpiredToast', 'plans_page_toast');
       }
@@ -115,16 +111,15 @@ export const PlansPage: React.FC = () => {
 
   const loadPlans = async () => {
     try {
-      // Buscar planos da API
       const response = await fetch(`${API_BASE_URL}/api/plans`);
       if (!response.ok) {
-        throw new Error('Erro ao buscar planos');
+        throw new Error(t('plans.loadError'));
       }
       const data = await response.json();
       setPlans(data);
       trackViewPlans();
     } catch (err: any) {
-      setError('Erro ao carregar planos');
+      setError(t('plans.loadError'));
     } finally {
       setLoading(false);
     }
@@ -132,17 +127,17 @@ export const PlansPage: React.FC = () => {
 
   const handleApplyCoupon = async () => {
     if (!user) {
-      setCouponError('Você precisa estar logado para usar um cupom.');
+      setCouponError(t('plans.couponUpgradeNeedLogin'));
       return;
     }
 
     if (!couponCode.trim()) {
-      setCouponError('Digite o código do cupom');
+      setCouponError(t('plans.couponEnterCode'));
       return;
     }
 
     if (!selectedPlan) {
-      setCouponError('Selecione um plano antes de aplicar o cupom. Clique no card do plano desejado.');
+      setCouponError(t('plans.couponSelectPlan'));
       return;
     }
 
@@ -165,38 +160,31 @@ export const PlansPage: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        // Melhorar mensagem se cupom for DISCOUNT
         if (data.error && data.error.includes('não é um cupom de upgrade de teste')) {
-          throw new Error('Este cupom é de desconto financeiro. Use-o na seção "Cupom de Desconto" abaixo para aplicá-lo no checkout.');
+          throw new Error(t('plans.isDiscountCoupon'));
         }
-        throw new Error(data.error || 'Erro ao aplicar cupom');
+        throw new Error(data.error || t('plans.loadError'));
       }
 
-      // Sucesso!
       setCouponSuccess({
         planName: data.subscription.planName,
         endsAt: new Date(data.subscription.endsAt),
         daysGranted: data.subscription.daysGranted
       });
 
-      // Analytics: rastrear trial upgrade aplicado
       trackTrialUpgradeApplied({
         couponCode: couponCode.toUpperCase(),
         planName: data.subscription.planName,
         durationDays: data.subscription.daysGranted
       });
 
-      showInfo(`Cupom aplicado! ${data.message}`);
-
-      // CRÍTICO: Atualizar estado do usuário no AuthContext
-      // para que RequireSubscriptionRoute reconheça a nova subscription
+      showInfo(`${t('plans.couponSuccessTitle')} ${data.message}`);
       await refetchUser();
 
     } catch (err: any) {
-      const errorMessage = err.message || 'Erro ao aplicar cupom';
+      const errorMessage = err.message || t('plans.loadError');
       setCouponError(errorMessage);
 
-      // Analytics: rastrear falha na validação
       trackCouponValidationFailed({
         couponCode: couponCode.toUpperCase(),
         errorReason: errorMessage,
@@ -209,12 +197,12 @@ export const PlansPage: React.FC = () => {
 
   const handleValidateDiscountCoupon = async () => {
     if (!discountCouponCode.trim()) {
-      setDiscountCouponError('Digite o código do cupom');
+      setDiscountCouponError(t('plans.couponEnterCode'));
       return;
     }
 
     if (!selectedPlan) {
-      setDiscountCouponError('Selecione um plano antes de validar o cupom. Clique no card do plano desejado.');
+      setDiscountCouponError(t('plans.couponSelectPlan'));
       return;
     }
 
@@ -235,12 +223,11 @@ export const PlansPage: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok || !data.valid) {
-        throw new Error(data.error || 'Cupom inválido');
+        throw new Error(data.error || t('plans.loadError'));
       }
 
-      // Verificar se não é cupom de TRIAL_UPGRADE
       if (data.coupon.purpose === 'TRIAL_UPGRADE') {
-        throw new Error('Este cupom é de upgrade temporário. Use-o na seção "Tem um cupom de upgrade?" acima.');
+        throw new Error(t('plans.isUpgradeCoupon'));
       }
 
       setDiscountCouponData({
@@ -251,7 +238,6 @@ export const PlansPage: React.FC = () => {
         appliesToPlan: data.coupon.appliesToPlan
       });
 
-      // Analytics: rastrear validação de cupom de desconto
       trackCouponValidated({
         couponCode: data.coupon.code,
         couponType: 'DISCOUNT',
@@ -260,13 +246,12 @@ export const PlansPage: React.FC = () => {
         location: 'plans_page'
       });
 
-      showInfo('Cupom de desconto validado! Escolha um plano abaixo para prosseguir.');
+      showInfo(t('plans.discountValidatedTitle'));
 
     } catch (err: any) {
-      const errorMessage = err.message || 'Erro ao validar cupom';
+      const errorMessage = err.message || t('plans.loadError');
       setDiscountCouponError(errorMessage);
 
-      // Analytics: rastrear falha na validação
       trackCouponValidationFailed({
         couponCode: discountCouponCode.toUpperCase(),
         errorReason: errorMessage,
@@ -278,13 +263,11 @@ export const PlansPage: React.FC = () => {
   };
 
   const handleChoosePlan = async (planSlug: string, couponCode?: string) => {
-    // Encontra o plano selecionado para tracking
     const selectedPlan = plans.find(p => p.slug === planSlug);
     if (selectedPlan) {
       trackSelectPlan(selectedPlan.name, selectedPlan.priceCents / 100);
     }
 
-    // Analytics: rastrear se cupom foi aplicado ao checkout
     if (couponCode && discountCouponData && selectedPlan) {
       trackCouponAppliedToCheckout({
         couponCode: couponCode,
@@ -294,27 +277,22 @@ export const PlansPage: React.FC = () => {
       });
     }
 
-    // Se o plano tem checkoutUrl, redireciona para checkout externo (Kiwify)
     if (selectedPlan?.checkoutUrl) {
-      // Adicionar cupom à URL se fornecido
       let checkoutUrl = selectedPlan.checkoutUrl;
       if (couponCode) {
         const separator = checkoutUrl.includes('?') ? '&' : '?';
         checkoutUrl = `${checkoutUrl}${separator}coupon=${encodeURIComponent(couponCode)}&discount_code=${encodeURIComponent(couponCode)}`;
       }
-      // Redirecionar para checkout Kiwify
       window.location.href = checkoutUrl;
       return;
     }
 
-    // Se não está logado, redirecionar para registro com plano selecionado
     if (!user) {
       navigate(`/register?plan=${planSlug}`);
       return;
     }
 
-    // Se está logado E não tem checkoutUrl, iniciar trial interno
-    if (trialLoading) return; // Bloquear duplo clique
+    if (trialLoading) return;
     setTrialLoading(true);
     setError('');
 
@@ -331,7 +309,6 @@ export const PlansPage: React.FC = () => {
 
       const data = await response.json();
 
-      // Trial já ativo (idempotente) — redirecionar para dashboard
       if (data.errorCode === 'TRIAL_ALREADY_ACTIVE') {
         await refetchUser();
         navigate('/dashboard');
@@ -340,28 +317,36 @@ export const PlansPage: React.FC = () => {
 
       if (!response.ok) {
         if (data.errorCode === 'SUBSCRIPTION_ALREADY_ACTIVE') {
-          // Usuário já tem assinatura paga ativa — atualizar dados e ir ao dashboard
           await refetchUser();
           navigate('/dashboard');
           return;
         }
-        throw new Error(data.error || 'Erro ao iniciar trial');
+        throw new Error(data.error || t('plans.loadError'));
       }
 
-      // Trial criado com sucesso — atualizar dados do usuário e redirecionar
       await refetchUser();
       navigate('/dashboard');
     } catch (err: any) {
-      setError('Erro ao iniciar trial: ' + err.message);
+      setError(t('plans.trialError') + err.message);
     } finally {
       setTrialLoading(false);
     }
   };
 
+  // Helper: format plan features
+  const formatMonitors = (count: number) =>
+    count === 999 ? t('plans.unlimitedMonitors') : `${count} ${count === 1 ? t('plans.monitors', { count }) : t('plans.monitors_plural', { count })}`;
+
+  const formatSites = (count: number) =>
+    count === 999 ? t('plans.unlimitedSites') : `${count} ${count === 1 ? t('plans.sites', { count }) : t('plans.sites_plural', { count })}`;
+
+  const formatAlerts = (count: number) =>
+    count === 999 ? t('plans.unlimitedAlerts') : t('plans.alerts', { count });
+
   if (loading) {
     return (
       <PublicLayout maxWidth="container.xl">
-        <p>Carregando planos...</p>
+        <p>{t('plans.loading')}</p>
       </PublicLayout>
     );
   }
@@ -370,19 +355,15 @@ export const PlansPage: React.FC = () => {
     <PublicLayout maxWidth="container.xl" showNav={!user}>
       {/* Plans Section */}
       <section style={styles.plansSection}>
-        <h1 style={styles.title}>Escolha o plano ideal para você</h1>
-        <p style={styles.subtitle}>
-          Use o RadarOne gratuitamente por 7 dias ou assine um plano com 7 dias de garantia.
-        </p>
+        <h1 style={styles.title}>{t('plans.title')}</h1>
+        <p style={styles.subtitle}>{t('plans.subtitle')}</p>
 
-        {/* Mensagem orientativa sobre seleção */}
         {!selectedPlan && (
           <div style={styles.selectionHint}>
-            💡 <strong>Dica:</strong> Clique no card de um plano para selecioná-lo antes de aplicar cupom
+            💡 <strong>{t('plans.selectionHintPrefix')}</strong> {t('plans.selectionHint')}
           </div>
         )}
 
-        {/* Banner único de motivo de bloqueio (mutuamente exclusivos) */}
         {reason === 'trial_expired' ? (
           <div style={styles.trialExpiredBanner}>
             <p style={styles.trialExpiredText}>
@@ -399,50 +380,54 @@ export const PlansPage: React.FC = () => {
 
         {error && <div style={styles.error}>{error}</div>}
 
-        {/* Sucesso do cupom de Trial Upgrade - Mostrar no topo se aplicado */}
+        {/* Sucesso do cupom de Trial Upgrade */}
         {couponSuccess && (
           <div style={styles.couponSuccessBox}>
             <h3 style={styles.couponSuccessTitle}>
-              ✅ Cupom aplicado com sucesso!
+              ✅ {t('plans.couponSuccessTitle')}
             </h3>
             <p style={styles.couponSuccessText}>
-              Você ganhou acesso ao plano <strong>{couponSuccess.planName}</strong> por{' '}
-              <strong>{couponSuccess.daysGranted} dias</strong>!
+              {t('plans.couponSuccessMessage')
+                .replace('<strong>', '').replace('</strong>', '')
+                .replace('{{plan}}', couponSuccess.planName)
+                .replace('{{days}}', String(couponSuccess.daysGranted))}
             </p>
             <p style={styles.couponSuccessText}>
-              Válido até: <strong>{couponSuccess.endsAt.toLocaleDateString('pt-BR')}</strong>
+              {t('plans.couponValidUntil')
+                .replace('<strong>', '').replace('</strong>', '')
+                .replace('{{date}}', couponSuccess.endsAt.toLocaleDateString())}
             </p>
             <button
               onClick={() => navigate('/dashboard')}
               style={styles.couponSuccessButton}
             >
-              Ir para o Dashboard
+              {t('plans.couponGoDashboard')}
             </button>
           </div>
         )}
 
-        {/* Cupom de Desconto Validado - Mostrar no topo se validado */}
+        {/* Cupom de Desconto Validado */}
         {discountCouponData && (
           <div style={styles.discountCouponSuccessBox}>
             <h3 style={styles.discountCouponSuccessTitle}>
-              ✅ Cupom de desconto validado!
+              ✅ {t('plans.discountValidatedTitle')}
             </h3>
             <p style={styles.discountCouponSuccessText}>
               <strong>{discountCouponData.code}</strong>
               {discountCouponData.description && `: ${discountCouponData.description}`}
             </p>
             <p style={styles.discountCouponSuccessText}>
-              Desconto: <strong>
+              {t('plans.discountValue')} <strong>
                 {discountCouponData.discountType === 'PERCENTAGE'
                   ? `${discountCouponData.discountValue}%`
-                  : `R$ ${(discountCouponData.discountValue / 100).toFixed(2)}`}
+                  : formatDiscountValue(discountCouponData.discountValue, i18n.language)}
               </strong>
             </p>
             <p style={styles.discountCouponSuccessText}>
-              Válido para: <strong>{discountCouponData.appliesToPlan}</strong>
+              {t('plans.discountValidFor')} <strong>{discountCouponData.appliesToPlan}</strong>
             </p>
             <p style={styles.discountCouponInfo}>
-              👇 Escolha um plano abaixo para prosseguir com o desconto aplicado
+              👇 {t('plans.discountChooseBelow')}
             </p>
             <button
               onClick={() => {
@@ -451,7 +436,7 @@ export const PlansPage: React.FC = () => {
               }}
               style={styles.discountCouponClearButton}
             >
-              Limpar cupom
+              {t('plans.discountClear')}
             </button>
           </div>
         )}
@@ -469,10 +454,10 @@ export const PlansPage: React.FC = () => {
               }}
             >
               {plan.isRecommended && (
-                <div style={styles.recommendedBadge}>⭐ Recomendado</div>
+                <div style={styles.recommendedBadge}>⭐ {t('plans.recommended')}</div>
               )}
               {selectedPlan?.id === plan.id && (
-                <div style={styles.selectedBadge}>✓ Selecionado</div>
+                <div style={styles.selectedBadge}>✓ {t('plans.selected')}</div>
               )}
 
               <h2 style={styles.planName}>{plan.name}</h2>
@@ -480,38 +465,39 @@ export const PlansPage: React.FC = () => {
 
               <div style={styles.planPrice}>
                 {plan.priceCents === 0 ? (
-                  <>
-                    <span style={styles.priceValue}>Grátis por 7 dias</span>
-                  </>
-                ) : (
-                  <>
-                    <span style={styles.priceSymbol}>R$</span>
-                    <span style={styles.priceValue}>
-                      {(plan.priceCents / 100).toFixed(0)}
-                    </span>
-                    <span style={styles.pricePeriod}>/mês</span>
-                  </>
-                )}
+                  <span style={styles.priceValue}>{t('plans.free7Days')}</span>
+                ) : (() => {
+                  const price = formatPlanPrice(plan.priceCents, i18n.language);
+                  return (
+                    <>
+                      <span style={styles.priceSymbol}>{price.currency === 'USD' ? '$' : 'R$'}</span>
+                      <span style={styles.priceValue}>
+                        {price.currency === 'USD' ? price.value.toFixed(2) : price.value.toFixed(0)}
+                      </span>
+                      <span style={styles.pricePeriod}>{price.suffix}</span>
+                    </>
+                  );
+                })()}
               </div>
 
               {plan.trialDays > 0 && plan.priceCents > 0 && (
                 <div style={styles.trialBadge}>
-                  ✓ 7 dias de garantia
+                  ✓ {t('plans.trialBadge')}
                 </div>
               )}
 
               <ul style={styles.planFeatures}>
-                <li>✅ {plan.maxMonitors === 999 ? 'Monitores ilimitados' : `${plan.maxMonitors} ${plan.maxMonitors === 1 ? 'monitor' : 'monitores'}`}</li>
-                <li>✅ {plan.maxSites === 999 ? 'Sites ilimitados' : `${plan.maxSites} ${plan.maxSites === 1 ? 'site' : 'sites diferentes'}`}</li>
-                <li>✅ {plan.maxAlertsPerDay === 999 ? 'Alertas ilimitados' : `Até ${plan.maxAlertsPerDay} alertas/dia`}</li>
-                <li>✅ Verificação a cada {plan.checkInterval} minutos</li>
-                <li>✅ Telegram + Email</li>
+                <li>✅ {formatMonitors(plan.maxMonitors)}</li>
+                <li>✅ {formatSites(plan.maxSites)}</li>
+                <li>✅ {formatAlerts(plan.maxAlertsPerDay)}</li>
+                <li>✅ {t('plans.interval', { minutes: plan.checkInterval })}</li>
+                <li>✅ {t('plans.channels')}</li>
               </ul>
 
               {plan.priceCents === 0 && (
                 <div style={styles.warningBox}>
                   <p style={styles.warningText}>
-                    ⚠️ Após 7 dias, é necessário assinar um plano para continuar usando o RadarOne.
+                    ⚠️ {t('plans.freeWarning')}
                   </p>
                 </div>
               )}
@@ -526,20 +512,23 @@ export const PlansPage: React.FC = () => {
                 }}
               >
                 {trialLoading && plan.priceCents === 0
-                  ? 'Iniciando trial...'
+                  ? t('plans.startingTrial')
                   : plan.priceCents === 0
-                  ? 'Usar grátis por 7 dias'
+                  ? t('plans.startTrial')
                   : discountCouponData
-                  ? `Assinar com ${discountCouponData.discountType === 'PERCENTAGE' ? discountCouponData.discountValue + '% OFF' : 'desconto'}`
-                  : 'Assinar agora'}
+                  ? t('plans.subscribeWithDiscount', {
+                      discount: discountCouponData.discountType === 'PERCENTAGE'
+                        ? discountCouponData.discountValue + '% OFF'
+                        : t('plans.discountValue').replace(':', '').trim()
+                    })
+                  : t('plans.subscribe')}
               </button>
             </div>
           ))}
         </div>
 
-        {/* SEÇÕES DE CUPOM - Agora abaixo dos planos */}
+        {/* SEÇÕES DE CUPOM */}
         <div style={styles.couponsContainer}>
-          {/* Seção de Cupom de Trial Upgrade (sempre visível se não aplicado) */}
           {!couponSuccess && (
             <div style={styles.couponSection}>
               <h3 style={styles.couponTitle}>{getABMessage('couponUpgradeTitle')}</h3>
@@ -548,14 +537,14 @@ export const PlansPage: React.FC = () => {
               </p>
               {!user && (
                 <div style={styles.loginWarning}>
-                  ℹ️ <strong>Atenção:</strong> Você precisa estar logado para aplicar este cupom.{' '}
-                  <a href="/login" style={styles.loginLink}>{AUTH_LABELS.LOGIN_CTA}</a>
+                  ℹ️ <strong>{t('plans.couponLoginWarning')}</strong>{' '}
+                  <a href="/login" style={styles.loginLink}>{t('public.login')}</a>
                 </div>
               )}
               <div style={styles.couponInputGroup}>
                 <input
                   type="text"
-                  placeholder="Digite o código do cupom"
+                  placeholder={t('plans.couponPlaceholder')}
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                   style={styles.couponInput}
@@ -569,7 +558,7 @@ export const PlansPage: React.FC = () => {
                     ...(couponLoading || !couponCode.trim() ? styles.couponButtonDisabled : {})
                   }}
                 >
-                  {couponLoading ? 'Aplicando...' : 'Aplicar cupom'}
+                  {couponLoading ? t('plans.couponApplying') : t('plans.couponApply')}
                 </button>
               </div>
               {couponError && (
@@ -580,7 +569,6 @@ export const PlansPage: React.FC = () => {
             </div>
           )}
 
-          {/* Seção de Cupom de Desconto (DISCOUNT) - sempre visível se não validado */}
           {!discountCouponData && (
             <div style={styles.discountCouponSection}>
               <h3 style={styles.discountCouponTitle}>{getABMessage('couponDiscountTitle')}</h3>
@@ -590,7 +578,7 @@ export const PlansPage: React.FC = () => {
               <div style={styles.couponInputGroup}>
                 <input
                   type="text"
-                  placeholder="Digite o código do cupom"
+                  placeholder={t('plans.couponPlaceholder')}
                   value={discountCouponCode}
                   onChange={(e) => setDiscountCouponCode(e.target.value.toUpperCase())}
                   style={styles.couponInput}
@@ -604,7 +592,7 @@ export const PlansPage: React.FC = () => {
                     ...(discountCouponLoading || !discountCouponCode.trim() ? styles.couponButtonDisabled : {})
                   }}
                 >
-                  {discountCouponLoading ? 'Validando...' : 'Validar cupom'}
+                  {discountCouponLoading ? t('plans.discountValidating') : t('plans.discountValidate')}
                 </button>
               </div>
               {discountCouponError && (
@@ -619,10 +607,10 @@ export const PlansPage: React.FC = () => {
         {/* Informações sobre planos */}
         <div style={styles.planInfoText}>
           <p style={{margin: 0, marginBottom: '4px'}}>
-            Todos os planos podem ser cancelados a qualquer momento.
+            {t('plans.cancelAnytime')}
           </p>
           <p style={{margin: 0}}>
-            Planos pagos contam com 7 dias de garantia.
+            {t('plans.guarantee')}
           </p>
         </div>
       </section>
@@ -632,8 +620,6 @@ export const PlansPage: React.FC = () => {
 
 const styles = {
   plansSection: {
-    // Container e padding já são controlados pelo PublicLayout
-    // Apenas adiciona padding vertical para espaçamento interno
     paddingTop: responsive.spacing.lg,
     paddingBottom: responsive.spacing.lg,
     position: 'relative' as const,
@@ -671,7 +657,6 @@ const styles = {
   plansGrid: {
     display: 'grid',
     gap: 'clamp(16px, 3vw, 24px)',
-    // Grid responsivo: 1 coluna no mobile, 2-3 colunas no desktop (baseado na largura mínima de 320px)
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
     marginBottom: responsive.spacing.xl,
   },
@@ -781,7 +766,6 @@ const styles = {
   planButtonRecommended: {
     backgroundColor: '#3b82f6',
   },
-  // Container para seções de cupom (abaixo dos planos)
   couponsContainer: {
     marginTop: responsive.spacing.xxl,
     marginBottom: responsive.spacing.xl,
@@ -789,7 +773,6 @@ const styles = {
     flexDirection: 'column' as const,
     gap: responsive.spacing.lg,
   },
-  // Texto informativo sobre planos (footer do layout cuida dos links)
   planInfoText: {
     textAlign: 'center' as const,
     color: '#6b7280',
@@ -812,7 +795,6 @@ const styles = {
     color: '#92400e',
     margin: 0,
   },
-  // Banner fixo para mostrar motivo do bloqueio (reason da URL)
   reasonBannerFixed: {
     backgroundColor: '#fef3c7',
     border: '2px solid #f59e0b',
@@ -828,7 +810,6 @@ const styles = {
     color: '#92400e',
     margin: 0,
   },
-  // Estilos do cupom de trial upgrade
   couponSection: {
     backgroundColor: '#f0f9ff',
     border: '2px solid #3b82f6',
@@ -926,7 +907,6 @@ const styles = {
     marginTop: responsive.spacing.md,
     minWidth: '200px',
   },
-  // Estilos do cupom de desconto (DISCOUNT)
   discountCouponSection: {
     backgroundColor: '#fef3c7',
     border: '2px solid #f59e0b',
