@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container } from '@chakra-ui/react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
 import { TELEGRAM_BOT_USERNAME, TELEGRAM_BOT_LINK } from '../constants/app';
 import * as responsive from '../styles/responsive';
-
-/**
- * Configurações de Notificações
- */
 
 interface NotificationSettings {
   emailEnabled: boolean;
@@ -28,6 +25,7 @@ interface LinkCodeData {
 
 export const NotificationSettingsPage: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,6 +33,7 @@ export const NotificationSettingsPage: React.FC = () => {
   const [success, setSuccess] = useState('');
 
   const [emailEnabled, setEmailEnabled] = useState(true);
+  const [telegramEnabled, setTelegramEnabled] = useState(false);
   const [telegramUsername, setTelegramUsername] = useState('');
   const [showLinkCodeModal, setShowLinkCodeModal] = useState(false);
   const [linkCodeData, setLinkCodeData] = useState<LinkCodeData | null>(null);
@@ -53,6 +52,7 @@ export const NotificationSettingsPage: React.FC = () => {
       });
       setSettings(data);
       setEmailEnabled(data.emailEnabled !== false);
+      setTelegramEnabled(data.telegramEnabled === true);
       setTelegramUsername(data.telegramUsername || '');
     } catch (err: any) {
       const isDev = import.meta.env.DEV;
@@ -62,9 +62,9 @@ export const NotificationSettingsPage: React.FC = () => {
           status: err.status,
           message: err.message
         });
-        setError(`Erro ao carregar configurações (${err.status || 'Network'}). Ver console.`);
+        setError(`${t('notification.errorLoad')} (${err.status || 'Network'})`);
       } else {
-        setError('Erro ao carregar configurações. Tente novamente.');
+        setError(t('notification.errorLoad'));
       }
     } finally {
       setLoading(false);
@@ -77,8 +77,8 @@ export const NotificationSettingsPage: React.FC = () => {
     setSuccess('');
 
     // Validação client-side: pelo menos 1 canal deve estar ativo
-    if (!emailEnabled && !settings?.telegramChatId) {
-      setError('Vincule o Telegram antes de desabilitar e-mail. Pelo menos 1 canal de notificação deve estar ativo.');
+    if (!emailEnabled && !telegramEnabled) {
+      setError(t('notification.validationAtLeastOne'));
       setSaving(false);
       return;
     }
@@ -87,9 +87,10 @@ export const NotificationSettingsPage: React.FC = () => {
       await api.put('/api/notifications/settings', {
         telegramUsername: telegramUsername.trim() || null,
         emailEnabled,
+        telegramEnabled,
       });
 
-      setSuccess('Configurações salvas com sucesso!');
+      setSuccess(t('notification.saved'));
       loadSettings();
     } catch (err: any) {
       const isDev = import.meta.env.DEV;
@@ -100,7 +101,7 @@ export const NotificationSettingsPage: React.FC = () => {
           message: err.message
         });
       }
-      setError(err.message || 'Erro ao salvar configurações');
+      setError(err.message || t('notification.errorSave'));
     } finally {
       setSaving(false);
     }
@@ -115,7 +116,7 @@ export const NotificationSettingsPage: React.FC = () => {
       setLinkCodeData(data);
       setShowLinkCodeModal(true);
     } catch (err: any) {
-      setError(err.message || 'Erro ao gerar código de vínculo');
+      setError(err.message || t('notification.errorLinkCode'));
     } finally {
       setGeneratingCode(false);
     }
@@ -128,9 +129,9 @@ export const NotificationSettingsPage: React.FC = () => {
 
     try {
       await api.post('/api/notifications/test-telegram', {});
-      setSuccess('Mensagem de teste enviada para o Telegram!');
+      setSuccess(t('notification.testSent'));
     } catch (err: any) {
-      setError(err.message || 'Erro ao enviar mensagem de teste');
+      setError(err.message || t('notification.errorTestTelegram'));
     } finally {
       setTestingTelegram(false);
     }
@@ -139,14 +140,14 @@ export const NotificationSettingsPage: React.FC = () => {
   const copyCode = () => {
     if (linkCodeData) {
       navigator.clipboard.writeText(linkCodeData.code);
-      setSuccess('Código copiado!');
+      setSuccess(t('notification.codeCopied'));
     }
   };
 
   if (loading) {
     return (
       <AppLayout>
-        <p>Carregando...</p>
+        <p>{t('notification.loading')}</p>
       </AppLayout>
     );
   }
@@ -156,16 +157,14 @@ export const NotificationSettingsPage: React.FC = () => {
       <Container maxW="container.xl" py={{ base: 6, md: 10 }}>
       <div style={styles.breadcrumb}>
         <Link to="/dashboard" style={styles.breadcrumbLink}>
-          Dashboard
+          {t('common.dashboard')}
         </Link>
         <span style={styles.breadcrumbSeparator}>/</span>
-        <span style={styles.breadcrumbCurrent}>Configurações de Notificações</span>
+        <span style={styles.breadcrumbCurrent}>{t('notification.breadcrumb')}</span>
       </div>
 
-      <h1 style={styles.title}>Configurações de Notificações</h1>
-      <p style={styles.subtitle}>
-        Configure como você quer receber os alertas de novos anúncios
-      </p>
+      <h1 style={styles.title}>{t('notification.title')}</h1>
+      <p style={styles.subtitle}>{t('notification.subtitle')}</p>
 
       {error && (
         <div style={styles.error}>
@@ -177,7 +176,7 @@ export const NotificationSettingsPage: React.FC = () => {
             }}
             style={styles.retryButton}
           >
-            Tentar novamente
+            {t('notification.tryAgain')}
           </button>
         </div>
       )}
@@ -186,12 +185,12 @@ export const NotificationSettingsPage: React.FC = () => {
       {settings && (
         <div style={styles.card}>
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Canal de notificação</h2>
+            <h2 style={styles.sectionTitle}>{t('notification.channelTitle')}</h2>
 
             {/* Email - Toggle */}
             <div style={styles.infoRow}>
               <div>
-                <div style={styles.channelTitle}>E-mail</div>
+                <div style={styles.channelTitle}>{t('notification.email')}</div>
                 <div style={styles.channelSubtitle}>{user?.email}</div>
               </div>
               <label style={styles.toggleLabel}>
@@ -202,38 +201,55 @@ export const NotificationSettingsPage: React.FC = () => {
                   style={styles.toggleCheckbox}
                 />
                 <span style={emailEnabled ? styles.badgeActive : styles.badgeInactive}>
-                  {emailEnabled ? 'Ativo' : 'Desativado'}
+                  {emailEnabled ? t('notification.active') : t('notification.disabled')}
                 </span>
               </label>
             </div>
 
-            {/* Telegram - Opcional */}
+            {/* Telegram - Toggle */}
             <div style={styles.infoRow}>
               <div style={{ flex: 1 }}>
-                <div style={styles.channelTitle}>Telegram (opcional)</div>
-                {settings.telegramEnabled && settings.telegramUsername ? (
+                <div style={styles.channelTitle}>{t('notification.telegram')}</div>
+                {settings.telegramUsername ? (
                   <div style={styles.channelSubtitle}>
-                    Configurado: {settings.telegramUsername}
+                    {t('notification.configured')}: {settings.telegramUsername}
                     {settings.telegramChatId && (
-                      <span style={styles.badgeConnected}> Vinculado</span>
+                      <span style={styles.badgeConnected}> {t('notification.linked')}</span>
                     )}
                   </div>
                 ) : (
-                  <div style={styles.channelSubtitle}>Não configurado</div>
+                  <div style={styles.channelSubtitle}>{t('notification.notConfigured')}</div>
+                )}
+                {/* Aviso: ativado mas sem vínculo */}
+                {telegramEnabled && !settings.telegramChatId && (
+                  <div style={styles.warningText}>
+                    {t('notification.warningLinkTelegram')}
+                  </div>
                 )}
               </div>
+              <label style={styles.toggleLabel}>
+                <input
+                  type="checkbox"
+                  checked={telegramEnabled}
+                  onChange={(e) => setTelegramEnabled(e.target.checked)}
+                  style={styles.toggleCheckbox}
+                />
+                <span style={telegramEnabled ? styles.badgeActive : styles.badgeInactive}>
+                  {telegramEnabled ? t('notification.active') : t('notification.disabled')}
+                </span>
+              </label>
             </div>
           </div>
 
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Configurar Telegram</h2>
+            <h2 style={styles.sectionTitle}>{t('notification.setupTelegram')}</h2>
 
             <div style={styles.infoBox}>
-              <p style={styles.infoTitle}>Como conectar o Telegram</p>
+              <p style={styles.infoTitle}>{t('notification.howToConnect')}</p>
               <ol style={styles.stepsList}>
-                <li>Digite seu @username do Telegram abaixo</li>
+                <li>{t('notification.step1')}</li>
                 <li>
-                  Abra o Telegram e fale com{' '}
+                  {t('notification.step2')}{' '}
                   <a
                     href={TELEGRAM_BOT_LINK}
                     target="_blank"
@@ -243,30 +259,30 @@ export const NotificationSettingsPage: React.FC = () => {
                     @{TELEGRAM_BOT_USERNAME}
                   </a>
                 </li>
-                <li>Digite /start para vincular sua conta</li>
-                <li>Pronto! Você receberá alertas por e-mail E Telegram</li>
+                <li>{t('notification.step3')}</li>
+                <li>{t('notification.step4')}</li>
               </ol>
             </div>
 
             <div style={styles.field}>
               <label style={styles.label}>
-                Seu @username do Telegram
+                {t('notification.usernameLabel')}
               </label>
               <input
                 type="text"
                 value={telegramUsername}
                 onChange={(e) => setTelegramUsername(e.target.value)}
                 style={styles.input}
-                placeholder="@seunome"
+                placeholder={t('notification.usernamePlaceholder')}
               />
               <p style={styles.hint}>
-                Deixe vazio para desabilitar notificações por Telegram
+                {t('notification.usernameHint')}
               </p>
             </div>
 
             <div style={styles.buttons}>
               <button onClick={handleSave} disabled={saving} style={styles.saveButton}>
-                {saving ? 'Salvando...' : 'Salvar configurações'}
+                {saving ? t('notification.saving') : t('notification.save')}
               </button>
             </div>
 
@@ -278,7 +294,7 @@ export const NotificationSettingsPage: React.FC = () => {
                   disabled={generatingCode}
                   style={styles.linkButton}
                 >
-                  {generatingCode ? 'Gerando código...' : 'Vincular Telegram'}
+                  {generatingCode ? t('notification.generatingCode') : t('notification.linkTelegram')}
                 </button>
               </div>
             )}
@@ -291,7 +307,7 @@ export const NotificationSettingsPage: React.FC = () => {
                   disabled={testingTelegram}
                   style={styles.testButton}
                 >
-                  {testingTelegram ? 'Enviando...' : 'Testar Telegram'}
+                  {testingTelegram ? t('notification.sending') : t('notification.testTelegram')}
                 </button>
               </div>
             )}
@@ -303,18 +319,18 @@ export const NotificationSettingsPage: React.FC = () => {
       {showLinkCodeModal && linkCodeData && (
         <div style={styles.modalOverlay} onClick={() => setShowLinkCodeModal(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>Vincular Telegram</h2>
+            <h2 style={styles.modalTitle}>{t('notification.linkTitle')}</h2>
 
             <div style={styles.codeBox}>
-              <div style={styles.codeLabel}>Seu código:</div>
+              <div style={styles.codeLabel}>{t('notification.yourCode')}</div>
               <div style={styles.codeValue}>{linkCodeData.code}</div>
               <button onClick={copyCode} style={styles.copyButton}>
-                Copiar código
+                {t('notification.copyCode')}
               </button>
             </div>
 
             <div style={styles.instructionsBox}>
-              <p style={styles.instructionsTitle}>Como vincular:</p>
+              <p style={styles.instructionsTitle}>{t('notification.howToLink')}</p>
               <ol style={styles.instructionsList}>
                 {linkCodeData.instructions.map((instruction, index) => (
                   <li key={index}>{instruction}</li>
@@ -326,7 +342,7 @@ export const NotificationSettingsPage: React.FC = () => {
               onClick={() => setShowLinkCodeModal(false)}
               style={styles.closeButton}
             >
-              Fechar
+              {t('notification.close')}
             </button>
           </div>
         </div>
@@ -409,6 +425,12 @@ const styles = {
   },
   channelSubtitle: {
     ...responsive.typography.small,
+  },
+  warningText: {
+    ...responsive.typography.small,
+    color: '#d97706',
+    marginTop: responsive.spacing.xs,
+    fontStyle: 'italic' as const,
   },
   toggleLabel: {
     display: 'flex',

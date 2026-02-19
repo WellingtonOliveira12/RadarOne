@@ -67,7 +67,7 @@ export class NotificationController {
   static async updateSettings(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.userId;
-      const { telegramUsername, emailEnabled } = req.body;
+      const { telegramUsername, emailEnabled, telegramEnabled: rawTelegramEnabled } = req.body;
 
       if (!userId) {
         res.status(401).json({ error: 'Não autenticado' });
@@ -75,46 +75,42 @@ export class NotificationController {
       }
 
       const newEmailEnabled = emailEnabled !== undefined ? Boolean(emailEnabled) : true;
+      const newTelegramEnabled = rawTelegramEnabled !== undefined ? Boolean(rawTelegramEnabled) : false;
 
-      logInfo('Atualizando configurações de notificação', { userId, telegramUsername, emailEnabled: newEmailEnabled });
+      logInfo('Atualizando configurações de notificação', {
+        userId, telegramUsername, emailEnabled: newEmailEnabled, telegramEnabled: newTelegramEnabled,
+      });
 
-      // Validação server-side: se desabilitar email, precisa ter Telegram ativo
-      if (!newEmailEnabled) {
-        const activeTelegram = await prisma.telegramAccount.findFirst({
-          where: { userId, active: true },
+      // Validação server-side: ao menos 1 canal deve estar ativo
+      if (!newEmailEnabled && !newTelegramEnabled) {
+        res.status(400).json({
+          error: 'Pelo menos 1 canal de notificação deve estar ativo',
+          message: 'Ative e-mail ou Telegram antes de salvar.',
         });
-        if (!activeTelegram) {
-          res.status(400).json({
-            error: 'Pelo menos 1 canal de notificação deve estar ativo',
-            message: 'Vincule o Telegram antes de desabilitar e-mail.',
-          });
-          return;
-        }
+        return;
       }
 
-      // Validar e normalizar telegram username
-      let normalizedUsername: string | null = null;
-      let telegramEnabled = false;
+      // Validar e normalizar telegram username (se fornecido)
+      let normalizedUsername: string | null | undefined = undefined; // undefined = não alterar
+      if (telegramUsername !== undefined) {
+        if (telegramUsername && typeof telegramUsername === 'string' && telegramUsername.trim()) {
+          normalizedUsername = telegramUsername.trim();
+          if (!normalizedUsername.startsWith('@')) {
+            normalizedUsername = `@${normalizedUsername}`;
+          }
 
-      if (telegramUsername && typeof telegramUsername === 'string' && telegramUsername.trim()) {
-        // Remover espaços e adicionar @ se não tiver
-        normalizedUsername = telegramUsername.trim();
-        if (!normalizedUsername.startsWith('@')) {
-          normalizedUsername = `@${normalizedUsername}`;
+          const telegramRegex = /^@[a-zA-Z0-9_]{5,32}$/;
+          if (!telegramRegex.test(normalizedUsername)) {
+            res.status(400).json({
+              error: 'Telegram username inválido',
+              message: 'O username deve ter entre 5 e 32 caracteres (letras, números e underscore)'
+            });
+            return;
+          }
+          logInfo('Telegram username validado', { normalizedUsername });
+        } else {
+          normalizedUsername = null;
         }
-
-        // Validar formato básico (letras, números, underscore)
-        const telegramRegex = /^@[a-zA-Z0-9_]{5,32}$/;
-        if (!telegramRegex.test(normalizedUsername)) {
-          res.status(400).json({
-            error: 'Telegram username inválido',
-            message: 'O username deve ter entre 5 e 32 caracteres (letras, números e underscore)'
-          });
-          return;
-        }
-
-        telegramEnabled = true;
-        logInfo('Telegram username validado', { normalizedUsername });
       }
 
       // Buscar configurações existentes
@@ -122,32 +118,33 @@ export class NotificationController {
         where: { userId }
       });
 
+      // Dados para update — NÃO limpar chatId/username ao desativar (apenas pausar)
+      const updateData: any = {
+        emailEnabled: newEmailEnabled,
+        telegramEnabled: newTelegramEnabled,
+      };
+      if (normalizedUsername !== undefined) {
+        updateData.telegramUsername = normalizedUsername;
+      }
+
       if (settings) {
-        // Atualizar existente
         settings = await prisma.notificationSettings.update({
           where: { userId },
-          data: {
-            emailEnabled: newEmailEnabled,
-            telegramEnabled,
-            telegramUsername: normalizedUsername,
-            // Se telegram desabilitado, limpar chatId também
-            telegramChatId: telegramEnabled ? settings.telegramChatId : null
-          }
+          data: updateData,
         });
       } else {
-        // Criar novo
         settings = await prisma.notificationSettings.create({
           data: {
             userId,
             emailEnabled: newEmailEnabled,
-            telegramEnabled,
-            telegramUsername: normalizedUsername,
-            telegramChatId: null
-          }
+            telegramEnabled: newTelegramEnabled,
+            telegramUsername: normalizedUsername ?? null,
+            telegramChatId: null,
+          },
         });
       }
 
-      logInfo('Configurações de notificação atualizadas', { userId, telegramEnabled });
+      logInfo('Configurações de notificação atualizadas', { userId, telegramEnabled: newTelegramEnabled });
 
       res.json({
         message: 'Configurações atualizadas com sucesso',
