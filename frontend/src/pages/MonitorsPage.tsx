@@ -9,6 +9,7 @@ import { trackMonitorCreated } from '../lib/analytics';
 import { TrialBanner } from '../components/TrialBanner';
 import { AppLayout } from '../components/AppLayout';
 import { getCountryList } from '../utils/countries';
+import { getSiteDefaultUrl, isDefaultUrl } from '../constants/siteDefaults';
 import * as responsive from '../styles/responsive';
 
 type MonitorSite =
@@ -119,6 +120,9 @@ export function MonitorsPage() {
 
   // Filtros estruturados (sem city/state — ficam só em Localização)
   const [filters, setFilters] = useState<StructuredFilters>({ ...DEFAULT_FILTERS });
+
+  // Dirty flag: true se o usuário editou manualmente a URL base
+  const [urlBaseManuallyEdited, setUrlBaseManuallyEdited] = useState(false);
 
   // Lista de países (reativa ao idioma)
   const countryList = getCountryList(i18n.language);
@@ -233,6 +237,9 @@ export function MonitorsPage() {
         body.searchUrl = searchUrl;
       } else {
         body.filtersJson = filters;
+        // Extrair preços para top-level (worker usa monitor.priceMin/priceMax)
+        if (filters.minPrice != null) body.priceMin = filters.minPrice;
+        if (filters.maxPrice != null) body.priceMax = filters.maxPrice;
         if (searchUrl) {
           body.searchUrl = searchUrl;
         }
@@ -272,6 +279,7 @@ export function MonitorsPage() {
     setStateRegion('');
     setCity('');
     setFilters({ ...DEFAULT_FILTERS });
+    setUrlBaseManuallyEdited(false);
   }
 
   function handleEdit(monitor: Monitor) {
@@ -382,7 +390,18 @@ export function MonitorsPage() {
             <label style={styles.label}>{t('monitors.site')}</label>
             <select
               value={site}
-              onChange={(e) => setSite(e.target.value as MonitorSite)}
+              onChange={(e) => {
+                const newSite = e.target.value as MonitorSite;
+                setSite(newSite);
+                // Auto-preencher URL base em modo filtros, se não editado manualmente
+                if (mode === 'STRUCTURED_FILTERS' && !urlBaseManuallyEdited) {
+                  setSearchUrl(getSiteDefaultUrl(newSite));
+                } else if (mode === 'STRUCTURED_FILTERS' && urlBaseManuallyEdited && isDefaultUrl(searchUrl)) {
+                  // Se o valor atual ainda é um default de outro site, auto-preencher
+                  setSearchUrl(getSiteDefaultUrl(newSite));
+                  setUrlBaseManuallyEdited(false);
+                }
+              }}
               required
               style={styles.input}
             >
@@ -457,7 +476,13 @@ export function MonitorsPage() {
                   type="radio"
                   name="mode"
                   checked={mode === 'STRUCTURED_FILTERS'}
-                  onChange={() => setMode('STRUCTURED_FILTERS')}
+                  onChange={() => {
+                    setMode('STRUCTURED_FILTERS');
+                    // Auto-preencher URL base se não editado manualmente
+                    if (!urlBaseManuallyEdited && (!searchUrl || isDefaultUrl(searchUrl))) {
+                      setSearchUrl(getSiteDefaultUrl(site));
+                    }
+                  }}
                   style={styles.radio}
                 />
                 <span>
@@ -640,9 +665,12 @@ export function MonitorsPage() {
                 <input
                   type="url"
                   value={searchUrl}
-                  onChange={(e) => setSearchUrl(e.target.value)}
+                  onChange={(e) => {
+                    setSearchUrl(e.target.value);
+                    setUrlBaseManuallyEdited(true);
+                  }}
                   style={styles.input}
-                  placeholder="https://www.olx.com.br/"
+                  placeholder={getSiteDefaultUrl(site) || 'https://...'}
                 />
                 <p style={styles.helpText}>{t('monitors.baseUrlHint')}</p>
               </div>
