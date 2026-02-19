@@ -95,7 +95,7 @@ export async function createMonitor(
 ): Promise<void> {
   try {
     const userId = req.userId;
-    const { name, site, searchUrl, priceMin, priceMax, country: rawCountry, stateRegion: rawState, city: rawCity } = req.body;
+    const { name, site, searchUrl, priceMin, priceMax, mode, filtersJson, country: rawCountry, stateRegion: rawState, city: rawCity } = req.body;
 
     if (!userId) {
       res.status(401).json({ error: 'Não autorizado' });
@@ -103,7 +103,8 @@ export async function createMonitor(
     }
 
     // Validação de campos obrigatórios
-    if (!name || !site || !searchUrl) {
+    // searchUrl é opcional em STRUCTURED_FILTERS (worker usa default URL)
+    if (!name || !site || (!searchUrl && mode !== 'STRUCTURED_FILTERS')) {
       res.status(400).json({
         error: 'Erro de validação',
         message: 'Nome, site e URL de busca são obrigatórios',
@@ -162,9 +163,11 @@ export async function createMonitor(
     const monitor = await monitorService.createMonitor(userId, {
       name,
       site,
-      searchUrl,
+      searchUrl: searchUrl || undefined,
       priceMin,
       priceMax,
+      mode: mode || 'URL_ONLY',
+      filtersJson: filtersJson || undefined,
       country,
       stateRegion,
       city,
@@ -219,7 +222,7 @@ export async function updateMonitor(
   try {
     const userId = req.userId;
     const { id } = req.params;
-    const { name, site, searchUrl, priceMin, priceMax, active, country: rawCountry, stateRegion: rawState, city: rawCity } = req.body;
+    const { name, site, searchUrl, priceMin, priceMax, active, mode, filtersJson, country: rawCountry, stateRegion: rawState, city: rawCity } = req.body;
 
     if (!userId) {
       res.status(401).json({ error: 'Não autorizado' });
@@ -295,6 +298,8 @@ export async function updateMonitor(
       priceMin,
       priceMax,
       active,
+      mode,
+      filtersJson,
       country,
       stateRegion,
       city,

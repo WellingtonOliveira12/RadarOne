@@ -149,6 +149,26 @@ export class MonitorRunner {
         ? await circuitBreaker.executeForUser(monitor.site, monitor.userId, () => this.scrape(monitor))
         : await circuitBreaker.execute(monitor.site, () => this.scrape(monitor));
 
+      // Log de filtros aplicados e diagnóstico
+      const diagData = (monitor as any).__lastDiagnosis;
+      if (diagData?.metrics) {
+        const m = diagData.metrics;
+        log.info('FILTER_SUMMARY', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          adsRaw: m.adsRaw,
+          adsValid: m.adsValid,
+          skippedReasons: m.skippedReasons,
+          filters: {
+            priceMin: monitor.priceMin ?? null,
+            priceMax: monitor.priceMax ?? null,
+            country: (monitor as any).country ?? null,
+            stateRegion: (monitor as any).stateRegion ?? null,
+            city: (monitor as any).city ?? null,
+          },
+        });
+      }
+
       // Processa anúncios
       const newAds = await this.processAds(monitor.id, ads);
 

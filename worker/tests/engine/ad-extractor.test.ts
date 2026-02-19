@@ -222,6 +222,160 @@ describe('extractAds', () => {
     expect(result.skippedReasons).toHaveProperty('no_url', 1);
   });
 
+  // ──── Price filter tests ────
+
+  it('should skip ads below priceMin', async () => {
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/100/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Item Barato' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 50' },
+        },
+      }),
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/101/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Item Caro' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 500' },
+        },
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    const monitorWithPrice = { ...testMonitor, priceMin: 100 };
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', testConfig, monitorWithPrice);
+
+    expect(result.adsRaw).toBe(2);
+    expect(result.ads).toHaveLength(1);
+    expect(result.ads[0].title).toBe('Item Caro');
+    expect(result.skippedReasons).toHaveProperty('price_below_min', 1);
+  });
+
+  it('should skip ads above priceMax', async () => {
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/200/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Item Caro' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 5.000' },
+        },
+      }),
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/201/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Item OK' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 200' },
+        },
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    const monitorWithPrice = { ...testMonitor, priceMax: 1000 };
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', testConfig, monitorWithPrice);
+
+    expect(result.adsRaw).toBe(2);
+    expect(result.ads).toHaveLength(1);
+    expect(result.ads[0].title).toBe('Item OK');
+    expect(result.skippedReasons).toHaveProperty('price_above_max', 1);
+  });
+
+  it('should pass ads with price=0 through price filter (unparseable price)', async () => {
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/300/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Doação' },
+          'span[class*="x193iq5w"]': { textContent: 'Grátis' }, // priceParser returns 0
+        },
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    const monitorWithPrice = { ...testMonitor, priceMin: 100, priceMax: 5000 };
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', testConfig, monitorWithPrice);
+
+    // price=0 bypasses both min and max checks (guard: price > 0)
+    expect(result.ads).toHaveLength(1);
+    expect(result.ads[0].price).toBe(0);
+  });
+
+  // ──── Location filter tests ────
+
+  it('should skip ads that fail location filter', async () => {
+    const locationConfig: SiteConfig = {
+      ...testConfig,
+      selectors: {
+        ...testConfig.selectors,
+        location: ['span.location'],
+      },
+    };
+
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/400/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Item SP' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 100' },
+          'span.location': { textContent: 'São Paulo, SP' },
+        },
+      }),
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/401/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Item NY' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 200' },
+          'span.location': { textContent: 'New York, NY' },
+        },
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    const monitorWithLocation = { ...testMonitor, country: 'BR' };
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', locationConfig, monitorWithLocation);
+
+    expect(result.adsRaw).toBe(2);
+    expect(result.ads).toHaveLength(1);
+    expect(result.ads[0].title).toBe('Item SP');
+    expect(result.skippedReasons).toHaveProperty('location_country_mismatch', 1);
+  });
+
+  it('should not apply location filter when country is null', async () => {
+    const locationConfig: SiteConfig = {
+      ...testConfig,
+      selectors: {
+        ...testConfig.selectors,
+        location: ['span.location'],
+      },
+    };
+
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/500/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Item Anywhere' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 100' },
+          'span.location': { textContent: 'Tokyo, Japan' },
+        },
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    // country is undefined/null → no location filtering
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', locationConfig, testMonitor);
+
+    expect(result.ads).toHaveLength(1);
+    expect(result.skippedReasons).not.toHaveProperty('location_country_mismatch');
+  });
+
   it('should fallback to el.querySelector("a") for div containers with no linkSel match', async () => {
     // Simulate a div container where the link selector doesn't match,
     // but there's a generic <a> tag available

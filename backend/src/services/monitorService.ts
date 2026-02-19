@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import { MonitorSite } from '@prisma/client';
+import { MonitorSite, MonitorMode } from '@prisma/client';
 import { canUserCreateMonitor, canUserUseSite } from './planService';
 
 /**
@@ -15,9 +15,11 @@ import { canUserCreateMonitor, canUserUseSite } from './planService';
 export interface CreateMonitorInput {
   name: string;
   site: MonitorSite;
-  searchUrl: string;
+  searchUrl?: string;
   priceMin?: number;
   priceMax?: number;
+  mode?: MonitorMode;
+  filtersJson?: any;
   country?: string | null;
   stateRegion?: string | null;
   city?: string | null;
@@ -30,6 +32,8 @@ export interface UpdateMonitorInput {
   priceMin?: number;
   priceMax?: number;
   active?: boolean;
+  mode?: MonitorMode;
+  filtersJson?: any;
   country?: string | null;
   stateRegion?: string | null;
   city?: string | null;
@@ -106,7 +110,8 @@ export async function createMonitor(
     }
 
     // Validação 3: Valida campos obrigatórios
-    if (!data.name || !data.site || !data.searchUrl) {
+    // searchUrl é opcional em STRUCTURED_FILTERS (worker usa default URL)
+    if (!data.name || !data.site || (!data.searchUrl && data.mode !== 'STRUCTURED_FILTERS')) {
       throw new Error('Nome, site e URL de busca são obrigatórios');
     }
 
@@ -126,7 +131,9 @@ export async function createMonitor(
         searchUrl: data.searchUrl,
         priceMin: data.priceMin,
         priceMax: data.priceMax,
-        country: data.country || 'BR',
+        mode: data.mode || 'URL_ONLY',
+        filtersJson: data.filtersJson,
+        country: data.country ?? null,
         stateRegion: data.stateRegion,
         city: data.city,
         active: true, // Novo monitor inicia ativo
@@ -199,6 +206,8 @@ export async function updateMonitor(
         priceMin: data.priceMin,
         priceMax: data.priceMax,
         active: data.active,
+        mode: data.mode,
+        filtersJson: data.filtersJson,
         country: data.country,
         stateRegion: data.stateRegion,
         city: data.city,
