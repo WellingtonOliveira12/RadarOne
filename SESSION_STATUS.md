@@ -1,13 +1,95 @@
 # RadarOne - Status do Projeto
 
-> **Última atualização**: 2026-02-18 22:00 UTC
+> **Última atualização**: 2026-02-18 23:30 UTC
 > **Branch**: `main`
-> **Último commit**: pendente (PR em construção)
+> **Último commit**: `8869ed0` feat(monitors): global country list + remove redundant filters
 > **Deploy Render**: Live (worker + backend)
 
 ---
 
-## PR: Email Opcional + Default URL + Filtro Localização Global (2026-02-18)
+## PR: Produto Global — i18n + Notificações + Países + Filtros (2026-02-18)
+
+### Resumo
+
+4 melhorias para evolução do RadarOne para produto global, em 3 commits:
+
+| # | Feature | Arquivos | Migration | Risco |
+|---|---------|----------|-----------|-------|
+| 1 | **i18n PT/EN/ES** — react-i18next + LanguageSwitcher com bandeiras na navbar | 9 (6 novos + 3 mod) | Não | Baixo |
+| 2 | **Telegram toggle** — pausar sem desconectar + validação "ao menos 1 canal" | 2 modificados | Não | Baixo |
+| 3 | **Países global** — select com 249 nações (i18n-iso-countries) + remove filtros duplicados | 10 (2 novos + 8 mod) | Sim (ALTER COLUMN) | Médio |
+
+### Commits
+
+```
+54cb988 feat(i18n): add pt-BR/en/es translations + language switcher
+20c72ad feat(notifications): telegram toggle + channel validation
+8869ed0 feat(monitors): global country list + remove redundant filters
+```
+
+### Arquivos novos
+
+```
+frontend/src/i18n/config.ts                    # Configuração i18next (fallback pt-BR, localStorage)
+frontend/src/i18n/locales/pt-BR.json           # Traduções português
+frontend/src/i18n/locales/en.json              # Traduções inglês
+frontend/src/i18n/locales/es.json              # Traduções espanhol
+frontend/src/components/LanguageSwitcher.tsx    # Seletor 🇧🇷/🇺🇸/🇪🇸 (Chakra UI Menu)
+frontend/src/utils/countries.ts                # Helper i18n-iso-countries (pt-BR→pt mapping)
+backend/prisma/migrations/20260218200000_make_country_nullable/migration.sql
+```
+
+### Arquivos modificados
+
+```
+frontend/package.json                           # +react-i18next +i18next +i18next-browser-languagedetector +i18n-iso-countries
+frontend/src/main.tsx                           # Import i18n config
+frontend/src/components/AppLayout.tsx           # LanguageSwitcher na navbar + strings i18n
+frontend/src/pages/NotificationSettingsPage.tsx # Toggle Telegram independente + i18n
+frontend/src/pages/MonitorsPage.tsx             # Select global de países + remove city/state de filtros + i18n
+backend/src/controllers/notification.controller.ts # telegramEnabled explícito, não apaga vínculo
+backend/src/controllers/monitorController.ts    # Validação ISO-2 com 400 + normaliza '' → null
+backend/src/services/monitorService.ts          # Types country?: string | null
+backend/prisma/schema.prisma                    # country String → String? (nullable)
+worker/src/engine/location-matcher.ts           # null → early return, outros países só state/city
+worker/src/engine/ad-extractor.ts               # Remove check WORLDWIDE
+worker/src/types/scraper.ts                     # country?: string | null
+worker/tests/engine/location-matcher.test.ts    # +6 testes novos (null, empty, outros países)
+```
+
+### Decisões de design
+
+- **country NULL no DB** = sem filtro (worldwide). Frontend usa `''`, API normaliza para `null`
+- **Country inválido** retorna 400 (não salva null silenciosamente)
+- **Uppercase antes de validar**: `country = country?.trim().toUpperCase()` aceita 'br'/'us'
+- **Telegram desativado preserva vínculo**: chatId e username intactos (apenas pausa envio)
+- **Validação "ao menos 1 canal"**: backend e frontend
+- **Location matcher para países sem patterns** (não BR/US): apenas state/city, sem match por nome do país
+- **i18n-iso-countries**: mapeamento `pt-BR → pt`, `en → en`, `es → es` para locales da lib
+- **StructuredFilters**: removido `city` e `state` da interface (ficam só em Localização)
+- **Migração existente WORLDWIDE → NULL**: migration SQL converte rows existentes
+
+### Validação
+
+```
+worker: tsc --noEmit ✅ zero erros
+backend: tsc --noEmit ✅ zero erros
+frontend: tsc --noEmit ✅ zero erros
+worker: vitest run ✅ 9 suites, 87 testes (incluindo 6 novos do location-matcher)
+```
+
+### Produção (deploy)
+
+```bash
+# Migration (já aplicada):
+npx prisma migrate deploy
+# Resultado: ALTER COLUMN country DROP NOT NULL + DROP DEFAULT
+# + UPDATE monitors SET country = NULL WHERE country = 'WORLDWIDE'
+```
+
+---
+
+## PR anterior: Email Opcional + Default URL + Filtro Localização Global (2026-02-18)
 
 ### Resumo
 
@@ -19,54 +101,6 @@
 | 2 | **Default URL** — fallback defensivo por plataforma no worker | 1 novo + 1 mod | Não | Baixo |
 | 3 | **Localização global** — filtro country/state/city por monitor (best-effort) | 2 novos + 5 mod | Sim (ADD COLUMN) | Médio |
 | 4 | **Testes** — location-matcher.test.ts (14 testes) | 1 novo | Não | Nenhum |
-
-### Arquivos novos
-
-```
-worker/src/engine/default-urls.ts              # URLs default por plataforma
-worker/src/engine/location-matcher.ts          # Matcher de localização (country/state/city)
-worker/tests/engine/location-matcher.test.ts   # 14 testes do location matcher
-backend/prisma/migrations/20260218190000_add_location_fields_to_monitor/migration.sql
-```
-
-### Arquivos modificados
-
-```
-frontend/src/pages/NotificationSettingsPage.tsx  # Toggle email (era "Sempre ativo")
-frontend/src/pages/MonitorsPage.tsx              # Placeholder dinâmico + seção localização
-backend/src/controllers/notification.controller.ts # emailEnabled no PUT + validação
-backend/src/controllers/monitorController.ts     # country/stateRegion/city no create/update
-backend/src/services/monitorService.ts           # Types + prisma create/update
-backend/prisma/schema.prisma                     # +country, +state_region, +city no Monitor
-worker/src/services/monitor-runner.ts            # emailEnabled check + default URL fallback
-worker/src/engine/ad-extractor.ts                # Filtro de localização pós-preço
-worker/src/types/scraper.ts                      # MonitorWithFilters + location fields
-```
-
-### Validação
-
-```
-worker: tsc --noEmit ✅ zero erros
-backend: tsc --noEmit ✅ zero erros
-frontend: tsc -b ✅ zero erros
-worker: vitest run ✅ 9 suites, 81 testes (incluindo 14 novos do location-matcher)
-backend: vitest run — 5 suites pass, 4 fail (pré-existente: DB não mockado)
-```
-
-### Produção (deploy)
-
-```bash
-# Migration (Render release command):
-npx prisma migrate deploy
-# Resultado: ADD COLUMN com DEFAULT — safe, sem downtime
-```
-
-### Decisões de design
-
-- **country como string enum** (WORLDWIDE/BR/US), não tipo livre
-- **Siglas ambíguas** (AL/PA/MA/SC/MT/MS) excluídas dos patterns de ambos países → conservador (KEEP)
-- **searchUrl continua obrigatório** na API para URL_ONLY; default URL é apenas fallback defensivo no worker
-- **Location filter é best-effort**: depende do site expor `ad.location`; se vazio → anúncio NÃO é excluído
 
 ---
 
@@ -90,109 +124,91 @@ Auditoria completa de 32 arquivos em 6 camadas (schema, services, controllers, j
 | TypeScript | backend + worker + frontend: zero erros | ✅ |
 | Testes | 40 pass (5 suites), 34 fail pré-existentes (DB mock) | ✅ |
 
-### Riscos identificados (baixo, sem ação imediata)
+---
 
-1. ~~Dead code em billingService.ts~~ ✅ CORRIGIDO — `isLifetime: false` adicionado nas 3 funções (hardening preventivo)
-2. **Admin updateSubscription** não permite setar `isLifetime` (apenas status/validUntil). Intencional.
-3. **Falta de testes** para `redeemTrialUpgrade` (controller). Lógica verificada manualmente.
+## Testes
 
-### Edge cases verificados
+### Worker: 9 suites, 87 testes passando
 
-- Vitalício com `durationDays: null` → ✅ guard skip
-- Purpose null (legado) → ✅ tratado como DISCOUNT
-- Duplo vitalício → ✅ idempotente
-- Jobs não expiram vitalícios → ✅ `isLifetime: false` em todas as queries
-- Race conditions → ✅ queries atômicas, scheduler espaçado
+| Suite | Testes |
+|-------|--------|
+| `browser-manager.test.ts` | 13 |
+| `needs-reauth.test.ts` | 8 |
+| `page-diagnoser.test.ts` | 7 |
+| `telegram-service.test.ts` | 5 |
+| `ad-extractor.test.ts` | 5 |
+| `scroller.test.ts` | 4 |
+| `marketplace-engine.test.ts` | 3 |
+| `facebook-integration.test.ts` | 21 |
+| `location-matcher.test.ts` | 20 |
 
-### Comandos executados
+### Backend: 5 suites, 40 testes passando (+ 34 pré-existentes falhando — DB não mockado)
 
-```bash
-cd backend && npx tsc --noEmit     # zero erros
-cd worker && npx tsc --noEmit      # zero erros
-cd frontend && npx tsc -b          # zero erros
-cd backend && npx vitest run       # 40 pass, 34 fail (pré-existente)
+| Suite | Testes |
+|-------|--------|
+| `siteHealthService.test.ts` | 7 |
+| `billingService.test.ts` | 8 |
+| `planBootValidation.test.ts` | 4 |
+| `subscriptionService.test.ts` | 8 |
+| `auth.test.ts` | 11 (integration, mocked) |
+
+---
+
+## Observabilidade — Strings de log para monitorar
+
+| O que confirmar | String no log |
+|----------------|---------------|
+| Browser v2 iniciou | `BROWSER_MANAGER: Chromium ready` |
+| Semáforo ativo | `ENGINE_METRICS:` com `activeContexts=` |
+| Crash com recovery | `ENGINE_CRASH_RECOVERY:` seguido de `Chromium ready` |
+| Memory warning | `BROWSER_MANAGER: Memory warning` |
+| Memory bloqueou | `BROWSER_MEMORY_HIGH:` |
+| Shutdown limpo | `BROWSER_MANAGER: Shutdown complete` |
+| OOM-kill (ruim) | Log corta sem `Shutdown complete` + worker reinicia |
+| **Stats gravando** | `STATS_RECORDER: Falha ao persistir` (só aparece se ERRO) |
+| FB extraction fix | `FB_ENGINE:` com `skipped=` mostrando skippedReasons |
+| STRUCTURED guard | `MONITOR_SKIPPED: STRUCTURED_FILTERS sem searchUrl` |
+| Email enviado | `EMAIL_SENT: Email enviado com sucesso` com messageId |
+| Email API erro | `EMAIL_API_ERROR:` com httpStatus e errorMessage (diagnóstico) |
+| Email fatal | `EMAIL_FATAL:` — servico desabilitado (key ou domínio) |
+
+---
+
+## Arquivos-chave
+
+```
+worker/src/engine/browser-manager.ts       # BrowserManager v2 (semáforo, memory, crash)
+worker/src/engine/marketplace-engine.ts    # Motor principal
+worker/src/engine/types.ts                 # Tipos SiteConfig, etc.
+worker/src/engine/auth-strategy.ts         # Cascade de auth (recebe browser param)
+worker/src/engine/location-matcher.ts      # Matcher de localização (country/state/city)
+worker/src/engine/site-registry.ts         # Registry (onde registrar novos sites)
+worker/src/engine/configs/                 # Diretório de configs
+worker/src/scrapers/                       # Scrapers migrados
+worker/src/services/stats-recorder.ts      # StatsRecorder + mapPageType()
+worker/src/services/monitor-runner.ts      # Orquestrador (instrumentado)
+worker/src/utils/retry-helper.ts           # Retry + isBrowserCrashError
+worker/src/utils/ml-auth-provider.ts       # Auth ML (usa acquireContext)
+worker/src/health-server.ts                # Health com browser/memory metrics
+worker/src/worker.ts                       # Shutdown unificado
+backend/src/services/siteHealthService.ts  # Agregação de métricas por site
+frontend/src/pages/AdminSiteHealthPage.tsx # Dashboard de saúde
+frontend/src/i18n/config.ts               # Configuração i18next
+frontend/src/i18n/locales/                # Traduções PT/EN/ES
+frontend/src/components/LanguageSwitcher.tsx # Seletor de idioma
+frontend/src/utils/countries.ts           # Helper i18n-iso-countries
+render.yaml                                # Config Render (buildCommand, startCommand, envVars)
 ```
 
 ---
 
-## Hardening mais recente: 5 Correções de Produção
-
-| # | Fix | Arquivos | Risco |
-|---|-----|----------|-------|
-| 1 | **Facebook extraction** — container `<a>` retornava url='' (raw=18, adsFound=0) | ad-extractor.ts, facebook-scraper.ts, +ad-extractor.test.ts | Medio (guard `el.tagName === 'A'`) |
-| 2 | **Anti-bot jitter** — delays estáticos criavam padrão detectável | scroller.ts, marketplace-engine.ts | Baixo |
-| 3 | **Email no /health** — RESEND_API_KEY inválida sem visibilidade | health-server.ts | Muito baixo (aditivo) |
-| 4 | **SSL Postgres/Neon** — warning de SSL na conexão | worker/lib/prisma.ts, backend/lib/prisma.ts | Baixo (env var opt-in) |
-| 5 | **STRUCTURED_FILTERS guard** — monitores sem URL crashavam em page.goto(null) | monitor-runner.ts, scraper.ts types | Muito baixo |
-
-### Env vars configuradas no Render
-- `DATABASE_SSL=true` (backend + worker) — habilita SSL para Neon ✅
-- `RESEND_API_KEY=re_i7BBP...` (worker) — key válida do Resend ✅
-- `EMAIL_FROM=noreply@radarone.com.br` (worker) — domínio verificado no Resend (DKIM+SPF+MX) ✅
-
-### Impacto zero em ML/OLX/Facebook existente
-- Fix 1: branch `el.tagName === 'A'` só ativa para Facebook (containers ML/OLX são `<div>`/`<li>`)
-- Fix 2: jitter muda valor do delay, não contagem de scrolls → testes existentes passam
-- Fix 5: guard só afeta modo STRUCTURED_FILTERS sem URL (todos os monitores atuais são URL_ONLY)
-
----
-
-## Feature anterior: Painel de Saúde por Site
-
-Dashboard admin de observabilidade em tempo real por marketplace. Mostra status (HEALTHY/WARNING/CRITICAL/NO_DATA), taxa de sucesso, falhas consecutivas, tempo médio e monitores ativos por site.
-
-### Arquitetura
-
-| Componente | Descrição |
-|------------|-----------|
-| **SiteExecutionStats** (tabela) | Denormalizada, sem JOIN na MonitorLog. Índices em `site`, `success`, `createdAt` |
-| **StatsRecorder** (worker) | `await` + `try/catch` isolado — NUNCA propaga erro, NUNCA impacta scraping |
-| **mapPageType()** | Função centralizada: diagnosis.pageType → enum PageType do Prisma |
-| **SiteHealthService** (backend) | Agrega métricas por site: successRate, consecutiveFailures, avgDuration, etc. |
-| **GET /api/admin/site-health** | Endpoint admin (requireAdmin) |
-| **AdminSiteHealthPage** (frontend) | Grid de cards Chakra UI, auto-refresh 60s, ordenação por criticidade |
-
-### Arquivos criados/modificados
-
-```
-# Novos (4)
-worker/src/services/stats-recorder.ts          # StatsRecorder + mapPageType()
-backend/src/services/siteHealthService.ts       # SiteHealthService.getSiteHealthSummary()
-frontend/src/pages/AdminSiteHealthPage.tsx       # Dashboard admin
-backend/tests/services/siteHealthService.test.ts # 7 testes unitários
-
-# Modificados (7)
-backend/prisma/schema.prisma                     # +PageType enum, +SiteExecutionStats model
-worker/prisma/schema.prisma                      # Espelhado (para prisma generate)
-worker/src/services/monitor-runner.ts            # +3 pontos de instrumentação StatsRecorder
-backend/src/controllers/admin.controller.ts      # +getSiteHealth()
-backend/src/routes/admin.routes.ts               # +GET /site-health
-frontend/src/router.tsx                          # +rota lazy /admin/site-health
-frontend/src/components/AdminLayout.tsx          # +link "Saúde dos Sites" na sidebar
-```
-
-### Lógica de Status
-
-```
-NO_DATA    → totalRunsLast24h === 0
-HEALTHY    → successRate >= 85 AND consecutiveFailures < 3
-WARNING    → successRate >= 60 (e não HEALTHY)
-CRITICAL   → successRate < 60 OR consecutiveFailures >= 5
-```
-
-### Nota sobre Prisma Migration
-
-A migração foi aplicada via `prisma db push` (não `prisma migrate dev`) porque o banco remoto tinha uma migration local ausente (`20260201140000_reset_admin_2fa`). O schema está sincronizado.
-
----
-
-## Produção — Status Anterior
+## Produção — Status
 
 ### Deploy ativo
 
 | Item | Valor |
 |------|-------|
-| Commit live | `a13d005` |
+| Commit live | `8869ed0` |
 | Uptime confirmado | Estável |
 
 ### Env vars no Render (Worker — 16 vars)
@@ -239,126 +255,6 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 
 ---
 
-## Browser Hardening (v2) — CONCLUÍDO E VALIDADO EM PRODUÇÃO
-
-| Componente | Mudança |
-|------------|---------|
-| **BrowserManager v2** | Semáforo `acquireContext/release` (max configurable), limites RSS (WARN 380MB, STOP 420MB, FORCE_RELAUNCH 460MB), `ensureAlive({forceRelaunch})`, `getMetrics()`, shutdown graceful |
-| **Crash Detection** | `isBrowserCrashError()` detecta 6 patterns. Recovery imediato com `forceRelaunch` (max 2 retries) |
-| **Retry Presets** | `scraping`: 3 tentativas/2s. `browserCrash`: 2 tentativas/1s. Jitter no backoff |
-| **MarketplaceEngine** | `acquireContext/release`, crash recovery loop, log observabilidade |
-| **Auth Strategy** | Recebe `browser` via parâmetro |
-| **ML Auth Provider** | Usa `acquireContext()` em vez de `getOrLaunch()` direto |
-| **Health Endpoint** | Retorna `browser`, `memory`, `contexts` metrics |
-| **Worker Shutdown** | Handler unificado SIGTERM/SIGINT: scheduler → jobs → browser → DB |
-| **`--single-process`** | **REMOVIDO** (causa raiz dos crashes) |
-
----
-
-## Testes
-
-### Worker: 9 suites, 81 testes passando
-
-| Suite | Testes |
-|-------|--------|
-| `browser-manager.test.ts` | 13 |
-| `needs-reauth.test.ts` | 8 |
-| `page-diagnoser.test.ts` | 7 |
-| `telegram-service.test.ts` | 5 |
-| `ad-extractor.test.ts` | 5 |
-| `scroller.test.ts` | 4 |
-| `marketplace-engine.test.ts` | 3 |
-| `facebook-integration.test.ts` | 21 |
-| `location-matcher.test.ts` | 14 |
-
-### Backend: 5 suites, 40 testes passando (+ 34 pré-existentes falhando — DB não mockado)
-
-| Suite | Testes |
-|-------|--------|
-| `siteHealthService.test.ts` | 7 |
-| `billingService.test.ts` | 8 |
-| `planBootValidation.test.ts` | 4 |
-| `subscriptionService.test.ts` | 8 |
-| `auth.test.ts` | 11 (integration, mocked) |
-
----
-
-## Observabilidade — Strings de log para monitorar
-
-| O que confirmar | String no log |
-|----------------|---------------|
-| Browser v2 iniciou | `BROWSER_MANAGER: Chromium ready` |
-| Semáforo ativo | `ENGINE_METRICS:` com `activeContexts=` |
-| Crash com recovery | `ENGINE_CRASH_RECOVERY:` seguido de `Chromium ready` |
-| Memory warning | `BROWSER_MANAGER: Memory warning` |
-| Memory bloqueou | `BROWSER_MEMORY_HIGH:` |
-| Shutdown limpo | `BROWSER_MANAGER: Shutdown complete` |
-| OOM-kill (ruim) | Log corta sem `Shutdown complete` + worker reinicia |
-| **Stats gravando** | `STATS_RECORDER: Falha ao persistir` (só aparece se ERRO) |
-| FB extraction fix | `FB_ENGINE:` com `skipped=` mostrando skippedReasons |
-| STRUCTURED guard | `MONITOR_SKIPPED: STRUCTURED_FILTERS sem searchUrl` |
-| Email enviado | `EMAIL_SENT: Email enviado com sucesso` com messageId |
-| Email API erro | `EMAIL_API_ERROR:` com httpStatus e errorMessage (diagnóstico) |
-| Email fatal | `EMAIL_FATAL:` — servico desabilitado (key ou domínio) |
-
----
-
-## Arquivos-chave
-
-```
-worker/src/engine/browser-manager.ts       # BrowserManager v2 (semáforo, memory, crash)
-worker/src/engine/marketplace-engine.ts    # Motor principal
-worker/src/engine/types.ts                 # Tipos SiteConfig, etc.
-worker/src/engine/auth-strategy.ts         # Cascade de auth (recebe browser param)
-worker/src/engine/site-registry.ts         # Registry (onde registrar novos sites)
-worker/src/engine/configs/                 # Diretório de configs
-worker/src/scrapers/                       # Scrapers migrados
-worker/src/services/stats-recorder.ts      # StatsRecorder + mapPageType()
-worker/src/services/monitor-runner.ts      # Orquestrador (instrumentado)
-worker/src/utils/retry-helper.ts           # Retry + isBrowserCrashError
-worker/src/utils/ml-auth-provider.ts       # Auth ML (usa acquireContext)
-worker/src/health-server.ts                # Health com browser/memory metrics
-worker/src/worker.ts                       # Shutdown unificado
-backend/src/services/siteHealthService.ts  # Agregação de métricas por site
-frontend/src/pages/AdminSiteHealthPage.tsx # Dashboard de saúde
-render.yaml                                # Config Render (buildCommand, startCommand, envVars)
-```
-
----
-
-## Validação
-
-```bash
-cd backend && npx tsc --noEmit     # zero erros
-cd worker && npx tsc --noEmit      # zero erros
-cd frontend && npx tsc -b          # zero erros
-cd worker && npx vitest run        # 8 suites, 66 testes
-cd backend && npx vitest run tests/services/siteHealthService.test.ts  # 7 testes
-```
-
----
-
-## Histórico de commits recentes
-
-```
-a13d005 fix(worker): add diagnostic logging to email service API errors
-5c94a5e docs: update SESSION_STATUS with hardening fixes and 66 passing tests
-b72ae41 fix(worker): guard STRUCTURED_FILTERS monitors without searchUrl
-f99ce3a fix: add DATABASE_SSL env var for Postgres/Neon SSL connections
-e1b48fa feat(worker): add email service status to /health endpoint
-faf4fc8 fix(worker): add jitter to scroll and render delays for anti-bot evasion
-0464da3 fix(worker): fix Facebook ad extraction when container is <a> tag
-2b131ad feat: add Site Health dashboard — real-time observability per marketplace
-f638b14 feat(worker): add Facebook Marketplace to auth-sites + integration tests (61/61 pass)
-33668eb fix(connections): make cookie validation and modal provider-aware — fix Facebook using ML rules
-1976d47 docs: update SESSION_STATUS with production metrics and deploy config
-28ba145 fix(deploy): move NODE_OPTIONS to startCommand only — fix tsc OOM during build
-a1e31cc fix(deploy): build OOM — override NODE_OPTIONS during build, tune runtime for 512MB
-4b87544 feat(worker): harden browser lifecycle with semaphore, crash recovery and memory limits
-```
-
----
-
 ## Email Service — OPERACIONAL
 
 | Item | Status |
@@ -370,9 +266,6 @@ a1e31cc fix(deploy): build OOM — override NODE_OPTIONS during build, tune runt
 | **Primeiro envio** | 2026-02-18 18:47 UTC — `EMAIL_SENT` messageId=4cbc179a |
 | **Canais ativos** | Telegram + Email (multi-canal) |
 
-### Diagnóstico de erros
-O `email-service.ts` agora loga `EMAIL_API_ERROR` com `httpStatus`, `errorMessage` e `errorData` completos antes de desabilitar o serviço, facilitando debug futuro.
-
 ---
 
 ## TODO Futuro (NÃO implementar agora)
@@ -381,8 +274,12 @@ O `email-service.ts` agora loga `EMAIL_API_ERROR` com `httpStatus`, `errorMessag
 - Suspensão automática de sites com successRate < 40% por 10 execuções consecutivas
 - Alertas automáticos via AdminAlert quando site entra em CRITICAL
 
+### i18n — Próximas telas
+- Traduzir telas públicas (Landing, Planos, Login, Register, FAQ, Manual, Contato)
+- Traduzir dashboard
+- Traduzir admin pages
+
 ### Cupons/Vitalícios (identificados na auditoria)
-- ~~Adicionar `isLifetime: false` nas funções dead-code~~ ✅ FEITO (commit hardening preventivo)
 - Testes unitários para `redeemTrialUpgrade` (vitalício + temporário)
 - Permitir admin setar `isLifetime` via updateSubscription (se necessário)
 
