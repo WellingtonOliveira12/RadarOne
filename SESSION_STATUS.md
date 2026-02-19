@@ -1,13 +1,92 @@
 # RadarOne - Status do Projeto
 
-> **Última atualização**: 2026-02-18 23:30 UTC
+> **Última atualização**: 2026-02-19 01:10 UTC
 > **Branch**: `main`
-> **Último commit**: `8869ed0` feat(monitors): global country list + remove redundant filters
+> **Último commit**: `ee09d45` fix(filters): audit filter pipeline + structured logging + tests
 > **Deploy Render**: Live (worker + backend)
 
 ---
 
-## PR: Produto Global — i18n + Notificações + Países + Filtros (2026-02-18)
+## Produto Global v2 — i18n Global + USD + URL Auto-fill + Filter Audit (2026-02-19)
+
+### Resumo
+
+4 melhorias para globalização completa do RadarOne:
+
+| # | Feature | Arquivos | Migration | Risco |
+|---|---------|----------|-----------|-------|
+| 1 | **i18n global** — LanguageSwitcher em TODAS as páginas (públicas + logadas), tradução completa PT/EN/ES | 9 modificados | Não | Baixo |
+| 2 | **USD pricing** — Preços em USD ($5.80) quando idioma é EN/ES, BRL (R$29) para PT | 1 novo + 1 mod | Não | Baixo |
+| 3 | **URL base auto-fill** — Preenche URL base ao selecionar site em STRUCTURED_FILTERS, dirty flag | 1 novo + 1 mod | Não | Baixo |
+| 4 | **Filter audit** — Backend aceita mode/filtersJson, fix country default, logging FILTER_SUMMARY, +5 testes | 4 modificados | Não | Médio |
+
+### Commits
+
+```
+89d3022 feat(i18n): make LanguageSwitcher global (public + logged-in pages)
+75050cb feat(plans): show USD pricing when language is EN/ES
+bc0a48b feat(monitors): auto-fill base URL by site with dirty flag
+ee09d45 fix(filters): audit filter pipeline + structured logging + tests
+```
+
+### Arquivos novos
+
+```
+frontend/src/utils/currency.ts              # Conversão BRL↔USD (taxa fixa 1:5), formatPlanPrice()
+frontend/src/constants/siteDefaults.ts      # URLs padrão por site (espelho de worker/default-urls.ts)
+```
+
+### Arquivos modificados
+
+```
+frontend/src/components/PublicLayout.tsx     # LanguageSwitcher no header público + strings i18n
+frontend/src/pages/LandingPage.tsx          # LanguageSwitcher no header + todas strings i18n
+frontend/src/pages/LoginPage.tsx            # Todas strings traduzidas via t()
+frontend/src/pages/RegisterPage.tsx         # Todas strings traduzidas via t()
+frontend/src/pages/ForgotPasswordPage.tsx   # Todas strings traduzidas via t()
+frontend/src/pages/ContactPage.tsx          # Categorias traduzidas (value PT p/ API, label i18n)
+frontend/src/pages/PlansPage.tsx            # Preços USD/BRL dinâmicos + strings i18n
+frontend/src/pages/MonitorsPage.tsx         # URL auto-fill + priceMin/priceMax top-level extraction
+frontend/src/i18n/locales/pt-BR.json        # +200 keys (public, landing, auth, plans, contact)
+frontend/src/i18n/locales/en.json           # +200 keys traduzidas EN
+frontend/src/i18n/locales/es.json           # +200 keys traduzidas ES
+backend/src/controllers/monitorController.ts # Aceita mode/filtersJson, searchUrl opcional em STRUCTURED_FILTERS
+backend/src/services/monitorService.ts       # Interfaces +mode/filtersJson, country default null (não 'BR')
+worker/src/services/monitor-runner.ts        # Log FILTER_SUMMARY com skippedReasons + filtros aplicados
+worker/tests/engine/ad-extractor.test.ts     # +5 testes (price filter, location filter edge cases)
+```
+
+### Decisões de design
+
+- **Preço USD**: taxa fixa 1 USD = 5 BRL, display-only (checkout continua em BRL via Kiwify)
+- **BRL sem decimais** (R$ 29), **USD com 2 decimais** ($5.80) — melhor UX por moeda
+- **URL auto-fill**: dirty flag impede sobrescrever edições manuais; reset limpa flag
+- **mode/filtersJson**: agora persistidos no DB (antes eram ignorados pelo backend)
+- **priceMin/priceMax**: frontend extrai de filtersJson para top-level no modo STRUCTURED_FILTERS
+- **country default null** (não 'BR'): monitores sem país = sem filtro de localização
+- **FILTER_SUMMARY log**: inclui adsRaw, adsValid, skippedReasons, filtros aplicados
+
+### Bugs corrigidos na auditoria
+
+| Bug | Impacto | Correção |
+|-----|---------|----------|
+| Backend ignorava `mode` e `filtersJson` | Monitores STRUCTURED_FILTERS salvos sem modo/filtros no DB | Controller + Service aceitam e persistem |
+| Frontend não enviava `priceMin`/`priceMax` top-level em STRUCTURED_FILTERS | Worker não aplicava filtro de preço nesse modo | Extrair de filtersJson para body top-level |
+| Country default `'BR'` no service | Monitores sem país selecionado recebiam filtro BR | Alterado para `null` (sem filtro) |
+| searchUrl obrigatório para STRUCTURED_FILTERS | Impossível criar monitor STRUCTURED_FILTERS sem URL | Relaxado: URL opcional nesse modo |
+
+### Validação
+
+```
+frontend: tsc --noEmit ✅ zero erros
+backend:  tsc --noEmit ✅ zero erros
+worker:   tsc --noEmit ✅ zero erros
+worker:   vitest run   ✅ 9 suites, 92 testes (87 + 5 novos)
+```
+
+---
+
+## PR anterior: Produto Global — i18n + Notificações + Países + Filtros (2026-02-18)
 
 ### Resumo
 
@@ -128,7 +207,7 @@ Auditoria completa de 32 arquivos em 6 camadas (schema, services, controllers, j
 
 ## Testes
 
-### Worker: 9 suites, 87 testes passando
+### Worker: 9 suites, 92 testes passando
 
 | Suite | Testes |
 |-------|--------|
@@ -136,7 +215,7 @@ Auditoria completa de 32 arquivos em 6 camadas (schema, services, controllers, j
 | `needs-reauth.test.ts` | 8 |
 | `page-diagnoser.test.ts` | 7 |
 | `telegram-service.test.ts` | 5 |
-| `ad-extractor.test.ts` | 5 |
+| `ad-extractor.test.ts` | 10 |
 | `scroller.test.ts` | 4 |
 | `marketplace-engine.test.ts` | 3 |
 | `facebook-integration.test.ts` | 21 |
@@ -171,6 +250,7 @@ Auditoria completa de 32 arquivos em 6 camadas (schema, services, controllers, j
 | Email enviado | `EMAIL_SENT: Email enviado com sucesso` com messageId |
 | Email API erro | `EMAIL_API_ERROR:` com httpStatus e errorMessage (diagnóstico) |
 | Email fatal | `EMAIL_FATAL:` — servico desabilitado (key ou domínio) |
+| **Filtros aplicados** | `FILTER_SUMMARY` com adsRaw, adsValid, skippedReasons, filters |
 
 ---
 
@@ -197,6 +277,8 @@ frontend/src/i18n/config.ts               # Configuração i18next
 frontend/src/i18n/locales/                # Traduções PT/EN/ES
 frontend/src/components/LanguageSwitcher.tsx # Seletor de idioma
 frontend/src/utils/countries.ts           # Helper i18n-iso-countries
+frontend/src/utils/currency.ts            # Conversão BRL↔USD (taxa fixa 1:5)
+frontend/src/constants/siteDefaults.ts    # URLs padrão por site (auto-fill)
 render.yaml                                # Config Render (buildCommand, startCommand, envVars)
 ```
 
@@ -208,7 +290,7 @@ render.yaml                                # Config Render (buildCommand, startC
 
 | Item | Valor |
 |------|-------|
-| Commit live | `8869ed0` |
+| Commit live | `ee09d45` |
 | Uptime confirmado | Estável |
 
 ### Env vars no Render (Worker — 16 vars)
@@ -275,8 +357,9 @@ Todos os 9 scrapers migrados de código legado (~200+ linhas) para engine config
 - Alertas automáticos via AdminAlert quando site entra em CRITICAL
 
 ### i18n — Próximas telas
-- Traduzir telas públicas (Landing, Planos, Login, Register, FAQ, Manual, Contato)
-- Traduzir dashboard
+- ~~Traduzir telas públicas (Landing, Planos, Login, Register, FAQ, Manual, Contato)~~ ✅ Feito
+- Traduzir FAQ e Manual (conteúdo extenso)
+- Traduzir dashboard (MonitorsPage parcialmente feito)
 - Traduzir admin pages
 
 ### Cupons/Vitalícios (identificados na auditoria)
