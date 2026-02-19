@@ -4,7 +4,7 @@
  */
 
 export interface LocationFilter {
-  country: string;       // 'WORLDWIDE' | 'BR' | 'US'
+  country?: string | null;  // ISO-3166-1 alpha-2 (ex: BR, US) ou null = sem filtro
   stateRegion?: string | null;
   city?: string | null;
 }
@@ -30,55 +30,52 @@ const COUNTRY_PATTERNS: Record<string, RegExp[]> = {
  * Matches an ad location string against a monitor's location filter.
  *
  * Logic:
- * 1. WORLDWIDE -> always match
- * 2. Empty location -> match (avoid false negatives)
- * 3. Check patterns of monitor's country -> if match -> KEEP
- * 4. Check patterns of OTHER country -> if match -> SKIP
- * 5. No pattern matches (ambiguous) -> KEEP (conservative)
- * 6. If stateRegion set -> word-boundary match
- * 7. If city set -> substring match
+ * 1. No country (null/''/undefined/'WORLDWIDE') -> match everything (skip total)
+ * 2. Empty ad location -> match (avoid false negatives)
+ * 3. BR/US: check exclusive patterns -> if matches OTHER but NOT own -> SKIP
+ * 4. Other countries (not BR/US): skip country matching, only apply state/city
+ * 5. If stateRegion set -> word-boundary match
+ * 6. If city set -> substring match
  */
 export function matchLocation(adLocation: string | undefined | null, filter: LocationFilter): LocationMatchResult {
-  // 1. WORLDWIDE -> always match
-  if (filter.country === 'WORLDWIDE') {
+  // 1. No country = sem filtro -> match everything immediately
+  if (!filter.country || filter.country === 'WORLDWIDE') {
     return { match: true };
   }
 
-  // 2. Empty location -> match (avoid false negatives)
+  // 2. Empty ad location -> match (avoid false negatives)
   if (!adLocation || !adLocation.trim()) {
     return { match: true };
   }
 
   const loc = adLocation.trim();
 
-  // 3-5. Country matching via exclusive patterns
+  // 3. Country matching via exclusive patterns (only BR and US have patterns)
   const ownPatterns = COUNTRY_PATTERNS[filter.country];
-  const otherCountries = Object.keys(COUNTRY_PATTERNS).filter(c => c !== filter.country);
-
-  let matchesOwn = false;
-  let matchesOther = false;
 
   if (ownPatterns) {
-    matchesOwn = ownPatterns.some(re => re.test(loc));
-  }
+    // BR or US: check patterns
+    const otherCountries = Object.keys(COUNTRY_PATTERNS).filter(c => c !== filter.country);
 
-  for (const otherCountry of otherCountries) {
-    const otherPatterns = COUNTRY_PATTERNS[otherCountry];
-    if (otherPatterns && otherPatterns.some(re => re.test(loc))) {
-      matchesOther = true;
-      break;
+    let matchesOwn = ownPatterns.some(re => re.test(loc));
+    let matchesOther = false;
+
+    for (const otherCountry of otherCountries) {
+      const otherPatterns = COUNTRY_PATTERNS[otherCountry];
+      if (otherPatterns && otherPatterns.some(re => re.test(loc))) {
+        matchesOther = true;
+        break;
+      }
+    }
+
+    // If matches OTHER country but NOT own -> mismatch
+    if (matchesOther && !matchesOwn) {
+      return { match: false, reason: 'location_country_mismatch' };
     }
   }
+  // 4. Other countries (no patterns): skip country matching, only state/city below
 
-  // If matches OTHER country but NOT own -> mismatch
-  if (matchesOther && !matchesOwn) {
-    return { match: false, reason: 'location_country_mismatch' };
-  }
-
-  // If neither matches (ambiguous) -> KEEP (conservative)
-  // If matches own (with or without other) -> KEEP and check state/city
-
-  // 6. State/region filter
+  // 5. State/region filter
   if (filter.stateRegion) {
     const normalizedState = filter.stateRegion.toUpperCase().trim();
     const stateRegex = new RegExp(`\\b${escapeRegex(normalizedState)}\\b`, 'i');
@@ -87,7 +84,7 @@ export function matchLocation(adLocation: string | undefined | null, filter: Loc
     }
   }
 
-  // 7. City filter
+  // 6. City filter
   if (filter.city) {
     const normalizedCity = filter.city.trim();
     if (!loc.toLowerCase().includes(normalizedCity.toLowerCase())) {

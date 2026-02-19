@@ -1,12 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Container } from '@chakra-ui/react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import { getToken } from '../lib/auth';
 import { useAuth } from '../context/AuthContext';
 import { trackMonitorCreated } from '../lib/analytics';
 import { TrialBanner } from '../components/TrialBanner';
 import { AppLayout } from '../components/AppLayout';
+import { getCountryList } from '../utils/countries';
 import * as responsive from '../styles/responsive';
 
 type MonitorSite =
@@ -24,8 +26,6 @@ type MonitorMode = 'URL_ONLY' | 'STRUCTURED_FILTERS';
 
 interface StructuredFilters {
   keywords?: string;
-  city?: string;
-  state?: string;
   minPrice?: number;
   maxPrice?: number;
   minYear?: number;
@@ -41,7 +41,7 @@ interface Monitor {
   mode?: MonitorMode;
   filtersJson?: StructuredFilters;
   active: boolean;
-  country?: string;
+  country?: string | null;
   stateRegion?: string;
   city?: string;
 }
@@ -83,8 +83,18 @@ const URL_PLACEHOLDERS: Record<MonitorSite, string> = {
   LEILAO: 'https://www.leilao.com.br/...',
 };
 
+const DEFAULT_FILTERS: StructuredFilters = {
+  keywords: '',
+  minPrice: undefined,
+  maxPrice: undefined,
+  minYear: undefined,
+  maxYear: undefined,
+  category: '',
+};
+
 export function MonitorsPage() {
   useAuth(); // Required for protected route
+  const { t, i18n } = useTranslation();
 
   // Lista
   const [monitors, setMonitors] = useState<Monitor[]>([]);
@@ -103,21 +113,15 @@ export function MonitorsPage() {
   const [saving, setSaving] = useState(false);
 
   // Localização (global)
-  const [country, setCountry] = useState('BR');
+  const [country, setCountry] = useState('');
   const [stateRegion, setStateRegion] = useState('');
   const [city, setCity] = useState('');
 
-  // Filtros estruturados
-  const [filters, setFilters] = useState<StructuredFilters>({
-    keywords: '',
-    city: '',
-    state: '',
-    minPrice: undefined,
-    maxPrice: undefined,
-    minYear: undefined,
-    maxYear: undefined,
-    category: '',
-  });
+  // Filtros estruturados (sem city/state — ficam só em Localização)
+  const [filters, setFilters] = useState<StructuredFilters>({ ...DEFAULT_FILTERS });
+
+  // Lista de países (reativa ao idioma)
+  const countryList = getCountryList(i18n.language);
 
   useEffect(() => {
     fetchMonitors();
@@ -125,7 +129,6 @@ export function MonitorsPage() {
   }, []);
 
   // Busca status das sessões para sites que requerem login
-  // NOTA: Usa skipAutoLogout pois é chamada não-crítica e não deve deslogar o usuário
   async function fetchSessionStatus() {
     try {
       const token = getToken();
@@ -134,16 +137,14 @@ export function MonitorsPage() {
       const data = await api.request<{ sessions: Array<{ site: string; status: string }> }>('/api/sessions', {
         method: 'GET',
         token,
-        skipAutoLogout: true, // Não fazer logout se falhar - essa é uma chamada auxiliar
+        skipAutoLogout: true,
       });
       const statusMap: Record<string, { connected: boolean; status?: string }> = {};
 
-      // Inicializa todos os sites que requerem login como não conectados
       SITES_REQUIRING_LOGIN.forEach(siteId => {
         statusMap[siteId] = { connected: false };
       });
 
-      // Atualiza com os dados reais
       data.sessions?.forEach((session) => {
         statusMap[session.site] = {
           connected: session.status === 'ACTIVE',
@@ -153,7 +154,6 @@ export function MonitorsPage() {
 
       setSessionStatus(statusMap);
     } catch (err) {
-      // Silently fail - não crítico
       console.error('Erro ao buscar status de sessões:', err);
     }
   }
@@ -165,7 +165,7 @@ export function MonitorsPage() {
 
       const token = getToken();
       if (!token) {
-        setError('Você precisa fazer login para ver os monitores.');
+        setError(t('monitors.errorLogin'));
         return;
       }
 
@@ -177,22 +177,19 @@ export function MonitorsPage() {
       setMonitors(data.data);
       setHasSubscription(true);
     } catch (err: any) {
-      // Tratar erro de sem assinatura
       const errorCode = err.errorCode || err.response?.data?.errorCode;
       if (errorCode === 'NO_SUBSCRIPTION' || err.message?.includes('precisa assinar')) {
         setHasSubscription(false);
-        setError('Você precisa assinar um plano para criar monitores.');
+        setError(t('monitors.subscriptionRequired'));
         return;
       }
 
-      // Tratar erro de limite excedido
       if (err.response?.status === 403 || err.message?.includes('limite')) {
         setError(
-          err.response?.data?.error ||
-            'Limite de monitores atingido. Faça upgrade do seu plano.'
+          err.response?.data?.error || t('monitors.errorLimitReached')
         );
       } else {
-        setError(err.message || 'Erro ao buscar monitores');
+        setError(err.message || t('monitors.errorFetch'));
       }
     } finally {
       setLoadingLista(false);
@@ -207,7 +204,7 @@ export function MonitorsPage() {
     try {
       const token = getToken();
       if (!token) {
-        setError('Você precisa fazer login primeiro.');
+        setError(t('monitors.errorLoginFirst'));
         return;
       }
 
@@ -216,7 +213,7 @@ export function MonitorsPage() {
         try {
           new URL(searchUrl);
         } catch {
-          setError('URL inválida. Exemplo: https://www.mercadolivre.com.br/...');
+          setError(t('monitors.errorInvalidUrl'));
           setSaving(false);
           return;
         }
@@ -227,7 +224,7 @@ export function MonitorsPage() {
         site,
         mode,
         active,
-        country,
+        country: country || null, // '' -> null (sem filtro)
         stateRegion: stateRegion.trim() || null,
         city: city.trim() || null,
       };
@@ -235,9 +232,7 @@ export function MonitorsPage() {
       if (mode === 'URL_ONLY') {
         body.searchUrl = searchUrl;
       } else {
-        // STRUCTURED_FILTERS
         body.filtersJson = filters;
-        // Pode incluir searchUrl como URL base (opcional)
         if (searchUrl) {
           body.searchUrl = searchUrl;
         }
@@ -247,45 +242,36 @@ export function MonitorsPage() {
         await api.put(`/api/monitors/${idSelecionado}`, body, token);
       } else {
         await api.post('/api/monitors', body, token);
-        // Track monitor creation
         trackMonitorCreated(site, mode);
       }
 
       // reset
-      setName('');
-      setSite('MERCADO_LIVRE');
-      setMode('URL_ONLY');
-      setSearchUrl('');
-      setActive(true);
-      setIdSelecionado(null);
-      setCountry('BR');
-      setStateRegion('');
-      setCity('');
-      setFilters({
-        keywords: '',
-        city: '',
-        state: '',
-        minPrice: undefined,
-        maxPrice: undefined,
-        minYear: undefined,
-        maxYear: undefined,
-        category: '',
-      });
-
+      resetForm();
       await fetchMonitors();
     } catch (err: any) {
-      // Tratar erro de limite excedido
       if (err.response?.status === 403 || err.message?.includes('limite')) {
         setError(
-          err.response?.data?.error ||
-            'Limite de monitores atingido. Faça upgrade do seu plano para adicionar mais.'
+          err.response?.data?.error || t('monitors.errorLimitReached')
         );
       } else {
-        setError(err.message || 'Erro ao salvar monitor');
+        setError(err.message || t('monitors.errorSave'));
       }
     } finally {
       setSaving(false);
     }
+  }
+
+  function resetForm() {
+    setName('');
+    setSite('MERCADO_LIVRE');
+    setMode('URL_ONLY');
+    setSearchUrl('');
+    setActive(true);
+    setIdSelecionado(null);
+    setCountry('');
+    setStateRegion('');
+    setCity('');
+    setFilters({ ...DEFAULT_FILTERS });
   }
 
   function handleEdit(monitor: Monitor) {
@@ -295,70 +281,37 @@ export function MonitorsPage() {
     setSearchUrl(monitor.searchUrl || '');
     setActive(monitor.active);
     setIdSelecionado(monitor.id);
-    setCountry(monitor.country || 'BR');
+    setCountry(monitor.country || '');
     setStateRegion(monitor.stateRegion || '');
     setCity(monitor.city || '');
 
     if (monitor.mode === 'STRUCTURED_FILTERS' && monitor.filtersJson) {
       setFilters(monitor.filtersJson);
     } else {
-      setFilters({
-        keywords: '',
-        city: '',
-        state: '',
-        minPrice: undefined,
-        maxPrice: undefined,
-        minYear: undefined,
-        maxYear: undefined,
-        category: '',
-      });
+      setFilters({ ...DEFAULT_FILTERS });
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function handleDelete(id: string) {
-    const confirmed = window.confirm('Tem certeza que deseja excluir este monitor?');
+    const confirmed = window.confirm(t('monitors.confirmDelete'));
     if (!confirmed) return;
 
     try {
       setError('');
       const token = getToken();
       if (!token) {
-        setError('Você precisa fazer login primeiro.');
+        setError(t('monitors.errorLoginFirst'));
         return;
       }
 
-      // Usar DELETE (não POST) para excluir monitor
       await api.delete(`/api/monitors/${id}`, token);
       await fetchMonitors();
     } catch (err: any) {
-      // Mensagem de erro mais específica
-      const errorMessage = err.data?.message || err.message || 'Erro ao excluir monitor';
+      const errorMessage = err.data?.message || err.message || t('monitors.errorDelete');
       setError(errorMessage);
     }
-  }
-
-  function handleCancelEdit() {
-    setName('');
-    setSite('MERCADO_LIVRE');
-    setMode('URL_ONLY');
-    setSearchUrl('');
-    setActive(true);
-    setIdSelecionado(null);
-    setCountry('BR');
-    setStateRegion('');
-    setCity('');
-    setFilters({
-      keywords: '',
-      city: '',
-      state: '',
-      minPrice: undefined,
-      maxPrice: undefined,
-      minYear: undefined,
-      maxYear: undefined,
-      category: '',
-    });
   }
 
   return (
@@ -366,16 +319,14 @@ export function MonitorsPage() {
       <Container maxW="container.xl" py={{ base: 6, md: 10 }}>
         <div style={styles.breadcrumb}>
           <Link to="/dashboard" style={styles.breadcrumbLink}>
-            Dashboard
+            {t('common.dashboard')}
           </Link>
           <span style={styles.breadcrumbSeparator}>/</span>
-          <span style={styles.breadcrumbCurrent}>Monitores</span>
+          <span style={styles.breadcrumbCurrent}>{t('monitors.breadcrumb')}</span>
         </div>
 
-        <h1 style={styles.title}>Monitores</h1>
-        <p style={styles.subtitle}>
-          Configure monitores para receber alertas de novos anúncios
-        </p>
+        <h1 style={styles.title}>{t('monitors.title')}</h1>
+        <p style={styles.subtitle}>{t('monitors.subtitle')}</p>
 
         {/* Banner de trial expirando */}
         <TrialBanner />
@@ -385,13 +336,11 @@ export function MonitorsPage() {
           <div style={styles.subscriptionWarning}>
             <div style={styles.warningIcon}>⚠️</div>
             <div style={styles.warningContent}>
-              <strong>Você precisa assinar um plano para criar monitores.</strong>
-              <p style={styles.warningText}>
-                Escolha um plano para começar a monitorar anúncios e receber alertas em tempo real.
-              </p>
+              <strong>{t('monitors.subscriptionRequired')}</strong>
+              <p style={styles.warningText}>{t('monitors.subscriptionRequiredDesc')}</p>
             </div>
             <Link to="/settings/subscription" style={styles.upgradeButton}>
-              Ver planos
+              {t('monitors.viewPlans')}
             </Link>
           </div>
         )}
@@ -402,7 +351,7 @@ export function MonitorsPage() {
             {error.includes('limite') && (
               <div style={styles.upgradeLink}>
                 <Link to="/plans" style={styles.link}>
-                  Ver planos
+                  {t('monitors.viewPlans')}
                 </Link>
               </div>
             )}
@@ -412,25 +361,25 @@ export function MonitorsPage() {
         {/* FORMULÁRIO */}
         <form onSubmit={handleSubmit} style={styles.form}>
           <h2 style={styles.formTitle}>
-            {idSelecionado ? 'Editar Monitor' : 'Novo Monitor'}
+            {idSelecionado ? t('monitors.editMonitor') : t('monitors.newMonitor')}
           </h2>
 
           <fieldset disabled={!hasSubscription} style={styles.fieldset}>
 
           <div style={styles.field}>
-            <label style={styles.label}>Nome do monitor</label>
+            <label style={styles.label}>{t('monitors.monitorName')}</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               style={styles.input}
-              placeholder="Ex: iPhone 13 Pro usado"
+              placeholder={t('monitors.monitorNamePlaceholder')}
             />
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Site</label>
+            <label style={styles.label}>{t('monitors.site')}</label>
             <select
               value={site}
               onChange={(e) => setSite(e.target.value as MonitorSite)}
@@ -452,9 +401,9 @@ export function MonitorsPage() {
                 <>
                   <span style={styles.sessionIcon}>✅</span>
                   <div style={styles.sessionContent}>
-                    <strong>Conta conectada</strong>
+                    <strong>{t('monitors.session.connected')}</strong>
                     <p style={styles.sessionText}>
-                      Sua conta do {getSiteLabel(site)} está conectada. O monitor funcionará automaticamente.
+                      {t('monitors.session.connectedDesc', { site: getSiteLabel(site) })}
                     </p>
                   </div>
                 </>
@@ -462,27 +411,26 @@ export function MonitorsPage() {
                 <>
                   <span style={styles.sessionIcon}>⚠️</span>
                   <div style={styles.sessionContent}>
-                    <strong>Reconexão necessária</strong>
+                    <strong>{t('monitors.session.needsReauth')}</strong>
                     <p style={styles.sessionText}>
-                      Sua sessão do {getSiteLabel(site)} precisa ser reconectada para o monitor funcionar.
+                      {t('monitors.session.needsReauthDesc', { site: getSiteLabel(site) })}
                     </p>
                   </div>
                   <Link to="/settings/connections" style={styles.sessionButton}>
-                    Reconectar agora
+                    {t('monitors.session.reconnect')}
                   </Link>
                 </>
               ) : (
                 <>
                   <span style={styles.sessionIcon}>🔒</span>
                   <div style={styles.sessionContent}>
-                    <strong>Conexão necessária</strong>
+                    <strong>{t('monitors.session.loginRequired')}</strong>
                     <p style={styles.sessionText}>
-                      O {getSiteLabel(site)} requer login para mostrar todos os anúncios.
-                      Conecte sua conta para que o monitor funcione corretamente.
+                      {t('monitors.session.loginRequiredDesc', { site: getSiteLabel(site) })}
                     </p>
                   </div>
                   <Link to="/settings/connections" style={styles.sessionButton}>
-                    Conectar conta
+                    {t('monitors.session.connect')}
                   </Link>
                 </>
               )}
@@ -490,7 +438,7 @@ export function MonitorsPage() {
           )}
 
           <div style={styles.field}>
-            <label style={styles.label}>Modo de monitoramento</label>
+            <label style={styles.label}>{t('monitors.monitoringMode')}</label>
             <div style={styles.radioGroup}>
               <label style={styles.radioLabel}>
                 <input
@@ -501,7 +449,7 @@ export function MonitorsPage() {
                   style={styles.radio}
                 />
                 <span>
-                  <strong>URL específica</strong> - Monitorar uma URL de busca exata
+                  <strong>{t('monitors.urlOnly')}</strong> - {t('monitors.urlOnlyDesc')}
                 </span>
               </label>
               <label style={styles.radioLabel}>
@@ -513,8 +461,7 @@ export function MonitorsPage() {
                   style={styles.radio}
                 />
                 <span>
-                  <strong>Filtros personalizados</strong> - Usar filtros como
-                  palavra-chave, cidade, preço, etc.
+                  <strong>{t('monitors.structuredFilters')}</strong> - {t('monitors.structuredFiltersDesc')}
                 </span>
               </label>
             </div>
@@ -522,57 +469,56 @@ export function MonitorsPage() {
 
           {/* Localização (disponível em ambos os modos) */}
           <div style={styles.locationBox}>
-            <h3 style={styles.locationTitle}>Localização</h3>
+            <h3 style={styles.locationTitle}>{t('monitors.location.title')}</h3>
             <div style={styles.locationGrid}>
               <div style={styles.field}>
-                <label style={styles.labelSmall}>País</label>
+                <label style={styles.labelSmall}>{t('monitors.location.country')}</label>
                 <select
                   value={country}
                   onChange={(e) => {
                     setCountry(e.target.value);
-                    if (e.target.value === 'WORLDWIDE') {
+                    if (e.target.value === '') {
                       setStateRegion('');
                       setCity('');
                     }
                   }}
                   style={styles.input}
                 >
-                  <option value="BR">Brasil</option>
-                  <option value="US">United States</option>
-                  <option value="WORLDWIDE">Mundial (sem filtro)</option>
+                  <option value="">{t('monitors.location.worldwide')}</option>
+                  {countryList.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
                 </select>
               </div>
               <div style={styles.field}>
-                <label style={styles.labelSmall}>Estado / Região</label>
+                <label style={styles.labelSmall}>{t('monitors.location.stateRegion')}</label>
                 <input
                   type="text"
                   value={stateRegion}
                   onChange={(e) => setStateRegion(e.target.value)}
-                  disabled={country === 'WORLDWIDE'}
+                  disabled={country === ''}
                   style={styles.input}
-                  placeholder="SP, NY, etc."
+                  placeholder={t('monitors.location.stateRegionPlaceholder')}
                 />
               </div>
               <div style={styles.field}>
-                <label style={styles.labelSmall}>Cidade</label>
+                <label style={styles.labelSmall}>{t('monitors.location.city')}</label>
                 <input
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  disabled={country === 'WORLDWIDE'}
+                  disabled={country === ''}
                   style={styles.input}
-                  placeholder="São Paulo, New York..."
+                  placeholder={t('monitors.location.cityPlaceholder')}
                 />
               </div>
             </div>
-            <p style={styles.helpText}>
-              Pós-filtro best-effort. Depende do site expor localização nos anúncios.
-            </p>
+            <p style={styles.helpText}>{t('monitors.location.helpText')}</p>
           </div>
 
           {mode === 'URL_ONLY' && (
             <div style={styles.field}>
-              <label style={styles.label}>URL de busca</label>
+              <label style={styles.label}>{t('monitors.searchUrl')}</label>
               <input
                 type="url"
                 value={searchUrl}
@@ -581,19 +527,17 @@ export function MonitorsPage() {
                 style={styles.input}
                 placeholder={URL_PLACEHOLDERS[site] || 'https://...'}
               />
-              <p style={styles.helpText}>
-                Cole aqui a URL completa da busca que você quer monitorar.
-              </p>
+              <p style={styles.helpText}>{t('monitors.searchUrlHint')}</p>
             </div>
           )}
 
           {mode === 'STRUCTURED_FILTERS' && (
             <div style={styles.filtersBox}>
-              <h3 style={styles.filtersTitle}>Filtros personalizados</h3>
+              <h3 style={styles.filtersTitle}>{t('monitors.customFilters.title')}</h3>
 
               <div style={styles.filtersGrid}>
                 <div style={styles.field}>
-                  <label style={styles.labelSmall}>Palavras-chave</label>
+                  <label style={styles.labelSmall}>{t('monitors.customFilters.keywords')}</label>
                   <input
                     type="text"
                     value={filters.keywords || ''}
@@ -601,34 +545,12 @@ export function MonitorsPage() {
                       setFilters({ ...filters, keywords: e.target.value })
                     }
                     style={styles.input}
-                    placeholder="iPhone 13 Pro"
+                    placeholder={t('monitors.customFilters.keywordsPlaceholder')}
                   />
                 </div>
 
                 <div style={styles.field}>
-                  <label style={styles.labelSmall}>Cidade</label>
-                  <input
-                    type="text"
-                    value={filters.city || ''}
-                    onChange={(e) => setFilters({ ...filters, city: e.target.value })}
-                    style={styles.input}
-                    placeholder="São Paulo"
-                  />
-                </div>
-
-                <div style={styles.field}>
-                  <label style={styles.labelSmall}>Estado</label>
-                  <input
-                    type="text"
-                    value={filters.state || ''}
-                    onChange={(e) => setFilters({ ...filters, state: e.target.value })}
-                    style={styles.input}
-                    placeholder="SP"
-                  />
-                </div>
-
-                <div style={styles.field}>
-                  <label style={styles.labelSmall}>Categoria</label>
+                  <label style={styles.labelSmall}>{t('monitors.customFilters.category')}</label>
                   <input
                     type="text"
                     value={filters.category || ''}
@@ -636,12 +558,12 @@ export function MonitorsPage() {
                       setFilters({ ...filters, category: e.target.value })
                     }
                     style={styles.input}
-                    placeholder="Eletrônicos"
+                    placeholder={t('monitors.customFilters.categoryPlaceholder')}
                   />
                 </div>
 
                 <div style={styles.field}>
-                  <label style={styles.labelSmall}>Preço mínimo (R$)</label>
+                  <label style={styles.labelSmall}>{t('monitors.customFilters.minPrice')}</label>
                   <input
                     type="number"
                     min="0"
@@ -659,7 +581,7 @@ export function MonitorsPage() {
                 </div>
 
                 <div style={styles.field}>
-                  <label style={styles.labelSmall}>Preço máximo (R$)</label>
+                  <label style={styles.labelSmall}>{t('monitors.customFilters.maxPrice')}</label>
                   <input
                     type="number"
                     min="0"
@@ -677,7 +599,7 @@ export function MonitorsPage() {
                 </div>
 
                 <div style={styles.field}>
-                  <label style={styles.labelSmall}>Ano mínimo</label>
+                  <label style={styles.labelSmall}>{t('monitors.customFilters.minYear')}</label>
                   <input
                     type="number"
                     min="1900"
@@ -695,7 +617,7 @@ export function MonitorsPage() {
                 </div>
 
                 <div style={styles.field}>
-                  <label style={styles.labelSmall}>Ano máximo</label>
+                  <label style={styles.labelSmall}>{t('monitors.customFilters.maxYear')}</label>
                   <input
                     type="number"
                     min="1900"
@@ -714,7 +636,7 @@ export function MonitorsPage() {
               </div>
 
               <div style={styles.field}>
-                <label style={styles.labelSmall}>URL base (opcional)</label>
+                <label style={styles.labelSmall}>{t('monitors.baseUrl')}</label>
                 <input
                   type="url"
                   value={searchUrl}
@@ -722,9 +644,7 @@ export function MonitorsPage() {
                   style={styles.input}
                   placeholder="https://www.olx.com.br/"
                 />
-                <p style={styles.helpText}>
-                  Opcional: URL base do site para facilitar a busca
-                </p>
+                <p style={styles.helpText}>{t('monitors.baseUrlHint')}</p>
               </div>
             </div>
           )}
@@ -736,7 +656,7 @@ export function MonitorsPage() {
                 checked={active}
                 onChange={(e) => setActive(e.target.checked)}
               />
-              <span>Monitor ativo</span>
+              <span>{t('monitors.monitorActive')}</span>
             </label>
           </div>
 
@@ -744,30 +664,30 @@ export function MonitorsPage() {
 
           <div style={styles.buttons}>
             <button type="submit" disabled={saving || !hasSubscription} style={styles.saveButton}>
-              {saving ? 'Salvando...' : idSelecionado ? 'Atualizar' : 'Criar monitor'}
+              {saving ? t('monitors.saving') : idSelecionado ? t('monitors.update') : t('monitors.create')}
             </button>
 
             {idSelecionado && (
               <button
                 type="button"
-                onClick={handleCancelEdit}
+                onClick={resetForm}
                 style={styles.cancelButton}
               >
-                Cancelar
+                {t('monitors.cancel')}
               </button>
             )}
           </div>
         </form>
 
         {/* LISTA */}
-        <h2 style={styles.sectionTitle}>Seus Monitores</h2>
+        <h2 style={styles.sectionTitle}>{t('monitors.yourMonitors')}</h2>
 
-        {loadingLista && <p style={styles.loading}>Carregando monitores...</p>}
+        {loadingLista && <p style={styles.loading}>{t('monitors.loadingMonitors')}</p>}
 
         {!loadingLista && !error && monitors.length === 0 && (
           <div style={styles.emptyState}>
-            <p>Nenhum monitor cadastrado ainda.</p>
-            <p>Crie seu primeiro monitor acima para começar!</p>
+            <p>{t('monitors.noMonitors')}</p>
+            <p>{t('monitors.noMonitorsHint')}</p>
           </div>
         )}
 
@@ -776,12 +696,12 @@ export function MonitorsPage() {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Nome</th>
-                  <th style={styles.th}>Site</th>
-                  <th style={styles.th}>Modo</th>
-                  <th style={styles.th}>URL</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Ações</th>
+                  <th style={styles.th}>{t('monitors.name')}</th>
+                  <th style={styles.th}>{t('monitors.site')}</th>
+                  <th style={styles.th}>{t('monitors.mode')}</th>
+                  <th style={styles.th}>{t('monitors.url')}</th>
+                  <th style={styles.th}>{t('monitors.status')}</th>
+                  <th style={styles.th}>{t('monitors.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -791,9 +711,9 @@ export function MonitorsPage() {
                     <td style={styles.td}>{getSiteLabel(monitor.site)}</td>
                     <td style={styles.td}>
                       {monitor.mode === 'STRUCTURED_FILTERS' ? (
-                        <span style={styles.badgeFilters}>Filtros</span>
+                        <span style={styles.badgeFilters}>{t('monitors.filters')}</span>
                       ) : (
-                        <span style={styles.badgeUrl}>URL</span>
+                        <span style={styles.badgeUrl}>{t('monitors.urlBadge')}</span>
                       )}
                     </td>
                     <td style={styles.tdUrl}>
@@ -812,20 +732,20 @@ export function MonitorsPage() {
                     </td>
                     <td style={styles.tdCenter}>
                       {monitor.active ? (
-                        <span style={styles.badgeActive}>✅ Ativo</span>
+                        <span style={styles.badgeActive}>✅ {t('monitors.active')}</span>
                       ) : (
-                        <span style={styles.badgeInactive}>❌ Inativo</span>
+                        <span style={styles.badgeInactive}>❌ {t('monitors.inactive')}</span>
                       )}
                     </td>
                     <td style={styles.tdCenter}>
                       <button onClick={() => handleEdit(monitor)} style={styles.editBtn}>
-                        Editar
+                        {t('monitors.edit')}
                       </button>
                       <button
                         onClick={() => handleDelete(monitor.id)}
                         style={styles.deleteBtn}
                       >
-                        Excluir
+                        {t('monitors.delete')}
                       </button>
                     </td>
                   </tr>

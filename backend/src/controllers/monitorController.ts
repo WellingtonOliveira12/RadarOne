@@ -137,14 +137,23 @@ export async function createMonitor(
       return;
     }
 
-    // Validação de localização
-    const VALID_COUNTRIES = ['WORLDWIDE', 'BR', 'US'];
-    const country = rawCountry && VALID_COUNTRIES.includes(rawCountry) ? rawCountry : 'BR';
-    const stateRegion = country === 'WORLDWIDE' ? null
+    // Validação de localização (ISO-3166-1 alpha-2 ou null = sem filtro)
+    let country: string | null = null;
+    if (rawCountry && typeof rawCountry === 'string' && rawCountry.trim() !== '') {
+      country = rawCountry.trim().toUpperCase();
+      if (!/^[A-Z]{2}$/.test(country)) {
+        res.status(400).json({
+          error: 'Erro de validação',
+          message: 'Código de país inválido. Use ISO-3166 alpha-2 (ex: BR, US, AR)',
+        });
+        return;
+      }
+    }
+    const stateRegion = !country ? null
       : (rawState && typeof rawState === 'string' && rawState.trim().length >= 2 && rawState.trim().length <= 40)
         ? rawState.trim().toUpperCase()
         : null;
-    const city = country === 'WORLDWIDE' ? null
+    const city = !country ? null
       : (rawCity && typeof rawCity === 'string' && rawCity.trim().length >= 2 && rawCity.trim().length <= 80)
         ? rawCity.trim()
         : null;
@@ -248,19 +257,30 @@ export async function updateMonitor(
       return;
     }
 
-    // Validação de localização (se fornecidos)
-    const VALID_COUNTRIES = ['WORLDWIDE', 'BR', 'US'];
-    const country = rawCountry !== undefined
-      ? (VALID_COUNTRIES.includes(rawCountry) ? rawCountry : 'BR')
-      : undefined;
-    const effectiveCountry = country || rawCountry;
-    const stateRegion = effectiveCountry === 'WORLDWIDE' ? null
+    // Validação de localização (ISO-3166-1 alpha-2 ou null = sem filtro)
+    let country: string | null | undefined = undefined;
+    if (rawCountry !== undefined) {
+      if (rawCountry && typeof rawCountry === 'string' && rawCountry.trim() !== '') {
+        country = rawCountry.trim().toUpperCase();
+        if (!/^[A-Z]{2}$/.test(country)) {
+          res.status(400).json({
+            error: 'Erro de validação',
+            message: 'Código de país inválido. Use ISO-3166 alpha-2 (ex: BR, US, AR)',
+          });
+          return;
+        }
+      } else {
+        country = null; // '' ou null = sem filtro
+      }
+    }
+    const effectiveCountry = country !== undefined ? country : rawCountry;
+    const stateRegion = effectiveCountry === null ? null
       : (rawState !== undefined)
         ? (typeof rawState === 'string' && rawState.trim().length >= 2 && rawState.trim().length <= 40
             ? rawState.trim().toUpperCase()
             : null)
         : undefined;
-    const city = effectiveCountry === 'WORLDWIDE' ? null
+    const city = effectiveCountry === null ? null
       : (rawCity !== undefined)
         ? (typeof rawCity === 'string' && rawCity.trim().length >= 2 && rawCity.trim().length <= 80
             ? rawCity.trim()

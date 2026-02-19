@@ -355,7 +355,7 @@ model Monitor {
   priceMax Float? @map("price_max")
 
   // Filtros de Localização (globais)
-  country     String  @default("BR")              // Enum: WORLDWIDE | BR | US (ISO-2)
+  country     String?                              // ISO-3166-1 alpha-2 (ex: BR, US) ou null = sem filtro
   stateRegion String? @map("state_region")         // "SP", "NY", etc.
   city        String?                              // "São Paulo", "New York"
 

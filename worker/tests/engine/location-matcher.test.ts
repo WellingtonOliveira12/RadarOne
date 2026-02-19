@@ -117,4 +117,49 @@ describe('matchLocation', () => {
       expect(result.reason).toBe('location_city_mismatch');
     }
   });
+
+  // Null/empty country = sem filtro (match everything)
+  it('should match everything when country is null', () => {
+    const filter: LocationFilter = { country: null };
+    expect(matchLocation('New York, NY', filter)).toEqual({ match: true });
+    expect(matchLocation('São Paulo, SP', filter)).toEqual({ match: true });
+    expect(matchLocation('', filter)).toEqual({ match: true });
+  });
+
+  it('should match everything when country is empty string', () => {
+    const filter: LocationFilter = { country: '' };
+    expect(matchLocation('Tokyo, Japan', filter)).toEqual({ match: true });
+  });
+
+  it('should match everything when country is undefined', () => {
+    const filter: LocationFilter = {};
+    expect(matchLocation('Berlin, Germany', filter)).toEqual({ match: true });
+  });
+
+  // Other countries (not BR/US): only state/city, no country pattern matching
+  it('should match for non-BR/US country with no state/city filter', () => {
+    const filter: LocationFilter = { country: 'ES' };
+    expect(matchLocation('Madrid', filter).match).toBe(true);
+    expect(matchLocation('Barcelona, Cataluña', filter).match).toBe(true);
+  });
+
+  it('should filter by state for non-BR/US country', () => {
+    const filter: LocationFilter = { country: 'ES', stateRegion: 'CATALUÑA' };
+    expect(matchLocation('Barcelona, Cataluña', filter).match).toBe(true);
+    const result = matchLocation('Madrid', filter);
+    expect(result.match).toBe(false);
+    if (!result.match) {
+      expect(result.reason).toBe('location_state_mismatch');
+    }
+  });
+
+  it('should filter by city for non-BR/US country', () => {
+    const filter: LocationFilter = { country: 'AR', city: 'Buenos Aires' };
+    expect(matchLocation('Buenos Aires, Argentina', filter).match).toBe(true);
+    const result = matchLocation('Córdoba, Argentina', filter);
+    expect(result.match).toBe(false);
+    if (!result.match) {
+      expect(result.reason).toBe('location_city_mismatch');
+    }
+  });
 });

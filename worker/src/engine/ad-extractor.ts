@@ -156,7 +156,7 @@ export async function extractAds(
     }
 
     // Location filter (best-effort: depends on site exposing ad.location)
-    if (monitor.country && monitor.country !== 'WORLDWIDE') {
+    if (monitor.country) {
       const locResult = matchLocation(raw.location, {
         country: monitor.country,
         stateRegion: monitor.stateRegion,

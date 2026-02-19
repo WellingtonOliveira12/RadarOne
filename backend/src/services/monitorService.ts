@@ -18,7 +18,7 @@ export interface CreateMonitorInput {
   searchUrl: string;
   priceMin?: number;
   priceMax?: number;
-  country?: string;
+  country?: string | null;
   stateRegion?: string | null;
   city?: string | null;
 }
@@ -30,7 +30,7 @@ export interface UpdateMonitorInput {
   priceMin?: number;
   priceMax?: number;
   active?: boolean;
-  country?: string;
+  country?: string | null;
   stateRegion?: string | null;
   city?: string | null;
 }
