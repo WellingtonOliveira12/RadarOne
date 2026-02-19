@@ -58,6 +58,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../components/AppLayout';
 import { api } from '../services/api';
 
@@ -228,6 +229,7 @@ interface SessionsResponse {
 // ============================================================
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   const config: Record<string, { colorScheme: string; icon: any }> = {
     ACTIVE: { colorScheme: 'green', icon: CheckCircle },
     NEEDS_REAUTH: { colorScheme: 'orange', icon: AlertTriangle },
@@ -237,30 +239,35 @@ function StatusBadge({ status }: { status: string }) {
   };
 
   const { colorScheme, icon } = config[status] || config.NOT_CONNECTED;
-  const labels: Record<string, string> = {
-    ACTIVE: 'Conectado',
-    NEEDS_REAUTH: 'Reconectar',
-    EXPIRED: 'Expirado',
-    INVALID: 'Inválido',
+  const labelKeys: Record<string, string> = {
+    ACTIVE: 'connections.status.connected',
+    NEEDS_REAUTH: 'connections.status.needsReauth',
+    EXPIRED: 'connections.status.expired',
+    INVALID: 'connections.status.invalid',
   };
 
   return (
     <Badge colorScheme={colorScheme} display="flex" alignItems="center" gap={1}>
       <Icon as={icon} boxSize={3} />
-      {labels[status] || 'Não conectado'}
+      {t(labelKeys[status] || 'connections.status.notConnected')}
     </Badge>
   );
 }
 
 function ExpirationCountdown({ expiresAt }: { expiresAt: string | null }) {
+  const { t } = useTranslation();
   const daysLeft = getDaysUntilExpiration(expiresAt);
   if (daysLeft === null) return null;
+
+  const expiresLabel = daysLeft === 1
+    ? t('connections.expiration.expiresIn', { days: 1 })
+    : t('connections.expiration.expiresIn_plural', { days: daysLeft });
 
   if (daysLeft <= 0) {
     return (
       <Badge colorScheme="red" display="flex" alignItems="center" gap={1}>
         <Icon as={Clock} boxSize={3} />
-        Expirado
+        {t('connections.expiration.expired')}
       </Badge>
     );
   }
@@ -269,7 +276,7 @@ function ExpirationCountdown({ expiresAt }: { expiresAt: string | null }) {
     return (
       <Badge colorScheme="red" display="flex" alignItems="center" gap={1}>
         <Icon as={Clock} boxSize={3} />
-        Expira em {daysLeft} dia{daysLeft > 1 ? 's' : ''}
+        {expiresLabel}
       </Badge>
     );
   }
@@ -278,14 +285,14 @@ function ExpirationCountdown({ expiresAt }: { expiresAt: string | null }) {
     return (
       <Badge colorScheme="orange" display="flex" alignItems="center" gap={1}>
         <Icon as={Clock} boxSize={3} />
-        Expira em {daysLeft} dias
+        {expiresLabel}
       </Badge>
     );
   }
 
   return (
     <Text fontSize="xs" color="gray.500">
-      Expira em {daysLeft} dias
+      {expiresLabel}
     </Text>
   );
 }
@@ -309,6 +316,7 @@ function ConnectionWizard({
   onUploadSuccess: () => void;
   serverUnavailable: boolean;
 }) {
+  const { t } = useTranslation();
   const providerConfig = getProviderConfig(siteId);
   const { onCopy, hasCopied } = useClipboard(providerConfig.playwrightCommand);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -346,12 +354,12 @@ function ConnectionWizard({
   const processFile = async (file: File) => {
     setUploadError(null);
     if (file.size > 5 * 1024 * 1024) {
-      setValidationResult({ valid: false, error: 'Arquivo muito grande (max 5 MB).' });
+      setValidationResult({ valid: false, error: t('connections.validation.fileTooLarge') });
       setSelectedFile(file);
       return;
     }
     if (!file.name.endsWith('.json')) {
-      setValidationResult({ valid: false, error: 'Selecione um arquivo .json' });
+      setValidationResult({ valid: false, error: t('connections.validation.jsonOnly') });
       setSelectedFile(file);
       return;
     }
@@ -394,7 +402,7 @@ function ConnectionWizard({
       setIsUploading(true);
 
       // Step 1: Wake server with health ping (fast, no auth needed)
-      setUploadStatus('Verificando servidor...');
+      setUploadStatus(t('connections.wizard.checkingServer'));
       try {
         await api.request('/health', { method: 'GET', timeout: 15000, skipAutoLogout: true });
       } catch {
@@ -402,7 +410,7 @@ function ConnectionWizard({
       }
 
       // Step 2: Upload
-      setUploadStatus('Enviando arquivo de sessão...');
+      setUploadStatus(t('connections.wizard.uploadingSession'));
       await api.requestWithRetry(`/api/sessions/${siteId}/upload`, {
         method: 'POST',
         body: { storageState: validationResult.normalized },
@@ -410,8 +418,8 @@ function ConnectionWizard({
       });
 
       toast({
-        title: 'Conta conectada!',
-        description: `Sessão salva com ${validationResult.cookiesCount} cookies. Seus monitores agora funcionarão automaticamente.`,
+        title: t('connections.wizard.successTitle'),
+        description: t('connections.wizard.successDesc', { count: validationResult.cookiesCount }),
         status: 'success',
         duration: 5000,
       });
@@ -423,21 +431,21 @@ function ConnectionWizard({
       let details: string | undefined;
 
       if (error.isNetworkError || error.errorCode === 'NETWORK_ERROR' || error.errorCode === 'NETWORK_TIMEOUT') {
-        message = 'O servidor não respondeu. Ele pode estar iniciando (isso leva até 60 segundos no primeiro acesso do dia).';
+        message = t('connections.errors.networkError');
         details = `Código: ${error.errorCode || 'NETWORK_ERROR'} | Tentativas: 3`;
       } else if (error.status === 401) {
-        message = 'Sua sessão do RadarOne expirou. Faça login novamente.';
+        message = t('connections.errors.authExpired');
         details = `HTTP 401 — ${error.errorCode || 'INVALID_TOKEN'}`;
         setUploadError({ message, details, isAuthError: true });
         return;
       } else if (error.status === 400) {
-        message = error.message || 'O servidor rejeitou o arquivo. Verifique se é um arquivo de sessão válido.';
+        message = error.message || t('connections.errors.rejected');
         details = `HTTP 400 — ${error.errorCode || 'VALIDATION_ERROR'}`;
       } else if (error.status >= 500) {
-        message = 'Erro interno no servidor. Tente novamente em instantes.';
+        message = t('connections.errors.internalServer');
         details = `HTTP ${error.status} — ${error.errorCode || 'SERVER_ERROR'}`;
       } else {
-        message = error.message || 'Erro desconhecido. Tente novamente.';
+        message = error.message || t('connections.errors.unknownUpload');
         details = error.status ? `HTTP ${error.status}` : undefined;
       }
 
@@ -452,37 +460,34 @@ function ConnectionWizard({
     <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader>Conectar conta &ndash; {siteName}</ModalHeader>
+        <ModalHeader>{t('connections.wizard.title', { site: siteName })}</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
           <VStack spacing={5} align="stretch">
             <Alert status="info" borderRadius="md">
               <AlertIcon />
               <Box fontSize="sm">
-                <Text>
-                  O {siteName} exige login para mostrar certos anun&#x301;cios. Para o RadarOne monitorar por voce&#x302;,
-                  precisamos de um <strong>Arquivo de Sessão (.json)</strong>.
-                </Text>
+                <Text dangerouslySetInnerHTML={{ __html: t('connections.wizard.intro', { site: siteName }) }} />
                 <Text mt={1} fontWeight="medium">
-                  Sua senha nunca é pedida nem armazenada.
+                  {t('connections.wizard.noPassword')}
                 </Text>
               </Box>
             </Alert>
 
-            <Heading size="sm">Como gerar o arquivo</Heading>
+            <Heading size="sm">{t('connections.wizard.howToGenerate')}</Heading>
 
             <Tabs variant="enclosed" colorScheme="blue">
               <TabList>
                 <Tab data-testid="tab-extensao">
                   <HStack spacing={1}>
                     <Icon as={FileText} boxSize={4} />
-                    <Text>Via Cookies (Recomendado)</Text>
+                    <Text>{t('connections.wizard.tabCookies')}</Text>
                   </HStack>
                 </Tab>
                 <Tab data-testid="tab-automatico">
                   <HStack spacing={1}>
                     <Icon as={Terminal} boxSize={4} />
-                    <Text>Automático</Text>
+                    <Text>{t('connections.wizard.tabAutomatic')}</Text>
                   </HStack>
                 </Tab>
               </TabList>
@@ -492,15 +497,15 @@ function ConnectionWizard({
                 <TabPanel px={0}>
                   <Box bg="green.50" border="1px solid" borderColor="green.200" borderRadius="md" p={2} mb={3}>
                     <HStack>
-                      <Badge colorScheme="green" fontSize="xs">Recomendado</Badge>
-                      <Text fontSize="xs" color="green.700">Mais simples e prático para a maioria dos usuários.</Text>
+                      <Badge colorScheme="green" fontSize="xs">{t('connections.wizard.recommended')}</Badge>
+                      <Text fontSize="xs" color="green.700">{t('connections.wizard.recommendedDesc')}</Text>
                     </HStack>
                   </Box>
                   <VStack align="start" spacing={3}>
                     <Box>
-                      <Text fontWeight="medium" fontSize="sm" mb={1}>1. Instale uma extensão que exporte cookies para JSON.</Text>
+                      <Text fontWeight="medium" fontSize="sm" mb={1}>{t('connections.wizard.step1Cookies')}</Text>
                       <Text fontSize="xs" color="gray.500" mb={2}>
-                        Clique para instalar direto da Chrome Web Store:
+                        {t('connections.wizard.step1CookiesHint')}
                       </Text>
                       <VStack align="start" spacing={1} pl={3}>
                         <a
@@ -531,15 +536,15 @@ function ConnectionWizard({
                     </Box>
 
                     <Box>
-                      <Text fontWeight="medium" fontSize="sm">2. Faça login no {providerConfig.loginUrl}.</Text>
+                      <Text fontWeight="medium" fontSize="sm">{t('connections.wizard.step2Cookies', { url: providerConfig.loginUrl })}</Text>
                     </Box>
 
                     <Box>
-                      <Text fontWeight="medium" fontSize="sm">3. Use a extensão para exportar os cookies como .json.</Text>
+                      <Text fontWeight="medium" fontSize="sm">{t('connections.wizard.step3Cookies')}</Text>
                     </Box>
 
                     <Box>
-                      <Text fontWeight="medium" fontSize="sm">4. Envie o arquivo .json na área abaixo.</Text>
+                      <Text fontWeight="medium" fontSize="sm">{t('connections.wizard.step4Cookies')}</Text>
                     </Box>
                   </VStack>
                 </TabPanel>
@@ -548,12 +553,11 @@ function ConnectionWizard({
                 <TabPanel px={0}>
                   <VStack align="start" spacing={3}>
                     <Text fontSize="sm" color="gray.600">
-                      Gera o arquivo direto no seu computador. Você fará login numa janela de navegador;
-                      o RadarOne não vê sua senha.
+                      {t('connections.wizard.autoDesc')}
                     </Text>
 
                     <Box w="100%">
-                      <Text fontWeight="medium" fontSize="sm" mb={1}>1. Abra o terminal e cole este comando:</Text>
+                      <Text fontWeight="medium" fontSize="sm" mb={1}>{t('connections.wizard.step1Auto')}</Text>
                       <HStack
                         bg="gray.50"
                         border="1px solid"
@@ -573,20 +577,18 @@ function ConnectionWizard({
                           flexShrink={0}
                           data-testid="copy-command-btn"
                         >
-                          {hasCopied ? 'Copiado' : 'Copiar'}
+                          {hasCopied ? t('connections.wizard.copied') : t('connections.wizard.copy')}
                         </Button>
                       </HStack>
                     </Box>
 
                     <Box>
-                      <Text fontWeight="medium" fontSize="sm">2. Faça login no {providerConfig.displayName} na janela que abrir.</Text>
-                      <Text fontSize="xs" color="gray.500">Depois feche a janela do navegador.</Text>
+                      <Text fontWeight="medium" fontSize="sm">{t('connections.wizard.step2Auto', { site: providerConfig.displayName })}</Text>
+                      <Text fontSize="xs" color="gray.500">{t('connections.wizard.step2AutoHint')}</Text>
                     </Box>
 
                     <Box>
-                      <Text fontWeight="medium" fontSize="sm">
-                        3. Envie o arquivo <Code fontSize="xs">sessao.json</Code> gerado na área abaixo.
-                      </Text>
+                      <Text fontWeight="medium" fontSize="sm" dangerouslySetInnerHTML={{ __html: t('connections.wizard.step3Auto') }} />
                     </Box>
                   </VStack>
                 </TabPanel>
@@ -595,7 +597,7 @@ function ConnectionWizard({
 
             {/* UPLOAD AREA */}
             <Divider />
-            <Heading size="sm">Enviar Arquivo de Sessão</Heading>
+            <Heading size="sm">{t('connections.wizard.uploadTitle')}</Heading>
 
             <Box
               ref={dropZoneRef}
@@ -634,16 +636,16 @@ function ConnectionWizard({
                       {selectedFile.name}
                     </Text>
                     {validationResult?.valid && (
-                      <Badge colorScheme="green">{validationResult.cookiesCount} cookies encontrados</Badge>
+                      <Badge colorScheme="green">{t('connections.wizard.cookiesFound', { count: validationResult.cookiesCount })}</Badge>
                     )}
                   </>
                 ) : (
                   <>
                     <Text fontSize="sm" color="gray.500">
-                      Arraste o arquivo .json aqui ou clique para escolher
+                      {t('connections.wizard.dropHint')}
                     </Text>
                     <Text fontSize="xs" color="gray.400">
-                      Tamanho máximo: 5 MB
+                      {t('connections.wizard.maxSize')}
                     </Text>
                   </>
                 )}
@@ -655,7 +657,7 @@ function ConnectionWizard({
               <Alert status="error" borderRadius="md" data-testid="validation-error">
                 <AlertIcon />
                 <Box fontSize="sm">
-                  <AlertTitle>Arquivo inválido</AlertTitle>
+                  <AlertTitle>{t('connections.wizard.invalidFile')}</AlertTitle>
                   <AlertDescription>{validationResult.error}</AlertDescription>
                 </Box>
               </Alert>
@@ -666,9 +668,9 @@ function ConnectionWizard({
               <Alert status="warning" borderRadius="md" data-testid="server-warning">
                 <AlertIcon />
                 <Box fontSize="sm">
-                  <AlertTitle>Servidor iniciando</AlertTitle>
+                  <AlertTitle>{t('connections.wizard.serverStarting')}</AlertTitle>
                   <AlertDescription>
-                    O servidor pode estar em processo de inicialização. O envio pode demorar até 60 segundos.
+                    {t('connections.wizard.serverStartingDesc')}
                   </AlertDescription>
                 </Box>
               </Alert>
@@ -679,11 +681,11 @@ function ConnectionWizard({
               <Alert status={uploadError.isAuthError ? 'warning' : 'error'} borderRadius="md" data-testid="upload-error">
                 <AlertIcon />
                 <Box fontSize="sm" flex="1">
-                  <AlertTitle>{uploadError.isAuthError ? 'Sessão expirada' : 'Erro ao conectar conta'}</AlertTitle>
+                  <AlertTitle>{uploadError.isAuthError ? t('connections.wizard.sessionExpired') : t('connections.wizard.uploadError')}</AlertTitle>
                   <AlertDescription>{uploadError.message}</AlertDescription>
                   {uploadError.details && (
                     <Text fontSize="xs" color="gray.500" mt={1}>
-                      Detalhes técnicos: {uploadError.details}
+                      {t('connections.wizard.technicalDetails', { details: uploadError.details })}
                     </Text>
                   )}
                   {uploadError.isAuthError && (
@@ -693,7 +695,7 @@ function ConnectionWizard({
                       mt={2}
                       onClick={() => { window.location.href = '/login?reason=session_expired'; }}
                     >
-                      Fazer login
+                      {t('connections.wizard.doLogin')}
                     </Button>
                   )}
                 </Box>
@@ -704,18 +706,18 @@ function ConnectionWizard({
         <ModalFooter>
           <HStack spacing={3}>
             <Button variant="ghost" onClick={onClose}>
-              Cancelar
+              {t('connections.wizard.cancel')}
             </Button>
             <Button
               colorScheme={uploadError ? 'orange' : 'blue'}
               leftIcon={<Upload size={16} />}
               isDisabled={!validationResult?.valid}
               isLoading={isUploading}
-              loadingText={uploadStatus || 'Enviando...'}
+              loadingText={uploadStatus || t('connections.wizard.sending')}
               onClick={handleSubmit}
               data-testid="submit-upload-btn"
             >
-              {uploadError ? 'Tentar novamente' : 'Conectar conta'}
+              {uploadError ? t('connections.wizard.tryAgain') : t('connections.wizard.submit')}
             </Button>
           </HStack>
         </ModalFooter>
@@ -739,6 +741,7 @@ function SiteCard({
   onConnectClick: () => void;
   onDelete: (siteId: string) => void;
 }) {
+  const { t } = useTranslation();
   const daysLeft = getDaysUntilExpiration(session?.expiresAt || null);
   const needsAction = session && session.status !== 'ACTIVE';
   const expirationWarning = session?.status === 'ACTIVE' && daysLeft !== null && daysLeft <= 7;
@@ -759,12 +762,12 @@ function SiteCard({
   };
 
   const buttonLabel = needsAction
-    ? 'Reconectar agora'
+    ? t('connections.card.reconnectNow')
     : expirationWarning
-    ? 'Renovar sessão'
+    ? t('connections.card.renewSession')
     : session
-    ? 'Atualizar sessão'
-    : 'Conectar conta';
+    ? t('connections.card.updateSession')
+    : t('connections.card.connectAccount');
 
   return (
     <Card variant="outline" borderColor={getBorderColor()} bg={getBgColor()}>
@@ -775,7 +778,7 @@ function SiteCard({
               <Heading size="md">{site.name}</Heading>
               <Badge colorScheme="purple" fontSize="xs" display="flex" alignItems="center" gap={1}>
                 <Icon as={Shield} boxSize={3} />
-                Requer login
+                {t('connections.requiresLogin')}
               </Badge>
             </HStack>
             <Text fontSize="sm" color="gray.500">{site.domains[0]}</Text>
@@ -789,14 +792,14 @@ function SiteCard({
           <VStack align="start" spacing={2} mb={4}>
             <HStack fontSize="sm" color="gray.600" justify="space-between" width="100%">
               <HStack>
-                <Text>Cookies:</Text>
+                <Text>{t('connections.card.cookies')}</Text>
                 <Text fontWeight="medium">{session.cookiesCount}</Text>
               </HStack>
               <ExpirationCountdown expiresAt={session.expiresAt} />
             </HStack>
             {session.lastUsedAt && (
               <HStack fontSize="sm" color="gray.600">
-                <Text>Último uso:</Text>
+                <Text>{t('connections.card.lastUsed')}</Text>
                 <Text fontWeight="medium">
                   {new Date(session.lastUsedAt).toLocaleDateString('pt-BR', {
                     day: '2-digit',
@@ -815,12 +818,12 @@ function SiteCard({
             <AlertIcon />
             <Box>
               <AlertTitle fontSize="sm">
-                {daysLeft <= 3 ? 'Expira muito em breve!' : 'Expira em breve'}
+                {daysLeft <= 3 ? t('connections.card.expiresVerySoon') : t('connections.card.expiresSoon')}
               </AlertTitle>
               <AlertDescription fontSize="xs">
                 {daysLeft <= 1
-                  ? 'Sua sessão expira hoje ou amanhã. Recomendamos reconectar agora.'
-                  : `Sua sessão expira em ${daysLeft} dias. Recomendamos reconectar em breve.`}
+                  ? t('connections.card.expiresRecommendNow')
+                  : t('connections.card.expiresRecommendSoon', { days: daysLeft })}
               </AlertDescription>
             </Box>
           </Alert>
@@ -830,13 +833,13 @@ function SiteCard({
           <Alert status="warning" mb={4} borderRadius="md">
             <AlertIcon />
             <Box>
-              <AlertTitle fontSize="sm">Ação necessária</AlertTitle>
+              <AlertTitle fontSize="sm">{t('connections.card.actionRequired')}</AlertTitle>
               <AlertDescription fontSize="xs">
                 {session.status === 'NEEDS_REAUTH'
-                  ? 'O site pediu login novamente. Gere um novo arquivo de sessão para continuar monitorando.'
+                  ? t('connections.card.needsReauthDesc')
                   : session.status === 'EXPIRED'
-                  ? 'Sua sessão expirou. Gere um novo arquivo de sessão.'
-                  : 'Sessão inválida. Por favor, gere uma nova sessão.'}
+                  ? t('connections.card.expiredDesc')
+                  : t('connections.card.invalidDesc')}
               </AlertDescription>
             </Box>
           </Alert>
@@ -846,10 +849,9 @@ function SiteCard({
           <Alert status="info" mb={4} borderRadius="md">
             <AlertIcon />
             <Box>
-              <AlertTitle fontSize="sm">Conecte sua conta</AlertTitle>
+              <AlertTitle fontSize="sm">{t('connections.card.connectTitle')}</AlertTitle>
               <AlertDescription fontSize="xs">
-                Para monitorar anúncios do {site.name}, você precisa conectar sua conta
-                enviando um Arquivo de Sessão (.json). Nunca pedimos sua senha.
+                {t('connections.card.connectDesc', { site: site.name })}
               </AlertDescription>
             </Box>
           </Alert>
@@ -873,7 +875,7 @@ function SiteCard({
               size="sm"
               onClick={() => onDelete(site.id)}
             >
-              Remover
+              {t('connections.card.remove')}
             </Button>
           )}
         </HStack>
@@ -900,6 +902,7 @@ const FALLBACK_SUPPORTED_SITES: SupportedSite[] = [
 ];
 
 export default function ConnectionsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<SiteSession[]>([]);
   const [supportedSites, setSupportedSites] = useState<SupportedSite[]>([]);
@@ -926,16 +929,16 @@ export default function ConnectionsPage() {
       setSessions(data.sessions || []);
       setSupportedSites(data.supportedSites || []);
     } catch (error: any) {
-      let description = 'Erro desconhecido. Tente novamente.';
+      let description = t('connections.errors.unknown');
       if (error.isNetworkError || error.isColdStart) {
-        description = 'Servidor temporariamente indisponível. Tente novamente em instantes.';
+        description = t('connections.errors.serverUnavailable');
       } else if (error.status === 401) {
-        description = 'Sua sessão do RadarOne expirou. Faça login novamente.';
+        description = t('connections.errors.sessionExpired');
         setIsSessionExpired(true);
       } else if (error.status >= 500) {
-        description = 'Erro no servidor. Tente novamente.';
+        description = t('connections.errors.serverError');
       } else if (error.status === 404) {
-        description = 'Serviço não encontrado. Contate o suporte.';
+        description = t('connections.errors.notFound');
       } else if (error.message) {
         description = error.message;
       }
@@ -960,11 +963,11 @@ export default function ConnectionsPage() {
         method: 'DELETE',
         skipAutoLogout: true,
       });
-      toast({ title: 'Sessão removida', status: 'success', duration: 3000 });
+      toast({ title: t('connections.errors.deleteSuccess'), status: 'success', duration: 3000 });
       fetchSessions();
     } catch (error: any) {
       toast({
-        title: 'Erro ao remover sessão',
+        title: t('connections.errors.deleteError'),
         description: error.message,
         status: 'error',
         duration: 5000,
@@ -997,15 +1000,15 @@ export default function ConnectionsPage() {
           alignSelf="flex-start"
           onClick={() => navigate('/monitors')}
         >
-          Voltar para Monitores
+          {t('connections.backToMonitors')}
         </Button>
 
         {/* Header */}
         <HStack justify="space-between">
           <VStack align="start" spacing={1}>
-            <Heading size="lg">Conexões</Heading>
+            <Heading size="lg">{t('connections.title')}</Heading>
             <Text color="gray.600">
-              Conecte suas contas para monitorar sites que requerem login
+              {t('connections.subtitle')}
             </Text>
           </VStack>
           <Button
@@ -1014,7 +1017,7 @@ export default function ConnectionsPage() {
             size="sm"
             onClick={fetchSessions}
           >
-            Atualizar
+            {t('connections.refresh')}
           </Button>
         </HStack>
 
@@ -1024,9 +1027,9 @@ export default function ConnectionsPage() {
           <Alert status="warning" borderRadius="md">
             <AlertIcon />
             <Box>
-              <AlertTitle>Algumas conexões precisam de atenção</AlertTitle>
+              <AlertTitle>{t('connections.alerts.needsAttention')}</AlertTitle>
               <AlertDescription>
-                Reconecte as contas marcadas em laranja para continuar monitorando.
+                {t('connections.alerts.needsAttentionDesc')}
               </AlertDescription>
             </Box>
           </Alert>
@@ -1036,7 +1039,7 @@ export default function ConnectionsPage() {
           <Alert status={isSessionExpired ? 'warning' : 'error'} borderRadius="md">
             <AlertIcon />
             <Box flex="1">
-              <AlertTitle>{isSessionExpired ? 'Sessão expirada' : 'Erro ao carregar conexões'}</AlertTitle>
+              <AlertTitle>{isSessionExpired ? t('connections.wizard.sessionExpired') : t('connections.errors.loadError')}</AlertTitle>
               <AlertDescription>{fetchError}</AlertDescription>
             </Box>
             {isSessionExpired ? (
@@ -1046,11 +1049,11 @@ export default function ConnectionsPage() {
                 onClick={() => { window.location.href = '/login?reason=session_expired'; }}
                 ml={2}
               >
-                Fazer login
+                {t('connections.wizard.doLogin')}
               </Button>
             ) : (
               <Button size="sm" colorScheme="red" variant="outline" onClick={fetchSessions} ml={2}>
-                Tentar novamente
+                {t('connections.wizard.tryAgain')}
               </Button>
             )}
           </Alert>
@@ -1073,58 +1076,53 @@ export default function ConnectionsPage() {
 
         {/* FAQ */}
         <Box mt={8}>
-          <Heading size="md" mb={4}>Dúvidas frequentes</Heading>
+          <Heading size="md" mb={4}>{t('connections.faq.title')}</Heading>
           <Accordion allowToggle>
             <AccordionItem>
               <AccordionButton>
                 <Box flex="1" textAlign="left" fontWeight="medium">
-                  O que é um Arquivo de Sessão?
+                  {t('connections.faq.q1')}
                 </Box>
                 <AccordionIcon />
               </AccordionButton>
               <AccordionPanel pb={4} fontSize="sm" color="gray.600">
-                É um arquivo .json que contém os dados de login do seu navegador (cookies) após
-                você entrar em um site. Com ele, o RadarOne consegue acessar o site como se fosse
-                você, sem precisar da sua senha.
+                {t('connections.faq.a1')}
               </AccordionPanel>
             </AccordionItem>
 
             <AccordionItem>
               <AccordionButton>
                 <Box flex="1" textAlign="left" fontWeight="medium">
-                  É seguro?
+                  {t('connections.faq.q2')}
                 </Box>
                 <AccordionIcon />
               </AccordionButton>
               <AccordionPanel pb={4} fontSize="sm" color="gray.600">
-                Sim. O arquivo é criptografado com AES-256-GCM antes de ser armazenado.
-                Nunca pedimos sua senha e você pode revogar a sessão a qualquer momento clicando em "Remover".
+                {t('connections.faq.a2')}
               </AccordionPanel>
             </AccordionItem>
 
             <AccordionItem>
               <AccordionButton>
                 <Box flex="1" textAlign="left" fontWeight="medium">
-                  Quando preciso reconectar?
+                  {t('connections.faq.q3')}
                 </Box>
                 <AccordionIcon />
               </AccordionButton>
               <AccordionPanel pb={4} fontSize="sm" color="gray.600">
-                Quando o site pedir login novamente (normalmente a cada 7-30 dias) ou quando você
-                mudar sua senha. O RadarOne avisará quando for necessário.
+                {t('connections.faq.a3')}
               </AccordionPanel>
             </AccordionItem>
 
             <AccordionItem>
               <AccordionButton>
                 <Box flex="1" textAlign="left" fontWeight="medium">
-                  Como gerar o Arquivo de Sessão?
+                  {t('connections.faq.q4')}
                 </Box>
                 <AccordionIcon />
               </AccordionButton>
               <AccordionPanel pb={4} fontSize="sm" color="gray.600">
-                Clique no botão "Conectar conta" acima. O assistente mostrará duas opções:
-                gerar automaticamente via terminal (recomendado) ou usar uma extensão de navegador.
+                {t('connections.faq.a4')}
               </AccordionPanel>
             </AccordionItem>
           </Accordion>
