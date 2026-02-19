@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Container } from '@chakra-ui/react';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
@@ -22,6 +23,7 @@ interface ConnectTokenData {
 }
 
 export const TelegramConnectionPage: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,7 +44,7 @@ export const TelegramConnectionPage: React.FC = () => {
       });
       setStatus(data);
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar status');
+      setError(err.message || t('telegramConnect.loadError'));
     } finally {
       setLoading(false);
     }
@@ -57,31 +59,31 @@ export const TelegramConnectionPage: React.FC = () => {
       const data = await api.post('/api/telegram/connect-token', {});
       setTokenData(data);
     } catch (err: any) {
-      setError(err.message || 'Erro ao gerar link de conexão');
+      setError(err.message || t('telegramConnect.generateError'));
     } finally {
       setGenerating(false);
     }
   };
 
   const handleDisconnect = async () => {
-    if (!confirm('Deseja realmente desconectar o Telegram?')) {
+    if (!confirm(t('telegramConnect.disconnectConfirm'))) {
       return;
     }
 
     try {
       await api.post('/api/telegram/disconnect', {});
-      setSuccess('Telegram desconectado com sucesso');
+      setSuccess(t('telegramConnect.disconnected'));
       setTokenData(null);
       loadStatus();
     } catch (err: any) {
-      setError(err.message || 'Erro ao desconectar');
+      setError(err.message || t('telegramConnect.disconnectError'));
     }
   };
 
   const copyLink = () => {
     if (tokenData) {
       navigator.clipboard.writeText(tokenData.connectUrl);
-      setSuccess('Link copiado!');
+      setSuccess(t('telegramConnect.linkCopied'));
       setTimeout(() => setSuccess(''), 2000);
     }
   };
@@ -89,7 +91,7 @@ export const TelegramConnectionPage: React.FC = () => {
   if (loading) {
     return (
       <AppLayout>
-        <p>Carregando...</p>
+        <p>{t('common.loading')}</p>
       </AppLayout>
     );
   }
@@ -99,15 +101,15 @@ export const TelegramConnectionPage: React.FC = () => {
       <Container maxW="container.xl" py={{ base: 6, md: 10 }}>
       <div style={styles.breadcrumb}>
         <Link to="/dashboard" style={styles.breadcrumbLink}>
-          Dashboard
+          {t('telegramConnect.breadcrumbDashboard')}
         </Link>
         <span style={styles.breadcrumbSeparator}>/</span>
-        <span style={styles.breadcrumbCurrent}>Conectar Telegram</span>
+        <span style={styles.breadcrumbCurrent}>{t('telegramConnect.breadcrumbCurrent')}</span>
       </div>
 
-      <h1 style={styles.title}>Conecte seu Telegram para receber alertas</h1>
+      <h1 style={styles.title}>{t('telegramConnect.title')}</h1>
       <p style={styles.subtitle}>
-        Receba notificações instantâneas de novos anúncios direto no Telegram
+        {t('telegramConnect.subtitle')}
       </p>
 
       {error && <div style={styles.error}>{error}</div>}
@@ -118,16 +120,15 @@ export const TelegramConnectionPage: React.FC = () => {
         <div style={styles.card}>
           <div style={styles.connectedHeader}>
             <div>
-              <div style={styles.connectedTitle}>✅ Telegram conectado</div>
+              <div style={styles.connectedTitle}>{t('telegramConnect.connected')}</div>
               {status.username && (
                 <div style={styles.connectedSubtitle}>
-                  Conta: {status.username}
+                  {t('telegramConnect.account', { username: status.username })}
                 </div>
               )}
               {status.connectedAt && (
                 <div style={styles.connectedSubtitle}>
-                  Conectado em:{' '}
-                  {new Date(status.connectedAt).toLocaleString('pt-BR')}
+                  {t('telegramConnect.connectedAt', { date: new Date(status.connectedAt).toLocaleString(i18n.language) })}
                 </div>
               )}
             </div>
@@ -136,13 +137,13 @@ export const TelegramConnectionPage: React.FC = () => {
                 onClick={handleDisconnect}
                 style={styles.disconnectButton}
               >
-                Desconectar
+                {t('telegramConnect.disconnect')}
               </button>
               <button
                 onClick={() => setShowWrongBotModal(true)}
                 style={styles.helpButton}
               >
-                Não recebo alertas?
+                {t('telegramConnect.noAlerts')}
               </button>
             </div>
           </div>
@@ -154,44 +155,34 @@ export const TelegramConnectionPage: React.FC = () => {
             <div style={styles.warningIcon}>⚠️</div>
             <div>
               <div style={styles.warningTitle}>
-                Não pesquise no Telegram
+                {t('telegramConnect.warningTitle')}
               </div>
               <div style={styles.warningText}>
-                Use apenas o link oficial abaixo para evitar conectar bots
-                errados. Bots falsos podem ter nomes parecidos em outros
-                idiomas.
+                {t('telegramConnect.warningText')}
               </div>
             </div>
           </div>
 
           {/* Instruções e Botões */}
           <div style={styles.card}>
-            <h2 style={styles.sectionTitle}>Como conectar</h2>
+            <h2 style={styles.sectionTitle}>{t('telegramConnect.howToConnect')}</h2>
 
             <div style={styles.checklist}>
               <div style={styles.checkItem}>
                 <span style={styles.checkIcon}>✅</span>
-                <span>
-                  Clique em "Gerar link de conexão" abaixo
-                </span>
+                <span>{t('telegramConnect.step1')}</span>
               </div>
               <div style={styles.checkItem}>
                 <span style={styles.checkIcon}>✅</span>
-                <span>
-                  Abra o bot oficial:{' '}
-                  <strong>@{TELEGRAM_BOT_USERNAME}</strong>
-                </span>
+                <span dangerouslySetInnerHTML={{ __html: t('telegramConnect.step2', { bot: TELEGRAM_BOT_USERNAME }) }} />
               </div>
               <div style={styles.checkItem}>
                 <span style={styles.checkIcon}>✅</span>
-                <span>Aguarde a mensagem de confirmação</span>
+                <span>{t('telegramConnect.step3')}</span>
               </div>
               <div style={styles.checkItem}>
                 <span style={styles.checkIcon}>❌</span>
-                <span>
-                  Se aparecer bot com outro nome/idioma, você abriu o bot
-                  errado
-                </span>
+                <span>{t('telegramConnect.step4Wrong')}</span>
               </div>
             </div>
 
@@ -202,15 +193,15 @@ export const TelegramConnectionPage: React.FC = () => {
                 style={styles.primaryButton}
               >
                 {generating
-                  ? 'Gerando...'
-                  : 'Gerar link de conexão'}
+                  ? t('telegramConnect.generating')
+                  : t('telegramConnect.generateLink')}
               </button>
 
               <button
                 onClick={() => setShowWrongBotModal(true)}
                 style={styles.secondaryButton}
               >
-                Estou no bot errado?
+                {t('telegramConnect.wrongBot')}
               </button>
             </div>
           </div>
@@ -219,7 +210,7 @@ export const TelegramConnectionPage: React.FC = () => {
           {tokenData && (
             <div style={styles.card}>
               <h2 style={styles.sectionTitle}>
-                Link gerado - Use uma das opções abaixo
+                {t('telegramConnect.linkGenerated')}
               </h2>
 
               <div style={styles.qrSection}>
@@ -230,14 +221,14 @@ export const TelegramConnectionPage: React.FC = () => {
                     level="M"
                   />
                   <p style={styles.qrLabel}>
-                    Escaneie com o Telegram (Desktop)
+                    {t('telegramConnect.scanQr')}
                   </p>
                 </div>
 
                 <div style={styles.linkSection}>
                   <div style={styles.linkBox}>
                     <div style={styles.linkLabel}>
-                      Ou clique no link:
+                      {t('telegramConnect.clickLink')}
                     </div>
                     <a
                       href={tokenData.connectUrl}
@@ -245,12 +236,12 @@ export const TelegramConnectionPage: React.FC = () => {
                       rel="noopener noreferrer"
                       style={styles.linkButton}
                     >
-                      Abrir bot oficial no Telegram
+                      {t('telegramConnect.openBot')}
                     </a>
                   </div>
 
                   <div style={styles.linkBox}>
-                    <div style={styles.linkLabel}>Ou copie o link:</div>
+                    <div style={styles.linkLabel}>{t('telegramConnect.copyLink')}</div>
                     <div style={styles.copyBox}>
                       <input
                         type="text"
@@ -259,16 +250,13 @@ export const TelegramConnectionPage: React.FC = () => {
                         style={styles.input}
                       />
                       <button onClick={copyLink} style={styles.copyButton}>
-                        Copiar
+                        {t('telegramConnect.copy')}
                       </button>
                     </div>
                   </div>
 
                   <div style={styles.expiresBox}>
-                    ⏱️ Link expira em{' '}
-                    {new Date(tokenData.expiresAt).toLocaleTimeString(
-                      'pt-BR'
-                    )}
+                    {t('telegramConnect.linkExpires', { time: new Date(tokenData.expiresAt).toLocaleTimeString(i18n.language) })}
                   </div>
                 </div>
               </div>
@@ -288,40 +276,28 @@ export const TelegramConnectionPage: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 style={styles.modalTitle}>
-              Como corrigir se conectou no bot errado
+              {t('telegramConnect.wrongBotModalTitle')}
             </h2>
 
             <div style={styles.modalBody}>
-              <p>
-                Se você pesquisou no Telegram e caiu em um bot com nome
-                parecido (ex: "Радар ONE Бот" em russo), siga os passos:
-              </p>
+              <p>{t('telegramConnect.wrongBotModalIntro')}</p>
 
               <ol style={styles.stepsList}>
-                <li>Volte para esta página</li>
-                <li>Clique em "Gerar link de conexão" novamente</li>
-                <li>
-                  Clique em "Abrir bot oficial no Telegram" (não pesquise!)
-                </li>
-                <li>
-                  Confirme que o username é <strong>@{TELEGRAM_BOT_USERNAME}</strong>
-                </li>
-                <li>
-                  Aguarde a mensagem "✅ Telegram conectado ao RadarOne"
-                </li>
+                <li>{t('telegramConnect.modalStep1')}</li>
+                <li>{t('telegramConnect.modalStep2')}</li>
+                <li>{t('telegramConnect.modalStep3')}</li>
+                <li dangerouslySetInnerHTML={{ __html: t('telegramConnect.modalStep4', { bot: TELEGRAM_BOT_USERNAME }) }} />
+                <li>{t('telegramConnect.modalStep5')}</li>
               </ol>
 
-              <div style={styles.modalTip}>
-                <strong>Dica:</strong> Sempre use o link oficial. Nunca
-                pesquise "RadarOne" no Telegram.
-              </div>
+              <div style={styles.modalTip} dangerouslySetInnerHTML={{ __html: t('telegramConnect.modalTip') }} />
             </div>
 
             <button
               onClick={() => setShowWrongBotModal(false)}
               style={styles.closeButton}
             >
-              Entendi
+              {t('telegramConnect.understood')}
             </button>
           </div>
         </div>

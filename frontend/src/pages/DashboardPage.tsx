@@ -17,6 +17,7 @@ import {
   Spinner,
   Flex,
 } from '@chakra-ui/react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
@@ -47,6 +48,7 @@ interface UserStats {
 }
 
 export const DashboardPage: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -88,9 +90,9 @@ export const DashboardPage: React.FC = () => {
           message: err.message,
           data: err.data
         });
-        setError(`Erro ao carregar dados (${err.status || 'Network'} - ${err.errorCode || 'UNKNOWN'}). Ver console.`);
+        setError(t('dashboard.errorDev', { status: err.status || 'Network', code: err.errorCode || 'UNKNOWN' }));
       } else {
-        setError('Erro ao carregar dados. Tente novamente mais tarde.');
+        setError(t('dashboard.errorProd'));
       }
     } finally {
       setLoading(false);
@@ -110,12 +112,12 @@ export const DashboardPage: React.FC = () => {
     if (!subscription) return null;
 
     const statusConfig: Record<string, { colorScheme: string; label: string }> = {
-      TRIAL: { colorScheme: 'blue', label: '🎁 Período de teste' },
-      ACTIVE: { colorScheme: 'green', label: '✅ Ativo' },
-      PAST_DUE: { colorScheme: 'orange', label: '⚠️ Pagamento pendente' },
-      CANCELLED: { colorScheme: 'gray', label: '❌ Cancelado' },
-      EXPIRED: { colorScheme: 'red', label: '❌ Expirado' },
-      SUSPENDED: { colorScheme: 'red', label: '🚫 Suspenso' },
+      TRIAL: { colorScheme: 'blue', label: t('dashboard.statusTrial') },
+      ACTIVE: { colorScheme: 'green', label: t('dashboard.statusActive') },
+      PAST_DUE: { colorScheme: 'orange', label: t('dashboard.statusPastDue') },
+      CANCELLED: { colorScheme: 'gray', label: t('dashboard.statusCancelled') },
+      EXPIRED: { colorScheme: 'red', label: t('dashboard.statusExpired') },
+      SUSPENDED: { colorScheme: 'red', label: t('dashboard.statusSuspended') },
     };
 
     const config = statusConfig[subscription.status] || statusConfig.ACTIVE;
@@ -132,7 +134,7 @@ export const DashboardPage: React.FC = () => {
       <AppLayout>
         <Container maxW="container.xl" centerContent py={20}>
           <Spinner size="xl" color="blue.500" thickness="4px" />
-          <Text mt={4} color="gray.600">Carregando...</Text>
+          <Text mt={4} color="gray.600">{t('dashboard.loading')}</Text>
         </Container>
       </AppLayout>
     );
@@ -148,10 +150,10 @@ export const DashboardPage: React.FC = () => {
         <VStack align="stretch" spacing={6}>
           <Box>
             <Heading as="h1" size={{ base: 'lg', md: 'xl' }} color="gray.800" mb={2}>
-              Olá, {user?.name || 'Usuário'}! 👋
+              {t('dashboard.welcome', { name: user?.name || 'User' })}
             </Heading>
             <Text fontSize={{ base: 'sm', md: 'md' }} color="gray.600">
-              Bem-vindo ao seu painel de controle do RadarOne
+              {t('dashboard.welcomeSubtitle')}
             </Text>
           </Box>
 
@@ -161,7 +163,7 @@ export const DashboardPage: React.FC = () => {
               <AlertIcon />
               <AlertDescription flex={1}>{error}</AlertDescription>
               <Button size="sm" onClick={() => { setError(''); loadDashboardData(); }}>
-                Tentar novamente
+                {t('dashboard.retry')}
               </Button>
             </Alert>
           )}
@@ -177,7 +179,7 @@ export const DashboardPage: React.FC = () => {
               <Flex justify="space-between" align="flex-start" mb={6} flexWrap="wrap" gap={3}>
                 <Box>
                   <Text fontSize="sm" color="gray.600" mb={1}>
-                    Seu Plano
+                    {t('dashboard.yourPlan')}
                   </Text>
                   <Heading as="h2" size="lg" color="gray.800">
                     {subscription.plan.name}
@@ -190,9 +192,7 @@ export const DashboardPage: React.FC = () => {
               {subscription.isTrial && (
                 <Alert status="info" borderRadius="md" mb={4}>
                   <AlertIcon />
-                  <AlertDescription>
-                    ⏰ Seu período de teste termina em <strong>{daysLeft} dias</strong>
-                  </AlertDescription>
+                  <AlertDescription dangerouslySetInnerHTML={{ __html: t('dashboard.trialInfo', { days: daysLeft }) }} />
                 </Alert>
               )}
 
@@ -201,7 +201,7 @@ export const DashboardPage: React.FC = () => {
                 <Alert status="warning" borderRadius="md" mb={4}>
                   <AlertIcon />
                   <AlertDescription flex={1}>
-                    ⚠️ Seu plano está para expirar! Clique aqui para renovar ou fazer upgrade.
+                    {t('dashboard.expiryWarning')}
                   </AlertDescription>
                   <Button
                     as={RouterLink}
@@ -210,7 +210,7 @@ export const DashboardPage: React.FC = () => {
                     colorScheme="orange"
                     ml={2}
                   >
-                    Gerenciar assinatura
+                    {t('dashboard.manageSubscription')}
                   </Button>
                 </Alert>
               )}
@@ -221,11 +221,11 @@ export const DashboardPage: React.FC = () => {
                 <Box textAlign="center">
                   <Text fontSize="3xl" fontWeight="bold" color="gray.800" mb={1}>
                     {subscription.plan.maxMonitors === 999
-                      ? `${stats.monitorsCount} (Ilimitado)`
+                      ? `${stats.monitorsCount} (${t('dashboard.unlimited')})`
                       : `${stats.monitorsCount} / ${subscription.plan.maxMonitors}`}
                   </Text>
                   <Text fontSize="sm" color="gray.600" mb={2}>
-                    Monitores
+                    {t('dashboard.monitors')}
                   </Text>
                   {subscription.plan.maxMonitors !== 999 && (
                     <Progress
@@ -241,11 +241,11 @@ export const DashboardPage: React.FC = () => {
                 <Box textAlign="center">
                   <Text fontSize="3xl" fontWeight="bold" color="gray.800" mb={1}>
                     {subscription.plan.maxSites === 999
-                      ? `${stats.sitesCount} (Ilimitado)`
+                      ? `${stats.sitesCount} (${t('dashboard.unlimited')})`
                       : `${stats.sitesCount} / ${subscription.plan.maxSites}`}
                   </Text>
                   <Text fontSize="sm" color="gray.600" mb={2}>
-                    Sites diferentes
+                    {t('dashboard.sites')}
                   </Text>
                   {subscription.plan.maxSites !== 999 && (
                     <Progress
@@ -260,10 +260,10 @@ export const DashboardPage: React.FC = () => {
                 {/* Alertas */}
                 <Box textAlign="center">
                   <Text fontSize="3xl" fontWeight="bold" color="gray.800" mb={1}>
-                    {subscription.plan.maxAlertsPerDay === 999 ? 'Ilimitado' : subscription.plan.maxAlertsPerDay}
+                    {subscription.plan.maxAlertsPerDay === 999 ? t('dashboard.unlimited') : subscription.plan.maxAlertsPerDay}
                   </Text>
                   <Text fontSize="sm" color="gray.600">
-                    Alertas/dia
+                    {t('dashboard.alertsPerDay')}
                   </Text>
                 </Box>
               </SimpleGrid>
@@ -286,10 +286,10 @@ export const DashboardPage: React.FC = () => {
               >
                 <Text fontSize="4xl" mb={3}>🔍</Text>
                 <Heading as="h3" size="sm" mb={2} color="gray.800">
-                  Gerenciar Monitores
+                  {t('dashboard.manageMonitors')}
                 </Heading>
                 <Text fontSize="sm" color="gray.600">
-                  Criar, editar ou excluir seus monitores de anúncios
+                  {t('dashboard.manageMonitorsDesc')}
                 </Text>
               </Box>
             </Link>
@@ -308,10 +308,10 @@ export const DashboardPage: React.FC = () => {
               >
                 <Text fontSize="4xl" mb={3}>🔔</Text>
                 <Heading as="h3" size="sm" mb={2} color="gray.800">
-                  Configurar Notificações
+                  {t('dashboard.configNotifications')}
                 </Heading>
                 <Text fontSize="sm" color="gray.600">
-                  Escolha entre Telegram ou e-mail para receber alertas
+                  {t('dashboard.configNotificationsDesc')}
                 </Text>
               </Box>
             </Link>
@@ -330,10 +330,10 @@ export const DashboardPage: React.FC = () => {
               >
                 <Text fontSize="4xl" mb={3}>💳</Text>
                 <Heading as="h3" size="sm" mb={2} color="gray.800">
-                  Gerenciar Assinatura
+                  {t('dashboard.manageSubscriptionCard')}
                 </Heading>
                 <Text fontSize="sm" color="gray.600">
-                  Ver plano atual, fazer upgrade ou cancelar
+                  {t('dashboard.manageSubscriptionCardDesc')}
                 </Text>
               </Box>
             </Link>
@@ -352,10 +352,10 @@ export const DashboardPage: React.FC = () => {
               >
                 <Text fontSize="4xl" mb={3}>📖</Text>
                 <Heading as="h3" size="sm" mb={2} color="gray.800">
-                  Ajuda e Suporte
+                  {t('dashboard.helpSupport')}
                 </Heading>
                 <Text fontSize="sm" color="gray.600">
-                  Manual, FAQ e contato para tirar suas dúvidas
+                  {t('dashboard.helpSupportDesc')}
                 </Text>
               </Box>
             </Link>
@@ -368,9 +368,7 @@ export const DashboardPage: React.FC = () => {
               <Alert status="warning" borderRadius="lg">
                 <AlertIcon />
                 <AlertDescription flex={1}>
-                  📊 Você está usando{' '}
-                  {Math.round((stats.monitorsCount / subscription.plan.maxMonitors) * 100)}
-                  % dos seus monitores. Considere fazer upgrade para adicionar mais.
+                  {t('dashboard.usageWarning', { percent: Math.round((stats.monitorsCount / subscription.plan.maxMonitors) * 100) })}
                 </AlertDescription>
                 <Button
                   as={RouterLink}
@@ -379,7 +377,7 @@ export const DashboardPage: React.FC = () => {
                   colorScheme="yellow"
                   ml={2}
                 >
-                  Ver planos
+                  {t('dashboard.viewPlans')}
                 </Button>
               </Alert>
             )}

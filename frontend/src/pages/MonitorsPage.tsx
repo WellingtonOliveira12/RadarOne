@@ -114,7 +114,7 @@ export function MonitorsPage() {
   const [saving, setSaving] = useState(false);
 
   // Localização (global)
-  const [country, setCountry] = useState('');
+  const [country, setCountry] = useState('BR');
   const [stateRegion, setStateRegion] = useState('');
   const [city, setCity] = useState('');
 
@@ -275,7 +275,7 @@ export function MonitorsPage() {
     setSearchUrl('');
     setActive(true);
     setIdSelecionado(null);
-    setCountry('');
+    setCountry('BR');
     setStateRegion('');
     setCity('');
     setFilters({ ...DEFAULT_FILTERS });
@@ -509,8 +509,12 @@ export function MonitorsPage() {
                   }}
                   style={styles.input}
                 >
+                  {/* BR sempre primeiro (já vem em countryList[0]) */}
+                  {countryList.length > 0 && (
+                    <option key={countryList[0].code} value={countryList[0].code}>{countryList[0].label}</option>
+                  )}
                   <option value="">{t('monitors.location.worldwide')}</option>
-                  {countryList.map((c) => (
+                  {countryList.slice(1).map((c) => (
                     <option key={c.code} value={c.code}>{c.label}</option>
                   ))}
                 </select>
