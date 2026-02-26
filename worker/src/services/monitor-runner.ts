@@ -17,6 +17,7 @@ import { userSessionService } from './user-session-service';
 import { isAuthError } from './session-provider';
 import { StatsRecorder, mapPageType } from './stats-recorder';
 import { getDefaultUrl } from '../engine/default-urls';
+import { buildSearchUrl } from '../engine/url-builder';
 
 /**
  * MonitorRunner
@@ -60,16 +61,50 @@ export class MonitorRunner {
         }
       }
 
-      // Guard: STRUCTURED_FILTERS sem URL builder implementado → skip gracioso
+      // STRUCTURED_FILTERS: build dynamic URL from location + keyword data
       const monitorMode = (monitor as any).mode as string | undefined;
-      if (monitorMode === 'STRUCTURED_FILTERS' && !monitor.searchUrl) {
-        log.info('MONITOR_SKIPPED: STRUCTURED_FILTERS sem searchUrl', { monitorId: monitor.id });
-        await this.logExecution(monitor.id, {
-          status: 'SKIPPED',
-          error: 'STRUCTURED_FILTERS: URL builder not implemented',
-          executionTime: Date.now() - startTime,
-        });
-        return;
+      if (monitorMode === 'STRUCTURED_FILTERS') {
+        try {
+          const buildResult = buildSearchUrl(monitor as any);
+          if (buildResult) {
+            (monitor as any).searchUrl = buildResult.url;
+            log.info('FB_MONITOR_URL', {
+              monitorId: monitor.id,
+              url: buildResult.url,
+            });
+            log.info('FB_MONITOR_LOCATION', {
+              monitorId: monitor.id,
+              location: buildResult.location,
+            });
+            log.info('FB_MONITOR_MODE', {
+              monitorId: monitor.id,
+              mode: 'STRUCTURED_FILTERS',
+            });
+          } else if (!monitor.searchUrl) {
+            // No URL builder for this site AND no searchUrl → skip
+            log.info('MONITOR_SKIPPED: STRUCTURED_FILTERS without URL builder or searchUrl', {
+              monitorId: monitor.id,
+              site: monitor.site,
+            });
+            await this.logExecution(monitor.id, {
+              status: 'SKIPPED',
+              error: `STRUCTURED_FILTERS: No URL builder for ${monitor.site} and no searchUrl provided`,
+              executionTime: Date.now() - startTime,
+            });
+            return;
+          }
+        } catch (urlBuildError: any) {
+          log.error('FB_URL_BUILD_FAILED', urlBuildError, {
+            monitorId: monitor.id,
+            site: monitor.site,
+          });
+          await this.logExecution(monitor.id, {
+            status: 'ERROR',
+            error: urlBuildError.message,
+            executionTime: Date.now() - startTime,
+          });
+          return;
+        }
       }
 
       // Verifica se usuário tem consultas disponíveis
