@@ -1023,17 +1023,25 @@ export default function ConnectionsPage() {
 
         <Divider />
 
-        {sessions.some((s) => s.status === 'NEEDS_REAUTH') && (
-          <Alert status="warning" borderRadius="md">
-            <AlertIcon />
-            <Box>
-              <AlertTitle>{t('connections.alerts.needsAttention')}</AlertTitle>
-              <AlertDescription>
-                {t('connections.alerts.needsAttentionDesc')}
-              </AlertDescription>
-            </Box>
-          </Alert>
-        )}
+        {(() => {
+          const problemSessions = sessions.filter((s) =>
+            ['NEEDS_REAUTH', 'INVALID', 'EXPIRED'].includes(s.status)
+          );
+          if (problemSessions.length === 0) return null;
+          return (
+            <Alert status="warning" borderRadius="md">
+              <AlertIcon />
+              <Box>
+                <AlertTitle>
+                  {t('connections.alerts.needsAttentionCount', { count: problemSessions.length })}
+                </AlertTitle>
+                <AlertDescription>
+                  {t('connections.alerts.needsAttentionDesc')}
+                </AlertDescription>
+              </Box>
+            </Alert>
+          );
+        })()}
 
         {fetchError && (
           <Alert status={isSessionExpired ? 'warning' : 'error'} borderRadius="md">

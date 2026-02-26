@@ -419,8 +419,22 @@ class UserSessionService {
       const decrypted = cryptoManager.decrypt(session.encryptedStorageState);
       storageState = JSON.parse(decrypted);
     } catch (error: any) {
-      logger.error({ sessionId: session.id, error: error.message }, 'USER_SESSION_DECRYPT_ERROR');
-      await this.markSessionStatus(session.id, UserSessionStatus.INVALID, 'Erro ao descriptografar');
+      const reason = error.message.includes('CRYPTO_KEY_MISSING')
+        ? 'key_missing'
+        : error.message.includes('key_mismatch') || error.message.includes('Unsupported state')
+          ? 'key_mismatch'
+          : 'data_corrupted';
+      logger.error(
+        {
+          sessionId: session.id,
+          userId: cryptoManager.mask(userId, 4, 4),
+          site,
+          reason,
+          error: error.message,
+        },
+        'USER_SESSION_DECRYPT_ERROR'
+      );
+      await this.markSessionStatus(session.id, UserSessionStatus.INVALID, `Decrypt failed: ${reason}`);
       return {
         success: false,
         status: UserSessionStatus.INVALID,
@@ -738,15 +752,22 @@ export const userSessionService = new UserSessionService();
 // Valida chave no boot e loga diagnóstico
 const keyValidation = userSessionService.validateEncryptionKey();
 if (!keyValidation.valid) {
-  console.error(
+  const errorMsg =
     `❌ USER_SESSION_SERVICE: ${keyValidation.error}\n` +
     `   Todas as sessões de autenticação (Facebook, Mercado Livre) vão FALHAR.\n` +
     `   Para corrigir:\n` +
     `   1. Gere uma chave: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"\n` +
     `   2. Configure SESSION_ENCRYPTION_KEY no backend E no worker (mesmo valor)\n` +
-    `   3. No Render: Settings > Environment > adicione SESSION_ENCRYPTION_KEY`
-  );
+    `   3. No Render: Settings > Environment > adicione SESSION_ENCRYPTION_KEY`;
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(errorMsg);
+  }
+  console.error(errorMsg);
 } else {
   const src = process.env.SESSION_ENCRYPTION_KEY ? 'SESSION_ENCRYPTION_KEY' : 'SCRAPER_ENCRYPTION_KEY';
-  console.log(`✅ USER_SESSION_SERVICE: Encryption key loaded from ${src}`);
+  console.log(
+    `✅ USER_SESSION_SERVICE: Encryption key loaded ` +
+    `[source=${src}, keyPresent=true]`
+  );
 }

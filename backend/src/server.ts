@@ -16,6 +16,19 @@ import { prisma } from './lib/prisma';
 // Re-exporta para compatibilidade com código existente
 export { prisma };
 
+// Validate session encryption key at boot
+import { validateSessionKey } from './utils/session-crypto';
+const sessionKeyCheck = validateSessionKey();
+if (!sessionKeyCheck.valid) {
+  const msg = `SESSION_CRYPTO: ${sessionKeyCheck.error}`;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(msg);
+  }
+  console.warn(`⚠️  ${msg}`);
+} else {
+  console.log(`✅ SESSION_CRYPTO: Encryption key loaded [source=${sessionKeyCheck.source}]`);
+}
+
 // ============================================
 // MÉTRICAS DE COLD START
 // ============================================

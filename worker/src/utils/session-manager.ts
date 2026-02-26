@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { Page, Browser, BrowserContext } from 'playwright';
 import { logger } from './logger';
-import * as crypto from 'crypto';
+import { cryptoManager } from '../auth/crypto-manager';
 
 /**
  * Session Manager - Gerenciamento de Sessões de Login
@@ -41,9 +41,6 @@ export interface UserSession {
   expiresAt: Date;
   lastUsedAt: Date;
 }
-
-// Chave para criptografia (deve estar no .env em produção)
-const ENCRYPTION_KEY = process.env.SESSION_ENCRYPTION_KEY || 'change-me-in-production-32chars!';
 
 class SessionManager {
   /**
@@ -287,36 +284,17 @@ class SessionManager {
   }
 
   /**
-   * Criptografa dados
+   * Criptografa dados usando cryptoManager centralizado (AES-256-GCM)
    */
   private encrypt(text: string): string {
-    const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
-    const iv = crypto.randomBytes(16);
-
-    const cipher = crypto.createCipheriv(algorithm, key, iv);
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-
-    return `${iv.toString('hex')}:${encrypted}`;
+    return cryptoManager.encrypt(text);
   }
 
   /**
-   * Descriptografa dados
+   * Descriptografa dados usando cryptoManager centralizado (AES-256-GCM)
    */
   private decrypt(text: string): string {
-    const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
-
-    const parts = text.split(':');
-    const iv = Buffer.from(parts[0], 'hex');
-    const encrypted = parts[1];
-
-    const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-
-    return decrypted;
+    return cryptoManager.decrypt(text);
   }
 
   /**

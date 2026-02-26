@@ -433,7 +433,8 @@
     },
     "alerts": {
       "needsAttention": "Some connections need attention",
-      "needsAttentionDesc": "Reconnect the accounts marked in orange to continue monitoring."
+      "needsAttentionCount": "{{count}} connection(s) need attention",
+      "needsAttentionDesc": "Reconnect expired, invalid, or accounts that need reauthentication to continue monitoring."
     }
   },
   "dashboard": {

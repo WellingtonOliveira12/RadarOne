@@ -198,6 +198,46 @@ export function maskDomain(domain: string): string {
 }
 
 // ============================================================
+// VALIDAÇÃO DE CHAVE
+// ============================================================
+
+/**
+ * Validates if the session encryption key is properly configured.
+ * Call at boot to fail fast if key is missing or insecure.
+ */
+export function validateSessionKey(): { valid: boolean; error?: string; source?: string } {
+  const key = process.env.SESSION_ENCRYPTION_KEY || process.env.SCRAPER_ENCRYPTION_KEY;
+  const source = process.env.SESSION_ENCRYPTION_KEY ? 'SESSION_ENCRYPTION_KEY' :
+    process.env.SCRAPER_ENCRYPTION_KEY ? 'SCRAPER_ENCRYPTION_KEY' : 'NONE';
+
+  if (!key) {
+    return {
+      valid: false,
+      error: 'SESSION_ENCRYPTION_KEY not configured. Set a 32+ char key in both backend and worker.',
+      source,
+    };
+  }
+
+  if (key === 'CHANGE_ME_IN_PRODUCTION_32CHARS!' || key === 'change-me-in-production-32chars!') {
+    return {
+      valid: false,
+      error: 'SESSION_ENCRYPTION_KEY is using an insecure default value. Set a secure key.',
+      source,
+    };
+  }
+
+  if (key.length < 32) {
+    return {
+      valid: false,
+      error: `SESSION_ENCRYPTION_KEY too short (${key.length} chars). Minimum: 32 characters.`,
+      source,
+    };
+  }
+
+  return { valid: true, source };
+}
+
+// ============================================================
 // EXPORTS ADICIONAIS
 // ============================================================
 
@@ -208,4 +248,5 @@ export const sessionCrypto = {
   isValid: isValidStorageState,
   extractMeta: extractStorageStateMeta,
   maskDomain,
+  validateKey: validateSessionKey,
 };

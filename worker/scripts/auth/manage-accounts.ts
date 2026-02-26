@@ -16,29 +16,10 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import * as crypto from 'crypto';
 import * as readline from 'readline';
+import { cryptoManager } from '../../src/auth/crypto-manager';
 
 const prisma = new PrismaClient();
-
-// ============================================================
-// CRYPTO (simplificado para CLI)
-// ============================================================
-
-const ENCRYPTION_KEY = process.env.SCRAPER_ENCRYPTION_KEY ||
-  process.env.SESSION_ENCRYPTION_KEY ||
-  'CHANGE_ME_IN_PRODUCTION_32CHARS!';
-
-function encrypt(plaintext: string): string {
-  if (!plaintext) return '';
-  const key = crypto.scryptSync(ENCRYPTION_KEY, 'radarone-salt', 32);
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
-  let encrypted = cipher.update(plaintext, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  const authTag = cipher.getAuthTag();
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
-}
 
 // ============================================================
 // HELPERS
@@ -224,11 +205,11 @@ async function addAccount(): Promise<void> {
       site,
       label: label || `${site} Account`,
       username,
-      passwordEnc: encrypt(password),
+      passwordEnc: cryptoManager.encrypt(password),
       mfaType: mfaType as any,
-      totpSecretEnc: totpSecret ? encrypt(totpSecret) : null,
+      totpSecretEnc: totpSecret ? cryptoManager.encrypt(totpSecret) : null,
       otpEmail: otpEmail || null,
-      otpEmailPwdEnc: otpEmailPassword ? encrypt(otpEmailPassword) : null,
+      otpEmailPwdEnc: otpEmailPassword ? cryptoManager.encrypt(otpEmailPassword) : null,
       priority,
       status: 'OK',
     },

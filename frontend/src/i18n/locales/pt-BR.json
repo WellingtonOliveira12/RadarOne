@@ -433,7 +433,8 @@
     },
     "alerts": {
       "needsAttention": "Algumas conexões precisam de atenção",
-      "needsAttentionDesc": "Reconecte as contas marcadas em laranja para continuar monitorando."
+      "needsAttentionCount": "{{count}} conexão(ões) precisa(m) de atenção",
+      "needsAttentionDesc": "Reconecte as contas expiradas, inválidas ou que precisam de reautenticação para continuar monitorando."
     }
   },
   "dashboard": {
