@@ -143,6 +143,11 @@ export class MarketplaceEngine {
         timeout: this.config.navigationTimeout,
       });
 
+      // 3.1 Log final URL after redirects (observability for all sites)
+      console.log(
+        `NAV_FINAL_URL: ${this.config.site} requested=${monitor.searchUrl} final=${page.url()}`
+      );
+
       // 4. Wait for render (with jitter to avoid bot detection)
       await page.waitForTimeout(applyJitter(this.config.renderDelay));
       if (this.config.renderWaitSelector) {
