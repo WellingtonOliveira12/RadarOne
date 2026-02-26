@@ -27,21 +27,52 @@ const IV_LENGTH = 16;
 /** Tamanho do auth tag em bytes */
 const AUTH_TAG_LENGTH = 16;
 
-/** Chave de criptografia (deve estar no .env em produção) */
-const ENCRYPTION_KEY = process.env.SCRAPER_ENCRYPTION_KEY ||
-  process.env.SESSION_ENCRYPTION_KEY ||
-  'CHANGE_ME_IN_PRODUCTION_32CHARS!';
+/**
+ * Encryption key — priority aligned with backend (session-crypto.ts):
+ *   1. SESSION_ENCRYPTION_KEY (preferred)
+ *   2. SCRAPER_ENCRYPTION_KEY (legacy fallback)
+ *
+ * ⚠️  No insecure default — if neither is set, decrypt will fail at runtime
+ *     with a clear error instead of silently using a wrong key.
+ */
+const ENCRYPTION_KEY = process.env.SESSION_ENCRYPTION_KEY ||
+  process.env.SCRAPER_ENCRYPTION_KEY ||
+  '';
+
+/** True when no encryption key is configured */
+export const ENCRYPTION_KEY_MISSING = !ENCRYPTION_KEY;
+
+/** Which env var provided the key (for diagnostics) */
+export const ENCRYPTION_KEY_SOURCE: string =
+  process.env.SESSION_ENCRYPTION_KEY ? 'SESSION_ENCRYPTION_KEY' :
+  process.env.SCRAPER_ENCRYPTION_KEY ? 'SCRAPER_ENCRYPTION_KEY' :
+  'NONE';
 
 // ============================================================
 // CLASSE PRINCIPAL
 // ============================================================
 
 class CryptoManager {
-  private key: Buffer;
+  private key: Buffer | null;
 
   constructor() {
-    // Deriva a chave usando scrypt para tamanho consistente
-    this.key = crypto.scryptSync(ENCRYPTION_KEY, 'radarone-salt', KEY_LENGTH);
+    if (ENCRYPTION_KEY) {
+      this.key = crypto.scryptSync(ENCRYPTION_KEY, 'radarone-salt', KEY_LENGTH);
+    } else {
+      this.key = null;
+    }
+  }
+
+  /** Throws if key is not configured */
+  private requireKey(): Buffer {
+    if (!this.key) {
+      throw new Error(
+        'CRYPTO_KEY_MISSING: SESSION_ENCRYPTION_KEY not configured. ' +
+        'Set the same key in both backend and worker environments. ' +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+      );
+    }
+    return this.key;
   }
 
   /**
@@ -51,11 +82,13 @@ class CryptoManager {
   encrypt(plaintext: string): string {
     if (!plaintext) return '';
 
+    const key = this.requireKey();
+
     // Gera IV aleatório
     const iv = crypto.randomBytes(IV_LENGTH);
 
     // Cria cipher
-    const cipher = crypto.createCipheriv(ALGORITHM, this.key, iv, {
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
 
@@ -78,6 +111,8 @@ class CryptoManager {
     if (!ciphertext) return '';
 
     try {
+      const key = this.requireKey();
+
       // Separa componentes
       const parts = ciphertext.split(':');
       if (parts.length !== 3) {
@@ -89,7 +124,7 @@ class CryptoManager {
       const encrypted = parts[2];
 
       // Cria decipher
-      const decipher = crypto.createDecipheriv(ALGORITHM, this.key, iv, {
+      const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, {
         authTagLength: AUTH_TAG_LENGTH,
       });
       decipher.setAuthTag(authTag);
@@ -100,8 +135,22 @@ class CryptoManager {
 
       return decrypted;
     } catch (error: any) {
-      console.error(`CRYPTO_DECRYPT_ERROR: ${error.message}`);
-      throw new Error('Falha ao descriptografar: chave incorreta ou dados corrompidos');
+      const reason = error.message.includes('CRYPTO_KEY_MISSING')
+        ? 'key_missing'
+        : error.message.includes('Unsupported state')
+          ? 'key_mismatch'
+          : 'data_corrupted';
+      console.error(
+        `CRYPTO_DECRYPT_ERROR: reason=${reason} keySource=${ENCRYPTION_KEY_SOURCE} error=${error.message}`
+      );
+      throw new Error(
+        `Falha ao descriptografar (${reason}): ` +
+        (reason === 'key_missing'
+          ? 'SESSION_ENCRYPTION_KEY não configurada no worker'
+          : reason === 'key_mismatch'
+            ? 'Chave do worker difere da chave do backend. Verifique SESSION_ENCRYPTION_KEY.'
+            : 'Dados corrompidos ou formato inválido')
+      );
     }
   }
 

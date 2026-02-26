@@ -735,8 +735,18 @@ class UserSessionService {
 // Singleton
 export const userSessionService = new UserSessionService();
 
-// Valida chave no boot
+// Valida chave no boot e loga diagnóstico
 const keyValidation = userSessionService.validateEncryptionKey();
 if (!keyValidation.valid) {
-  console.warn(`⚠️  USER_SESSION_SERVICE: ${keyValidation.error}`);
+  console.error(
+    `❌ USER_SESSION_SERVICE: ${keyValidation.error}\n` +
+    `   Todas as sessões de autenticação (Facebook, Mercado Livre) vão FALHAR.\n` +
+    `   Para corrigir:\n` +
+    `   1. Gere uma chave: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"\n` +
+    `   2. Configure SESSION_ENCRYPTION_KEY no backend E no worker (mesmo valor)\n` +
+    `   3. No Render: Settings > Environment > adicione SESSION_ENCRYPTION_KEY`
+  );
+} else {
+  const src = process.env.SESSION_ENCRYPTION_KEY ? 'SESSION_ENCRYPTION_KEY' : 'SCRAPER_ENCRYPTION_KEY';
+  console.log(`✅ USER_SESSION_SERVICE: Encryption key loaded from ${src}`);
 }
