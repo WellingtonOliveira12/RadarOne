@@ -18,6 +18,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockPrisma } = vi.hoisted(() => {
   const mockPrismaSubscription = {
     findMany: vi.fn(),
+    updateMany: vi.fn(),
   };
 
   return {
@@ -31,7 +32,11 @@ vi.mock('../../src/lib/prisma', () => ({
   prisma: mockPrisma,
 }));
 
-import { getCurrentSubscriptionForUser } from '../../src/services/subscriptionService';
+import {
+  getCurrentSubscriptionForUser,
+  hasValidSubscription,
+  cancelOldSubscriptions,
+} from '../../src/services/subscriptionService';
 
 // Helpers para criar subscriptions de teste
 function makeSubscription(overrides: Record<string, any> = {}) {
@@ -167,5 +172,170 @@ describe('getCurrentSubscriptionForUser', () => {
 
     const result = await getCurrentSubscriptionForUser('user-1');
     expect(result).not.toBeNull();
+  });
+
+  it('TRIAL vitalício é sempre válido (edge case)', async () => {
+    const sub = makeSubscription({
+      status: 'TRIAL',
+      isLifetime: true,
+      trialEndsAt: new Date('2020-01-01'), // past date, but lifetime
+    });
+    mockPrisma.subscription.findMany.mockResolvedValue([sub]);
+
+    const result = await getCurrentSubscriptionForUser('user-1');
+
+    expect(result).not.toBeNull();
+    expect(result!.isLifetime).toBe(true);
+  });
+
+  it('subscription vitalícia ACTIVE retorna sem verificar datas', async () => {
+    const lifetime = makeSubscription({
+      id: 'sub-lifetime',
+      status: 'ACTIVE',
+      isLifetime: true,
+      validUntil: null,
+    });
+    const expired = makeSubscription({
+      id: 'sub-expired',
+      status: 'ACTIVE',
+      isLifetime: false,
+      validUntil: new Date('2026-02-01'), // expired
+    });
+    mockPrisma.subscription.findMany.mockResolvedValue([lifetime, expired]);
+
+    const result = await getCurrentSubscriptionForUser('user-1');
+
+    expect(result!.id).toBe('sub-lifetime');
+    expect(result!.isLifetime).toBe(true);
+  });
+
+  it('findMany é chamado com filtro status ACTIVE/TRIAL e include plan', async () => {
+    mockPrisma.subscription.findMany.mockResolvedValue([]);
+
+    await getCurrentSubscriptionForUser('user-2');
+
+    expect(mockPrisma.subscription.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: 'user-2',
+          status: { in: ['ACTIVE', 'TRIAL'] },
+        }),
+        include: { plan: true },
+      })
+    );
+  });
+});
+
+// ============================================================
+// hasValidSubscription
+// ============================================================
+
+describe('hasValidSubscription', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-02-16T12:00:00Z'));
+  });
+
+  it('returns true when user has a valid subscription', async () => {
+    const sub = makeSubscription({
+      status: 'ACTIVE',
+      validUntil: new Date('2026-03-01'),
+    });
+    mockPrisma.subscription.findMany.mockResolvedValue([sub]);
+
+    const result = await hasValidSubscription('user-1');
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when user has no subscriptions', async () => {
+    mockPrisma.subscription.findMany.mockResolvedValue([]);
+
+    const result = await hasValidSubscription('user-1');
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false when trial is expired', async () => {
+    const sub = makeSubscription({
+      status: 'TRIAL',
+      trialEndsAt: new Date('2026-02-10'), // expired
+    });
+    mockPrisma.subscription.findMany.mockResolvedValue([sub]);
+
+    const result = await hasValidSubscription('user-1');
+
+    expect(result).toBe(false);
+  });
+
+  it('returns true for lifetime subscription', async () => {
+    const sub = makeSubscription({
+      status: 'ACTIVE',
+      isLifetime: true,
+      validUntil: null,
+    });
+    mockPrisma.subscription.findMany.mockResolvedValue([sub]);
+
+    const result = await hasValidSubscription('user-1');
+
+    expect(result).toBe(true);
+  });
+});
+
+// ============================================================
+// cancelOldSubscriptions
+// ============================================================
+
+describe('cancelOldSubscriptions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('cancels ACTIVE and TRIAL subscriptions for a user', async () => {
+    mockPrisma.subscription.updateMany.mockResolvedValue({ count: 2 });
+
+    const result = await cancelOldSubscriptions('user-1');
+
+    expect(result).toBe(2);
+    expect(mockPrisma.subscription.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        status: { in: ['ACTIVE', 'TRIAL'] },
+        isLifetime: false,
+      },
+      data: { status: 'CANCELLED' },
+    });
+  });
+
+  it('returns 0 when no subscriptions to cancel', async () => {
+    mockPrisma.subscription.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await cancelOldSubscriptions('user-1');
+
+    expect(result).toBe(0);
+  });
+
+  it('never cancels lifetime subscriptions (isLifetime: false in where clause)', async () => {
+    mockPrisma.subscription.updateMany.mockResolvedValue({ count: 1 });
+
+    await cancelOldSubscriptions('user-1');
+
+    const callArgs = mockPrisma.subscription.updateMany.mock.calls[0][0];
+    expect(callArgs.where.isLifetime).toBe(false);
+  });
+
+  it('sets status to CANCELLED', async () => {
+    mockPrisma.subscription.updateMany.mockResolvedValue({ count: 3 });
+
+    await cancelOldSubscriptions('user-1');
+
+    const callArgs = mockPrisma.subscription.updateMany.mock.calls[0][0];
+    expect(callArgs.data.status).toBe('CANCELLED');
+  });
+
+  it('propagates DB errors', async () => {
+    mockPrisma.subscription.updateMany.mockRejectedValue(new Error('DB error'));
+
+    await expect(cancelOldSubscriptions('user-1')).rejects.toThrow('DB error');
   });
 });

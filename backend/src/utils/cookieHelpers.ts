@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
+import { AUTH_CONFIG } from '../config/appConfig';
 
-const REFRESH_TOKEN_COOKIE = 'radarone_refresh';
+const REFRESH_TOKEN_COOKIE = AUTH_CONFIG.refreshTokenCookieName;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 /**

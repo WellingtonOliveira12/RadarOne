@@ -6,19 +6,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
  * Casos testados:
  * - ✅ Deve resetar queries de assinaturas ativas com sucesso
  * - ✅ Deve lidar com zero assinaturas ativas
- * - ✅ Deve criar log de auditoria no webhookLog
  * - ✅ Deve enviar email de relatório para admin
  * - ✅ Deve capturar exceções no Sentry em caso de erro
  * - ✅ Deve fazer retry em caso de erro transiente
  */
 
 // Mock do Prisma usando vi.hoisted()
-const { mockPrismaSubscription, mockPrismaWebhookLog, mockPrisma } = vi.hoisted(() => ({
+const { mockPrismaSubscription, mockPrisma } = vi.hoisted(() => ({
   mockPrismaSubscription: {
     updateMany: vi.fn(),
-  },
-  mockPrismaWebhookLog: {
-    create: vi.fn(),
   },
   mockPrisma: {} as any,
 }));
@@ -26,7 +22,6 @@ const { mockPrismaSubscription, mockPrismaWebhookLog, mockPrisma } = vi.hoisted(
 // Criar referência circular
 Object.assign(mockPrisma, {
   subscription: mockPrismaSubscription,
-  webhookLog: mockPrismaWebhookLog,
 });
 
 // Mock do emailService usando vi.hoisted()
@@ -45,8 +40,15 @@ const { mockRetryAsync } = vi.hoisted(() => ({
 }));
 
 // Aplicar mocks antes de importar o job
-vi.mock('../../src/server', () => ({
+vi.mock('../../src/lib/prisma', () => ({
   prisma: mockPrisma,
+}));
+
+vi.mock('../../src/utils/loggerHelpers', () => ({
+  logInfo: vi.fn(),
+  logError: vi.fn(),
+  logWarning: vi.fn(),
+  logSimpleInfo: vi.fn(),
 }));
 
 vi.mock('../../src/services/emailService', () => ({
@@ -83,11 +85,10 @@ describe('resetMonthlyQueries Job', () => {
     // Arrange
     const mockResult = { count: 10 };
     mockPrismaSubscription.updateMany.mockResolvedValue(mockResult);
-    mockPrismaWebhookLog.create.mockResolvedValue({});
     mockSendMonthlyQueriesResetReport.mockResolvedValue(undefined);
 
     // Act
-    await resetMonthlyQueries();
+    const result = await resetMonthlyQueries();
 
     // Assert
     expect(mockRetryAsync).toHaveBeenCalledOnce();
@@ -99,26 +100,19 @@ describe('resetMonthlyQueries Job', () => {
       'admin@radarone.com',
       10
     );
-    expect(mockPrismaWebhookLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          event: 'MONTHLY_QUERIES_RESET',
-          processed: true,
-          error: null,
-        }),
-      })
-    );
+    expect(result.processedCount).toBe(10);
+    expect(result.successCount).toBe(10);
+    expect(result.errorCount).toBe(0);
   });
 
   it('deve lidar com zero assinaturas ativas', async () => {
     // Arrange
     const mockResult = { count: 0 };
     mockPrismaSubscription.updateMany.mockResolvedValue(mockResult);
-    mockPrismaWebhookLog.create.mockResolvedValue({});
     mockSendMonthlyQueriesResetReport.mockResolvedValue(undefined);
 
     // Act
-    await resetMonthlyQueries();
+    const result = await resetMonthlyQueries();
 
     // Assert
     expect(mockPrismaSubscription.updateMany).toHaveBeenCalled();
@@ -126,24 +120,26 @@ describe('resetMonthlyQueries Job', () => {
       'admin@radarone.com',
       0
     );
-    expect(mockPrismaWebhookLog.create).toHaveBeenCalled();
+    expect(result.processedCount).toBe(0);
+    expect(result.successCount).toBe(0);
   });
 
-  it('deve criar log de auditoria mesmo se email falhar', async () => {
+  it('deve continuar com sucesso mesmo se email de relatório falhar', async () => {
     // Arrange
     const mockResult = { count: 5 };
     mockPrismaSubscription.updateMany.mockResolvedValue(mockResult);
-    mockPrismaWebhookLog.create.mockResolvedValue({});
     mockSendMonthlyQueriesResetReport.mockRejectedValue(
       new Error('Email service unavailable')
     );
 
     // Act
-    await resetMonthlyQueries();
+    const result = await resetMonthlyQueries();
 
-    // Assert
-    expect(mockPrismaWebhookLog.create).toHaveBeenCalled();
-    // Não deve lançar erro, apenas logar
+    // Assert - Job principal foi bem-sucedido apesar do email falhar
+    expect(result.processedCount).toBe(5);
+    expect(result.successCount).toBe(5);
+    expect(result.errorCount).toBe(0);
+    // Não deve capturar exception, pois o job principal teve sucesso
     expect(mockCaptureJobException).not.toHaveBeenCalled();
   });
 
@@ -155,8 +151,12 @@ describe('resetMonthlyQueries Job', () => {
     // Simular retryAsync lançando erro após falhas
     mockRetryAsync.mockRejectedValue(mockError);
 
-    // Act & Assert
-    await expect(resetMonthlyQueries()).rejects.toThrow('Database connection failed');
+    // Act
+    const result = await resetMonthlyQueries();
+
+    // Assert - Job now returns error result instead of throwing
+    expect(result.errorCount).toBe(1);
+    expect(result.summary).toContain('Database connection failed');
     expect(mockCaptureJobException).toHaveBeenCalledWith(
       mockError,
       expect.objectContaining({
@@ -169,7 +169,6 @@ describe('resetMonthlyQueries Job', () => {
     // Arrange
     const mockResult = { count: 3 };
     mockPrismaSubscription.updateMany.mockResolvedValue(mockResult);
-    mockPrismaWebhookLog.create.mockResolvedValue({});
     mockSendMonthlyQueriesResetReport.mockResolvedValue(undefined);
 
     // Act
@@ -187,28 +186,21 @@ describe('resetMonthlyQueries Job', () => {
     );
   });
 
-  it('deve incluir timezone e executedAt no payload do webhookLog', async () => {
+  it('deve incluir metadata com subscriptionsReset e executedAt no resultado', async () => {
     // Arrange
     const mockResult = { count: 7 };
     mockPrismaSubscription.updateMany.mockResolvedValue(mockResult);
-    mockPrismaWebhookLog.create.mockResolvedValue({});
     mockSendMonthlyQueriesResetReport.mockResolvedValue(undefined);
 
     // Act
-    await resetMonthlyQueries();
+    const result = await resetMonthlyQueries();
 
     // Assert
-    expect(mockPrismaWebhookLog.create).toHaveBeenCalledWith(
+    expect(result.metadata).toEqual(
       expect.objectContaining({
-        data: expect.objectContaining({
-          event: 'MONTHLY_QUERIES_RESET',
-          payload: expect.objectContaining({
-            timezone: 'America/Sao_Paulo',
-            executedAt: expect.any(String),
-            updatedCount: 7,
-            status: 'SUCCESS',
-          }),
-        }),
+        subscriptionsReset: 7,
+        executedAt: expect.any(String),
+        emailSent: true,
       })
     );
   });

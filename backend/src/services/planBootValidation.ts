@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { logInfo, logError, logWarning } from '../utils/loggerHelpers';
+import { PLAN_CONFIG } from '../config/appConfig';
 
 /**
  * Validação de integridade dos planos no boot do servidor.
@@ -16,7 +17,7 @@ export interface PlansIntegrityResult {
   brokenTrials: number;
 }
 
-const FALLBACK_TRIAL_DAYS = 7;
+const FALLBACK_TRIAL_DAYS = PLAN_CONFIG.fallbackTrialDays;
 
 export async function ensurePlansIntegrity(): Promise<PlansIntegrityResult> {
   const result: PlansIntegrityResult = { plansChecked: 0, plansFixed: 0, brokenTrials: 0 };

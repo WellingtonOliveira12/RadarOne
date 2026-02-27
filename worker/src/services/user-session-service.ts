@@ -416,7 +416,7 @@ class UserSessionService {
     // 4. Descriptografa storageState
     let storageState: StorageState;
     try {
-      const decrypted = cryptoManager.decrypt(session.encryptedStorageState);
+      const decrypted = cryptoManager.decrypt(session.encryptedStorageState!);
       storageState = JSON.parse(decrypted);
     } catch (error: any) {
       const reason = error.message.includes('CRYPTO_KEY_MISSING')
@@ -706,7 +706,7 @@ class UserSessionService {
       session.status === UserSessionStatus.NEEDS_REAUTH ||
       session.status === UserSessionStatus.EXPIRED ||
       session.status === UserSessionStatus.INVALID ||
-      (session.expiresAt && new Date() > session.expiresAt);
+      !!(session.expiresAt && new Date() > session.expiresAt);
 
     return {
       exists: true,

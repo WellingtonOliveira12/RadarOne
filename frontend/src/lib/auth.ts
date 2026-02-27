@@ -1,44 +1,39 @@
 /**
- * Biblioteca centralizada de autenticação
+ * Centralized authentication library
  *
- * ESTRATÉGIA DE SEGURANÇA:
- * - Access token: armazenado em memória (variável) — curta duração (15min)
- * - Refresh token: httpOnly cookie (gerenciado pelo backend) — 7 dias
- * - Fallback: localStorage para backward compatibility durante transição
+ * SECURITY STRATEGY:
+ * - Access token: stored in-memory only — short-lived (15min)
+ * - Refresh token: httpOnly cookie (managed by backend) — 7 days
  *
- * Ao recarregar a página, o access token é perdido (memória) e renovado
- * automaticamente via /auth/refresh (que usa o cookie httpOnly).
+ * On page reload, the access token is lost (memory) and renewed
+ * automatically via /auth/refresh (which uses the httpOnly cookie).
  */
 
-const TOKEN_KEY = 'radarone_token';
-
-// Access token em memória (mais seguro que localStorage)
+// Access token in memory only (never persisted to storage)
 let inMemoryToken: string | null = null;
 
 /**
- * Obtém o token JWT
- * Prioridade: memória > localStorage (fallback de transição)
+ * Gets the JWT access token from memory.
+ * Returns null if not available (e.g. after page reload).
  */
 export function getToken(): string | null {
-  if (inMemoryToken) return inMemoryToken;
-  // Fallback: verificar localStorage (tokens antigos antes da migração)
-  return localStorage.getItem(TOKEN_KEY);
+  return inMemoryToken;
 }
 
 /**
- * Salva o token JWT em memória (e localStorage para fallback)
+ * Saves the JWT access token in memory.
  */
 export function setToken(token: string): void {
   inMemoryToken = token;
-  // Manter localStorage durante transição para que abas existentes continuem funcionando
-  localStorage.setItem(TOKEN_KEY, token);
 }
 
 /**
- * Limpa TODAS as informações de autenticação
+ * Clears ALL authentication information.
+ * Removes legacy localStorage token if present (migration cleanup).
  */
 export function clearAuth(): void {
   inMemoryToken = null;
-  localStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem('returnUrl');
+  // Clean up legacy localStorage token from previous versions
+  try { localStorage.removeItem('radarone_token'); } catch { /* noop */ }
+  try { sessionStorage.removeItem('returnUrl'); } catch { /* noop */ }
 }

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { logInfo, logError, logWarning } from '../utils/loggerHelpers';
 import {
   processWebhookMessage,
   validateWebhookSecret,
@@ -38,7 +39,7 @@ export class TelegramController {
         botUsername: 'RadarOneAlertaBot'
       });
     } catch (error: any) {
-      console.error('[TelegramController] Erro ao gerar token', { error: error.message });
+      logError('[TelegramController] Erro ao gerar token', { error: error.message });
       res.status(500).json({ error: 'Erro ao gerar token de conexão' });
     }
   }
@@ -59,7 +60,7 @@ export class TelegramController {
 
       res.json(status);
     } catch (error: any) {
-      console.error('[TelegramController] Erro ao buscar status', { error: error.message });
+      logError('[TelegramController] Erro ao buscar status', { error: error.message });
       res.status(500).json({ error: 'Erro ao buscar status da conexão' });
     }
   }
@@ -84,7 +85,7 @@ export class TelegramController {
         res.status(500).json({ error: result.error || 'Erro ao desconectar' });
       }
     } catch (error: any) {
-      console.error('[TelegramController] Erro ao desconectar', { error: error.message });
+      logError('[TelegramController] Erro ao desconectar', { error: error.message });
       res.status(500).json({ error: 'Erro ao desconectar Telegram' });
     }
   }
@@ -125,7 +126,7 @@ export class TelegramController {
       const BASE_URL = process.env.BACKEND_BASE_URL || process.env.PUBLIC_URL || process.env.BACKEND_URL || 'https://api.radarone.com.br';
       const webhookUrl = `${BASE_URL}/api/telegram/webhook?secret=${TELEGRAM_WEBHOOK_SECRET}`;
 
-      console.log('[TelegramController.configureWebhook] Configurando webhook', {
+      logInfo('[TelegramController.configureWebhook] Configurando webhook', {
         userId,
         webhookUrl: webhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>'),
         action: 'configure_webhook_start'
@@ -135,7 +136,7 @@ export class TelegramController {
       const setResult = await setTelegramWebhook(webhookUrl);
 
       if (!setResult.success) {
-        console.error('[TelegramController.configureWebhook] Erro ao configurar webhook', {
+        logError('[TelegramController.configureWebhook] Erro ao configurar webhook', {
           error: setResult.error,
           action: 'configure_webhook_failed'
         });
@@ -153,7 +154,7 @@ export class TelegramController {
 
       const success = webhookInfo.success && webhookInfo.url === webhookUrl;
 
-      console.log('[TelegramController.configureWebhook] Webhook configurado', {
+      logInfo('[TelegramController.configureWebhook] Webhook configurado', {
         userId,
         success,
         currentUrl: webhookInfo.url?.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>'),
@@ -176,7 +177,7 @@ export class TelegramController {
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
-      console.error('[TelegramController.configureWebhook] Erro', { error: error.message });
+      logError('[TelegramController.configureWebhook] Erro', { error: error.message });
       res.status(500).json({ error: 'Erro ao configurar webhook' });
     }
   }
@@ -261,7 +262,7 @@ export class TelegramController {
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
-      console.error('[TelegramController.webhookHealth] Erro', { error: error.message });
+      logError('[TelegramController.webhookHealth] Erro', { error: error.message });
       res.status(500).json({ error: 'Erro ao verificar health do webhook' });
     }
   }
@@ -289,7 +290,7 @@ export class TelegramController {
 
       const targetUserId = req.query.userId as string | undefined;
 
-      console.log('[TelegramController.diagnose] Executando diagnóstico', {
+      logInfo('[TelegramController.diagnose] Executando diagnóstico', {
         action: 'diagnose_request',
         adminUserId: currentUserId,
         targetUserId: targetUserId || 'none',
@@ -300,7 +301,7 @@ export class TelegramController {
 
       res.json(result);
     } catch (error: any) {
-      console.error('[TelegramController.diagnose] Erro', { error: error.message });
+      logError('[TelegramController.diagnose] Erro', { error: error.message });
       res.status(500).json({ error: 'Erro ao executar diagnóstico' });
     }
   }
@@ -345,7 +346,7 @@ export class TelegramController {
         return;
       }
 
-      console.log('[TelegramController.reconfigureWebhook] Iniciando reconfiguração', {
+      logInfo('[TelegramController.reconfigureWebhook] Iniciando reconfiguração', {
         action: 'reconfigure_webhook_start',
         userId,
         timestamp: new Date().toISOString()
@@ -354,11 +355,11 @@ export class TelegramController {
       // PASSO 1: Validar token do bot (getMe)
       const botInfo = await getBotInfo();
       if (!botInfo.success) {
-        console.error('[TelegramController.reconfigureWebhook] Token inválido', {
+        logError('[TelegramController.reconfigureWebhook] Token inválido', {
           action: 'reconfigure_webhook_failed',
           reason: 'invalid_bot_token',
           error: botInfo.error,
-          errorCode: botInfo.errorCode
+          errorCode: String(botInfo.errorCode)
         });
 
         res.status(500).json({
@@ -369,7 +370,7 @@ export class TelegramController {
         return;
       }
 
-      console.log('[TelegramController.reconfigureWebhook] Bot validado', {
+      logInfo('[TelegramController.reconfigureWebhook] Bot validado', {
         action: 'bot_validated',
         botUsername: botInfo.username,
         botId: botInfo.id
@@ -381,7 +382,7 @@ export class TelegramController {
       // PASSO 3: Calcular webhook URL esperado
       const webhookUrl = getExpectedWebhookUrl();
 
-      console.log('[TelegramController.reconfigureWebhook] Configurando webhook', {
+      logInfo('[TelegramController.reconfigureWebhook] Configurando webhook', {
         action: 'set_webhook',
         webhookUrlMasked: webhookUrl.replace(TELEGRAM_WEBHOOK_SECRET, '<SECRET>'),
         webhookBefore: webhookBefore.url || 'none'
@@ -391,7 +392,7 @@ export class TelegramController {
       const setResult = await setTelegramWebhook(webhookUrl);
 
       if (!setResult.success) {
-        console.error('[TelegramController.reconfigureWebhook] Erro ao configurar webhook', {
+        logError('[TelegramController.reconfigureWebhook] Erro ao configurar webhook', {
           action: 'reconfigure_webhook_failed',
           error: setResult.error
         });
@@ -408,7 +409,7 @@ export class TelegramController {
       const webhookAfter = await getWebhookInfo();
       const success = webhookAfter.success && webhookAfter.url === webhookUrl;
 
-      console.log('[TelegramController.reconfigureWebhook] Webhook reconfigurado', {
+      logInfo('[TelegramController.reconfigureWebhook] Webhook reconfigurado', {
         action: 'reconfigure_webhook_complete',
         success,
         webhookBefore: webhookBefore.url || 'none',
@@ -442,7 +443,7 @@ export class TelegramController {
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
-      console.error('[TelegramController.reconfigureWebhook] Erro', { error: error.message });
+      logError('[TelegramController.reconfigureWebhook] Erro', { error: error.message });
       res.status(500).json({ error: 'Erro ao reconfigurar webhook' });
     }
   }
@@ -470,7 +471,7 @@ export class TelegramController {
 
       const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
-      console.log('[TelegramController.pingWebhook] Testando webhook internamente', {
+      logInfo('[TelegramController.pingWebhook] Testando webhook internamente', {
         action: 'ping_webhook',
         userId,
         timestamp: new Date().toISOString()
@@ -530,7 +531,7 @@ export class TelegramController {
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
-      console.error('[TelegramController.pingWebhook] Erro', { error: error.message });
+      logError('[TelegramController.pingWebhook] Erro', { error: error.message });
       res.status(500).json({ error: 'Erro ao executar ping do webhook' });
     }
   }
@@ -542,7 +543,7 @@ export class TelegramController {
   static async handleWebhook(req: Request, res: Response): Promise<void> {
     try {
       // LOG CRÍTICO: Webhook recebido
-      console.log('[TelegramWebhook] Request recebido', {
+      logInfo('[TelegramWebhook] Request recebido', {
         action: 'webhook_request_received',
         method: req.method,
         path: req.path,
@@ -562,7 +563,7 @@ export class TelegramController {
       const secretFromTelegramHeader = req.get('x-telegram-bot-api-secret-token');
       const secret = secretFromQuery || secretFromHeader || secretFromTelegramHeader;
 
-      console.log('[TelegramWebhook] Validando secret', {
+      logInfo('[TelegramWebhook] Validando secret', {
         action: 'webhook_secret_validation',
         hasQuery: !!secretFromQuery,
         hasCustomHeader: !!secretFromHeader,
@@ -572,7 +573,7 @@ export class TelegramController {
       });
 
       if (!validateWebhookSecret(secret)) {
-        console.warn('[TelegramWebhook] Tentativa de acesso não autorizado', {
+        logWarning('[TelegramWebhook] Tentativa de acesso não autorizado', {
           action: 'webhook_unauthorized',
           reason: 'invalid_secret',
           ip: req.ip,
@@ -586,7 +587,7 @@ export class TelegramController {
         return;
       }
 
-      console.log('[TelegramWebhook] Secret validado com sucesso', {
+      logInfo('[TelegramWebhook] Secret validado com sucesso', {
         action: 'webhook_secret_ok',
         secretSource: secretFromQuery ? 'query' : secretFromHeader ? 'custom-header' : 'telegram-header'
       });
@@ -602,7 +603,7 @@ export class TelegramController {
         const username = message.from?.username;
         const firstName = message.from?.first_name;
 
-        console.log('[TelegramWebhook] Mensagem recebida', {
+        logInfo('[TelegramWebhook] Mensagem recebida', {
           action: 'webhook_message_received',
           chatId,
           telegramUserId,
@@ -618,7 +619,7 @@ export class TelegramController {
         if (text && text.startsWith('/start ')) {
           const startParam = text.replace('/start ', '').trim();
 
-          console.log('[TelegramWebhook] Detectado comando /start', {
+          logInfo('[TelegramWebhook] Detectado comando /start', {
             action: 'webhook_start_command',
             chatId,
             startParam: startParam.substring(0, 20) + '...',
@@ -634,14 +635,14 @@ export class TelegramController {
           );
 
           if (result.success) {
-            console.log('[TelegramWebhook] /start processado com sucesso', {
+            logInfo('[TelegramWebhook] /start processado com sucesso', {
               action: 'webhook_start_success',
               chatId,
               timestamp: new Date().toISOString()
             });
             res.status(200).json({ ok: true });
           } else {
-            console.error('[TelegramWebhook] /start falhou', {
+            logError('[TelegramWebhook] /start falhou', {
               action: 'webhook_start_failed',
               chatId,
               error: result.error,
@@ -653,7 +654,7 @@ export class TelegramController {
         }
 
         // Processar como mensagem normal (link code antigo)
-        console.log('[TelegramWebhook] Processando mensagem normal (código RADAR)', {
+        logInfo('[TelegramWebhook] Processando mensagem normal (código RADAR)', {
           action: 'webhook_process_message',
           chatId,
           hasRadarPattern: text ? /RADAR-[A-Z0-9]{6}/i.test(text) : false,
@@ -663,14 +664,14 @@ export class TelegramController {
         const result = await processWebhookMessage(message);
 
         if (result.success) {
-          console.log('[TelegramWebhook] Mensagem processada com sucesso', {
+          logInfo('[TelegramWebhook] Mensagem processada com sucesso', {
             action: 'webhook_message_success',
             chatId,
             timestamp: new Date().toISOString()
           });
           res.status(200).json({ ok: true });
         } else {
-          console.error('[TelegramWebhook] Mensagem falhou', {
+          logError('[TelegramWebhook] Mensagem falhou', {
             action: 'webhook_message_failed',
             chatId,
             error: result.error,
@@ -680,7 +681,7 @@ export class TelegramController {
         }
       } else {
         // Outros tipos de update (callback_query, etc) - ignorar por ora
-        console.log('[TelegramWebhook] Update ignorado (não é mensagem)', {
+        logInfo('[TelegramWebhook] Update ignorado (não é mensagem)', {
           action: 'webhook_update_ignored',
           updateType: update.callback_query ? 'callback_query' : 'other',
           timestamp: new Date().toISOString()
@@ -688,7 +689,7 @@ export class TelegramController {
         res.status(200).json({ ok: true });
       }
     } catch (error: any) {
-      console.error('[TelegramWebhook] Erro ao processar webhook', {
+      logError('[TelegramWebhook] Erro ao processar webhook', {
         action: 'webhook_error',
         error: error.message,
         stack: error.stack,

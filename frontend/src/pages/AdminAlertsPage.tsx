@@ -6,7 +6,7 @@
  * - Badge de alertas não lidos
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, memo } from 'react';
 import {
   Heading,
   Card,
@@ -18,6 +18,8 @@ import {
   Center,
   Alert,
   AlertIcon,
+  AlertTitle,
+  AlertDescription,
   Button,
   HStack,
   Select,
@@ -58,6 +60,7 @@ const getSeverityColor = (severity: string) => {
 export const AdminAlertsPage: React.FC = () => {
   const [alerts, setAlerts] = useState<AdminAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [total, setTotal] = useState(0);
 
@@ -73,6 +76,7 @@ export const AdminAlertsPage: React.FC = () => {
   const loadAlerts = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       const params = new URLSearchParams();
       if (filterType) params.append('type', filterType);
@@ -84,27 +88,34 @@ export const AdminAlertsPage: React.FC = () => {
       setAlerts(response.alerts);
       setUnreadCount(response.unreadCount);
       setTotal(response.total);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || 'Erro ao carregar alertas');
     } finally {
       setLoading(false);
     }
   };
 
-  const markAsRead = async (id: string) => {
+  const markAsRead = useCallback(async (id: string) => {
     try {
       await api.put(`/api/admin/alerts/${id}/read`);
       loadAlerts();
     } catch (err) {
       console.error(err);
     }
-  };
+  }, []);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilterType('');
     setFilterSeverity('');
     setFilterStatus('');
-  };
+  }, []);
+
+  const exportQueryParams = useMemo(() => ({
+    type: filterType,
+    severity: filterSeverity,
+    isRead: filterStatus === 'read' ? 'true' : filterStatus === 'unread' ? 'false' : undefined,
+  }), [filterType, filterSeverity, filterStatus]);
 
   if (loading) {
     return (
@@ -131,7 +142,7 @@ export const AdminAlertsPage: React.FC = () => {
             </Badge>
             <ExportButton
               endpoint="/api/admin/alerts/export"
-              queryParams={{ type: filterType, severity: filterSeverity, isRead: filterStatus === 'read' ? 'true' : filterStatus === 'unread' ? 'false' : undefined }}
+              queryParams={exportQueryParams}
               label="Exportar Alertas"
             />
           </HStack>
@@ -201,15 +212,34 @@ export const AdminAlertsPage: React.FC = () => {
           </CardBody>
         </Card>
 
-        {/* Lista de Alertas */}
-        {alerts.length === 0 ? (
-          <Alert status="info">
+        {/* Error State */}
+        {error && (
+          <Alert status="error" borderRadius="md" mb={4}>
             <AlertIcon />
-            {filterType || filterSeverity || filterStatus
-              ? 'Nenhum alerta encontrado com os filtros aplicados'
-              : 'Nenhum alerta no momento'}
+            <Box flex={1}>
+              <AlertTitle>Erro ao carregar alertas</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Box>
+            <Button size="sm" colorScheme="red" variant="outline" onClick={loadAlerts} ml={4}>
+              Tentar Novamente
+            </Button>
           </Alert>
-        ) : (
+        )}
+
+        {/* Lista de Alertas */}
+        {!error && alerts.length === 0 ? (
+          <Alert status="info" borderRadius="md">
+            <AlertIcon />
+            <Box>
+              <AlertTitle>Nenhum alerta encontrado</AlertTitle>
+              <AlertDescription>
+                {filterType || filterSeverity || filterStatus
+                  ? 'Nenhum alerta corresponde aos filtros aplicados. Tente ajustar ou limpar os filtros.'
+                  : 'Não há alertas administrativos no momento.'}
+              </AlertDescription>
+            </Box>
+          </Alert>
+        ) : !error && (
           <VStack spacing={3} align="stretch">
             {alerts.map((alert) => (
               <AlertCard
@@ -231,8 +261,9 @@ interface AlertCardProps {
   onMarkAsRead: (id: string) => void;
 }
 
-const AlertCard: React.FC<AlertCardProps> = ({ alert, onMarkAsRead }) => {
+const AlertCard: React.FC<AlertCardProps> = memo(({ alert, onMarkAsRead }) => {
   const { isOpen, onToggle } = useDisclosure();
+  const severityColor = useMemo(() => getSeverityColor(alert.severity), [alert.severity]);
 
   return (
     <Card
@@ -244,7 +275,7 @@ const AlertCard: React.FC<AlertCardProps> = ({ alert, onMarkAsRead }) => {
         {/* Header */}
         <HStack justify="space-between" mb={2}>
           <HStack spacing={2}>
-            <Badge colorScheme={getSeverityColor(alert.severity)}>
+            <Badge colorScheme={severityColor}>
               {alert.severity}
             </Badge>
             <Badge colorScheme="gray" variant="outline">
@@ -329,4 +360,4 @@ const AlertCard: React.FC<AlertCardProps> = ({ alert, onMarkAsRead }) => {
       </CardBody>
     </Card>
   );
-};
+});

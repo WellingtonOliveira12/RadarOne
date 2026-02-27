@@ -1,0 +1,1373 @@
+import { Request, Response } from 'express';
+import { prisma } from '../lib/prisma';
+import { logAdminAction, AuditAction, AuditTargetType, getClientIp } from '../utils/auditLog';
+import { logInfo, logError } from '../utils/loggerHelpers';
+
+export class AdminCouponsController {
+  /**
+   * GET /api/admin/coupons/export
+   * Exportar cupons para CSV
+   */
+  static async exportCoupons(req: Request, res: Response) {
+    try {
+      const { status, code, type } = req.query;
+      const adminId = req.userId;
+
+      const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      // Construir filtros
+      const where: any = {};
+
+      if (status === 'active') {
+        where.isActive = true;
+      } else if (status === 'inactive') {
+        where.isActive = false;
+      }
+
+      if (code) {
+        where.code = {
+          contains: (code as string).toUpperCase(),
+          mode: 'insensitive'
+        };
+      }
+
+      if (type) {
+        where.discountType = type;
+      }
+
+      // Buscar cupons
+      const coupons = await prisma.coupon.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          plan: {
+            select: {
+              name: true,
+              slug: true
+            }
+          },
+          _count: {
+            select: {
+              usageLogs: true
+            }
+          }
+        }
+      });
+
+      const { generateCSV, getTimestamp } = await import('../services/exportService');
+
+      const csvData = coupons.map(coupon => ({
+        id: coupon.id,
+        code: coupon.code,
+        description: coupon.description || '',
+        discountType: coupon.discountType === 'PERCENTAGE' ? 'Percentual' : 'Fixo',
+        discountValue: coupon.discountType === 'PERCENTAGE'
+          ? `${coupon.discountValue}%`
+          : `R$ ${(coupon.discountValue / 100).toFixed(2)}`,
+        plan: coupon.plan?.name || 'Todos os planos',
+        maxUses: coupon.maxUses || 'Ilimitado',
+        usedCount: coupon._count.usageLogs,
+        remainingUses: coupon.maxUses ? coupon.maxUses - coupon._count.usageLogs : 'Ilimitado',
+        expiresAt: coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleString('pt-BR') : 'Sem expiração',
+        isActive: coupon.isActive ? 'Ativo' : 'Inativo',
+        createdAt: new Date(coupon.createdAt).toLocaleString('pt-BR'),
+        updatedAt: new Date(coupon.updatedAt).toLocaleString('pt-BR')
+      }));
+
+      const headers = {
+        id: 'ID',
+        code: 'Código',
+        description: 'Descrição',
+        discountType: 'Tipo de Desconto',
+        discountValue: 'Valor do Desconto',
+        plan: 'Plano Aplicável',
+        maxUses: 'Máximo de Usos',
+        usedCount: 'Usos Realizados',
+        remainingUses: 'Usos Restantes',
+        expiresAt: 'Data de Expiração',
+        isActive: 'Status',
+        createdAt: 'Data de Criação',
+        updatedAt: 'Última Atualização'
+      };
+
+      const { csv, filename } = generateCSV(
+        csvData,
+        headers,
+        `cupons_${getTimestamp()}`
+      );
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin.email,
+        action: 'COUPONS_EXPORTED' as any,
+        targetType: AuditTargetType.COUPON,
+        targetId: null,
+        beforeData: null,
+        afterData: { count: coupons.length, filters: where },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('\ufeff' + csv);
+
+    } catch (error) {
+      logError('Erro ao exportar cupons', { err: error });
+      return res.status(500).json({ error: 'Erro ao exportar cupons' });
+    }
+  }
+
+  /**
+   * GET /api/admin/coupons
+   * Listar todos os cupons com paginação e filtros
+   */
+  static async listCoupons(req: Request, res: Response) {
+    try {
+      const {
+        page = '1',
+        limit = '20',
+        status,
+        code,
+        type
+      } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const skip = (pageNum - 1) * limitNum;
+
+      // Construir filtros dinâmicos
+      const where: any = {};
+
+      if (status === 'active') {
+        where.isActive = true;
+      } else if (status === 'inactive') {
+        where.isActive = false;
+      }
+
+      if (code) {
+        where.code = {
+          contains: (code as string).toUpperCase(),
+          mode: 'insensitive'
+        };
+      }
+
+      if (type) {
+        where.discountType = type;
+      }
+
+      // Buscar cupons com relacionamentos
+      const [coupons, total] = await Promise.all([
+        prisma.coupon.findMany({
+          where,
+          skip,
+          take: limitNum,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            plan: {
+              select: {
+                id: true,
+                name: true,
+                slug: true
+              }
+            },
+            _count: {
+              select: {
+                usageLogs: true
+              }
+            }
+          }
+        }),
+        prisma.coupon.count({ where })
+      ]);
+
+      const totalPages = Math.ceil(total / limitNum);
+
+      return res.json({
+        coupons,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages
+        }
+      });
+
+    } catch (error) {
+      logError('Erro ao listar cupons', { err: error });
+      return res.status(500).json({ error: 'Erro ao listar cupons' });
+    }
+  }
+
+  /**
+   * POST /api/admin/coupons
+   * Criar novo cupom
+   */
+  static async createCoupon(req: Request, res: Response) {
+    try {
+      const {
+        code,
+        description,
+        purpose, // FASE: Cupons de Upgrade
+        discountType,
+        discountValue,
+        durationDays, // FASE: Cupons de Upgrade
+        isLifetime, // FASE: Cupons Vitalícios
+        maxUses,
+        expiresAt,
+        appliesToPlanId
+      } = req.body;
+
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      // Determinar purpose (default = DISCOUNT para backwards compatibility)
+      const couponPurpose = purpose || 'DISCOUNT';
+
+      // Validações
+      if (!code) {
+        return res.status(400).json({
+          error: 'Campo obrigatório: code'
+        });
+      }
+
+      // Validações específicas por tipo de cupom
+      if (couponPurpose === 'DISCOUNT') {
+        if (!discountType || discountValue === undefined) {
+          return res.status(400).json({
+            error: 'Cupom de desconto requer: discountType, discountValue'
+          });
+        }
+      } else if (couponPurpose === 'TRIAL_UPGRADE') {
+        // Se é vitalício, não precisa de durationDays
+        if (!isLifetime) {
+          if (!durationDays || durationDays < 1 || durationDays > 60) {
+            return res.status(400).json({
+              error: 'Cupom de trial upgrade requer durationDays entre 1 e 60'
+            });
+          }
+        }
+      }
+
+      // Code deve ser uppercase e sem espaços
+      const normalizedCode = code.trim().toUpperCase().replace(/\s+/g, '');
+
+      if (normalizedCode.length < 3) {
+        return res.status(400).json({
+          error: 'Código deve ter pelo menos 3 caracteres'
+        });
+      }
+
+      // Validar discountValue (apenas para cupons de desconto)
+      if (couponPurpose === 'DISCOUNT') {
+        if (discountValue <= 0) {
+          return res.status(400).json({
+            error: 'Valor de desconto deve ser maior que 0'
+          });
+        }
+
+        if (discountType === 'PERCENTAGE' && discountValue > 100) {
+          return res.status(400).json({
+            error: 'Desconto percentual não pode ser maior que 100%'
+          });
+        }
+      }
+
+      // Verificar se código já existe
+      const existing = await prisma.coupon.findUnique({
+        where: { code: normalizedCode }
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          error: 'Já existe um cupom com este código'
+        });
+      }
+
+      // Validar plano se especificado
+      if (appliesToPlanId) {
+        const plan = await prisma.plan.findUnique({
+          where: { id: appliesToPlanId }
+        });
+
+        if (!plan) {
+          return res.status(400).json({
+            error: 'Plano especificado não encontrado'
+          });
+        }
+      }
+
+      // Validar data de expiração
+      if (expiresAt && new Date(expiresAt) <= new Date()) {
+        return res.status(400).json({
+          error: 'Data de expiração deve ser futura'
+        });
+      }
+
+      // Criar cupom
+      const coupon = await prisma.coupon.create({
+        data: {
+          code: normalizedCode,
+          description: description || null,
+          purpose: couponPurpose, // FASE: Cupons de Upgrade
+          discountType: couponPurpose === 'DISCOUNT' ? discountType : 'FIXED', // Default se não aplicável
+          discountValue: couponPurpose === 'DISCOUNT' ? discountValue : 0, // Default se não aplicável
+          durationDays: couponPurpose === 'TRIAL_UPGRADE' && !isLifetime ? durationDays : null, // FASE: Cupons de Upgrade
+          isLifetime: couponPurpose === 'TRIAL_UPGRADE' ? Boolean(isLifetime) : false, // FASE: Cupons Vitalícios
+          maxUses: maxUses || null,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          appliesToPlanId: appliesToPlanId || null,
+          isActive: true,
+          usedCount: 0
+        },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          }
+        }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: AuditAction.COUPON_CREATED,
+        targetType: AuditTargetType.COUPON,
+        targetId: coupon.id,
+        beforeData: null,
+        afterData: coupon,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.status(201).json(coupon);
+
+    } catch (error) {
+      logError('Erro ao criar cupom', { err: error });
+      return res.status(500).json({ error: 'Erro ao criar cupom' });
+    }
+  }
+
+  /**
+   * PUT /api/admin/coupons/:id
+   * Atualizar cupom existente
+   */
+  static async updateCoupon(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const {
+        description,
+        purpose, // FASE: Cupons de Upgrade
+        discountType,
+        discountValue,
+        durationDays, // FASE: Cupons de Upgrade
+        isLifetime, // FASE: Cupons Vitalícios
+        maxUses,
+        expiresAt,
+        appliesToPlanId
+      } = req.body;
+
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      // Buscar cupom existente
+      const existing = await prisma.coupon.findUnique({
+        where: { id }
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Cupom não encontrado' });
+      }
+
+      // Determinar purpose e isLifetime a serem usados (do req ou do existente)
+      const couponPurpose = purpose !== undefined ? purpose : existing.purpose || 'DISCOUNT';
+      const effectiveIsLifetime = isLifetime !== undefined ? isLifetime : existing.isLifetime;
+
+      // Validações específicas por tipo de cupom
+      if (couponPurpose === 'DISCOUNT') {
+        if (discountValue !== undefined && discountValue <= 0) {
+          return res.status(400).json({
+            error: 'Valor de desconto deve ser maior que 0'
+          });
+        }
+
+        if (discountType === 'PERCENTAGE' && discountValue > 100) {
+          return res.status(400).json({
+            error: 'Desconto percentual não pode ser maior que 100%'
+          });
+        }
+      } else if (couponPurpose === 'TRIAL_UPGRADE') {
+        // Se não é vitalício, validar durationDays
+        if (!effectiveIsLifetime) {
+          if (durationDays !== undefined && (durationDays < 1 || durationDays > 60)) {
+            return res.status(400).json({
+              error: 'Duração deve estar entre 1 e 60 dias'
+            });
+          }
+        }
+      }
+
+      // Validar plano se especificado
+      if (appliesToPlanId) {
+        const plan = await prisma.plan.findUnique({
+          where: { id: appliesToPlanId }
+        });
+
+        if (!plan) {
+          return res.status(400).json({
+            error: 'Plano especificado não encontrado'
+          });
+        }
+      }
+
+      // Validar data de expiração
+      if (expiresAt && new Date(expiresAt) <= new Date()) {
+        return res.status(400).json({
+          error: 'Data de expiração deve ser futura'
+        });
+      }
+
+      // Atualizar cupom
+      const updated = await prisma.coupon.update({
+        where: { id },
+        data: {
+          description: description !== undefined ? description : existing.description,
+          purpose: purpose !== undefined ? purpose : existing.purpose, // FASE: Cupons de Upgrade
+          discountType: discountType || existing.discountType,
+          discountValue: discountValue !== undefined ? discountValue : existing.discountValue,
+          // Se é vitalício, durationDays deve ser null; senão, usar valor do request ou existente
+          durationDays: couponPurpose === 'TRIAL_UPGRADE' && effectiveIsLifetime
+            ? null
+            : (durationDays !== undefined ? durationDays : existing.durationDays),
+          isLifetime: couponPurpose === 'TRIAL_UPGRADE'
+            ? Boolean(effectiveIsLifetime)
+            : false, // FASE: Cupons Vitalícios
+          maxUses: maxUses !== undefined ? maxUses : existing.maxUses,
+          expiresAt: expiresAt !== undefined ? (expiresAt ? new Date(expiresAt) : null) : existing.expiresAt,
+          appliesToPlanId: appliesToPlanId !== undefined ? appliesToPlanId : existing.appliesToPlanId
+        },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          }
+        }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: AuditAction.COUPON_UPDATED,
+        targetType: AuditTargetType.COUPON,
+        targetId: updated.id,
+        beforeData: existing,
+        afterData: updated,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json(updated);
+
+    } catch (error) {
+      logError('Erro ao atualizar cupom', { err: error });
+      return res.status(500).json({ error: 'Erro ao atualizar cupom' });
+    }
+  }
+
+  /**
+   * PATCH /api/admin/coupons/:id/toggle
+   * Ativar/Desativar cupom
+   */
+  static async toggleCouponStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      // Buscar cupom existente
+      const existing = await prisma.coupon.findUnique({
+        where: { id }
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Cupom não encontrado' });
+      }
+
+      // Toggle status
+      const updated = await prisma.coupon.update({
+        where: { id },
+        data: {
+          isActive: !existing.isActive
+        },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          }
+        }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: updated.isActive ? AuditAction.COUPON_ACTIVATED : AuditAction.COUPON_DEACTIVATED,
+        targetType: AuditTargetType.COUPON,
+        targetId: updated.id,
+        beforeData: { isActive: existing.isActive },
+        afterData: { isActive: updated.isActive },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json(updated);
+
+    } catch (error) {
+      logError('Erro ao alternar status do cupom', { err: error });
+      return res.status(500).json({ error: 'Erro ao alternar status do cupom' });
+    }
+  }
+
+  /**
+   * DELETE /api/admin/coupons/:id
+   * Deletar cupom (soft delete via isActive)
+   */
+  static async deleteCoupon(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      // Buscar cupom existente
+      const existing = await prisma.coupon.findUnique({
+        where: { id },
+        include: {
+          _count: {
+            select: {
+              usageLogs: true
+            }
+          }
+        }
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Cupom não encontrado' });
+      }
+
+      // Se já foi usado, apenas desativar (soft delete)
+      if (existing._count.usageLogs > 0) {
+        const updated = await prisma.coupon.update({
+          where: { id },
+          data: { isActive: false }
+        });
+
+        // Audit log
+        await logAdminAction({
+          adminId: adminId!,
+          adminEmail: admin!.email,
+          action: AuditAction.COUPON_DEACTIVATED,
+          targetType: AuditTargetType.COUPON,
+          targetId: updated.id,
+          beforeData: existing,
+          afterData: { isActive: false, reason: 'Soft delete devido a usos existentes' },
+          ipAddress: getClientIp(req),
+          userAgent: req.get('user-agent')
+        });
+
+        return res.json({
+          message: 'Cupom desativado (possui usos registrados)',
+          coupon: updated
+        });
+      }
+
+      // Se nunca foi usado, pode deletar permanentemente
+      await prisma.coupon.delete({
+        where: { id }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: AuditAction.COUPON_DELETED,
+        targetType: AuditTargetType.COUPON,
+        targetId: id,
+        beforeData: existing,
+        afterData: null,
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json({
+        message: 'Cupom deletado permanentemente',
+        deleted: true
+      });
+
+    } catch (error) {
+      logError('Erro ao deletar cupom', { err: error });
+      return res.status(500).json({ error: 'Erro ao deletar cupom' });
+    }
+  }
+
+  /**
+   * PATCH /api/admin/coupons/bulk/toggle
+   * Ativar/Desativar múltiplos cupons
+   */
+  static async bulkToggleCoupons(req: Request, res: Response) {
+    try {
+      const { couponIds, isActive } = req.body;
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      if (!couponIds || !Array.isArray(couponIds) || couponIds.length === 0) {
+        return res.status(400).json({ error: 'IDs de cupons são obrigatórios' });
+      }
+
+      if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ error: 'isActive deve ser um booleano' });
+      }
+
+      // Atualizar todos de uma vez
+      const result = await prisma.coupon.updateMany({
+        where: {
+          id: {
+            in: couponIds
+          }
+        },
+        data: {
+          isActive
+        }
+      });
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: isActive ? AuditAction.COUPON_ACTIVATED : AuditAction.COUPON_DEACTIVATED,
+        targetType: AuditTargetType.COUPON,
+        targetId: null,
+        beforeData: { couponIds },
+        afterData: { isActive, count: result.count },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json({
+        message: `${result.count} cupons ${isActive ? 'ativados' : 'desativados'} com sucesso`,
+        count: result.count
+      });
+
+    } catch (error) {
+      logError('Erro ao alternar múltiplos cupons', { err: error });
+      return res.status(500).json({ error: 'Erro ao alternar múltiplos cupons' });
+    }
+  }
+
+  /**
+   * DELETE /api/admin/coupons/bulk
+   * Deletar múltiplos cupons
+   */
+  static async bulkDeleteCoupons(req: Request, res: Response) {
+    try {
+      const { couponIds } = req.body;
+      const adminId = req.userId;
+      const admin = await prisma.user.findUnique({ where: { id: adminId! } });
+
+      if (!couponIds || !Array.isArray(couponIds) || couponIds.length === 0) {
+        return res.status(400).json({ error: 'IDs de cupons são obrigatórios' });
+      }
+
+      // Buscar cupons com contagem de usos
+      const coupons = await prisma.coupon.findMany({
+        where: {
+          id: {
+            in: couponIds
+          }
+        },
+        include: {
+          _count: {
+            select: {
+              usageLogs: true
+            }
+          }
+        }
+      });
+
+      // Separar em "deletáveis" e "desativáveis"
+      const toDelete = coupons.filter(c => c._count.usageLogs === 0).map(c => c.id);
+      const toDeactivate = coupons.filter(c => c._count.usageLogs > 0).map(c => c.id);
+
+      let deletedCount = 0;
+      let deactivatedCount = 0;
+
+      // Deletar permanentemente os que não foram usados
+      if (toDelete.length > 0) {
+        const deleteResult = await prisma.coupon.deleteMany({
+          where: {
+            id: {
+              in: toDelete
+            }
+          }
+        });
+        deletedCount = deleteResult.count;
+      }
+
+      // Desativar os que já foram usados
+      if (toDeactivate.length > 0) {
+        const deactivateResult = await prisma.coupon.updateMany({
+          where: {
+            id: {
+              in: toDeactivate
+            }
+          },
+          data: {
+            isActive: false
+          }
+        });
+        deactivatedCount = deactivateResult.count;
+      }
+
+      // Audit log
+      await logAdminAction({
+        adminId: adminId!,
+        adminEmail: admin!.email,
+        action: AuditAction.COUPON_DELETED,
+        targetType: AuditTargetType.COUPON,
+        targetId: null,
+        beforeData: { couponIds, total: couponIds.length },
+        afterData: { deleted: deletedCount, deactivated: deactivatedCount },
+        ipAddress: getClientIp(req),
+        userAgent: req.get('user-agent')
+      });
+
+      return res.json({
+        message: `${deletedCount} cupons deletados, ${deactivatedCount} cupons desativados`,
+        deleted: deletedCount,
+        deactivated: deactivatedCount
+      });
+
+    } catch (error) {
+      logError('Erro ao deletar múltiplos cupons', { err: error });
+      return res.status(500).json({ error: 'Erro ao deletar múltiplos cupons' });
+    }
+  }
+
+  /**
+   * Importa cupons a partir de arquivo CSV
+   * POST /api/admin/coupons/import
+   * Permissão: ADMIN_SUPER ou ADMIN_FINANCE
+   *
+   * Formato CSV esperado:
+   * code,description,discountType,discountValue,maxUses,expiresAt,planSlug
+   * PROMO10,Desconto 10%,PERCENTAGE,10,100,2025-12-31,
+   * SAVE50,Economize 50 reais,FIXED,5000,50,2025-12-31,premium
+   */
+  static async importCoupons(req: Request, res: Response) {
+    try {
+      const userId = req.userId!;
+
+      // Get admin user for email
+      const admin = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin não encontrado' });
+      }
+
+      const userEmail = admin.email;
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'Arquivo CSV não fornecido' });
+      }
+
+      const fileContent = req.file.buffer.toString('utf-8');
+      const { parse } = await import('csv-parse/sync');
+
+      // Parse CSV
+      interface CouponCsvRow {
+        code: string;
+        description?: string;
+        discountType: string;
+        discountValue: string;
+        maxUses?: string;
+        expiresAt?: string;
+        planSlug?: string;
+      }
+
+      const records: CouponCsvRow[] = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        bom: true, // Handle UTF-8 BOM
+      });
+
+      if (records.length === 0) {
+        return res.status(400).json({ error: 'Arquivo CSV vazio' });
+      }
+
+      // VALIDAÇÃO EXTRA: Limite de linhas (máximo 1000 cupons por importação)
+      if (records.length > 1000) {
+        return res.status(400).json({
+          error: `Arquivo muito grande. Máximo de 1000 cupons por importação. Você enviou ${records.length} linhas.`
+        });
+      }
+
+      const results = {
+        success: [] as string[],
+        errors: [] as { line: number; code: string; error: string }[],
+        total: records.length,
+      };
+
+      // Process each row
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i];
+        const lineNumber = i + 2; // +2 porque linha 1 é header
+
+        try {
+          // VALIDAÇÃO EXTRA: Código
+          const code = row.code?.trim().toUpperCase();
+          if (!code || code.length < 3) {
+            throw new Error('Código inválido (mínimo 3 caracteres)');
+          }
+
+          // VALIDAÇÃO EXTRA: Tamanho máximo do código
+          if (code.length > 50) {
+            throw new Error('Código muito longo (máximo 50 caracteres)');
+          }
+
+          // VALIDAÇÃO EXTRA: Apenas caracteres alfanuméricos, hífens e underscores
+          if (!/^[A-Z0-9_-]+$/.test(code)) {
+            throw new Error('Código deve conter apenas letras, números, hífens e underscores');
+          }
+
+          const discountType = row.discountType?.toUpperCase();
+          if (!['PERCENTAGE', 'FIXED'].includes(discountType)) {
+            throw new Error('discountType deve ser PERCENTAGE ou FIXED');
+          }
+
+          const discountValue = parseFloat(row.discountValue);
+          if (isNaN(discountValue) || discountValue <= 0) {
+            throw new Error('discountValue deve ser maior que 0');
+          }
+
+          if (discountType === 'PERCENTAGE' && discountValue > 100) {
+            throw new Error('Desconto percentual não pode ser maior que 100');
+          }
+
+          // Check if coupon already exists
+          const existing = await prisma.coupon.findUnique({
+            where: { code },
+          });
+
+          if (existing) {
+            throw new Error('Cupom já existe');
+          }
+
+          // VALIDAÇÃO EXTRA: Parse optional fields com validação
+          let maxUses: number | null = null;
+          if (row.maxUses?.trim()) {
+            maxUses = parseInt(row.maxUses.trim());
+            if (isNaN(maxUses) || maxUses < 1) {
+              throw new Error('maxUses deve ser um número inteiro maior ou igual a 1');
+            }
+            if (maxUses > 1000000) {
+              throw new Error('maxUses muito alto (máximo 1.000.000)');
+            }
+          }
+
+          // VALIDAÇÃO EXTRA: Data de expiração com validação de formato
+          let expiresAt: Date | null = null;
+          if (row.expiresAt?.trim()) {
+            expiresAt = new Date(row.expiresAt.trim());
+            if (isNaN(expiresAt.getTime())) {
+              throw new Error('Data de expiração inválida (use formato YYYY-MM-DD)');
+            }
+            if (expiresAt <= new Date()) {
+              throw new Error('Data de expiração deve ser futura');
+            }
+            // VALIDAÇÃO EXTRA: Não permitir datas muito distantes (max 10 anos)
+            const tenYearsFromNow = new Date();
+            tenYearsFromNow.setFullYear(tenYearsFromNow.getFullYear() + 10);
+            if (expiresAt > tenYearsFromNow) {
+              throw new Error('Data de expiração muito distante (máximo 10 anos)');
+            }
+          }
+
+          // VALIDAÇÃO EXTRA: Descrição (se fornecida)
+          let description: string | null = null;
+          if (row.description?.trim()) {
+            description = row.description.trim();
+            if (description.length > 500) {
+              throw new Error('Descrição muito longa (máximo 500 caracteres)');
+            }
+          }
+
+          // Find plan by slug if provided
+          let appliesToPlanId = null;
+          if (row.planSlug?.trim()) {
+            const plan = await prisma.plan.findUnique({
+              where: { slug: row.planSlug.trim() },
+            });
+            if (!plan) {
+              throw new Error(`Plano "${row.planSlug}" não encontrado`);
+            }
+            appliesToPlanId = plan.id;
+          }
+
+          // Create coupon
+          await prisma.coupon.create({
+            data: {
+              code,
+              description,
+              discountType,
+              discountValue,
+              maxUses,
+              expiresAt,
+              appliesToPlanId,
+              isActive: true,
+            },
+          });
+
+          // Audit log
+          await logAdminAction({
+            adminId: userId,
+            adminEmail: userEmail,
+            action: AuditAction.COUPON_CREATED,
+            targetType: AuditTargetType.COUPON,
+            targetId: code,
+            afterData: { code, discountType, discountValue, source: 'CSV Import' },
+            ipAddress: getClientIp(req),
+            userAgent: req.get('user-agent'),
+          });
+
+          results.success.push(code);
+        } catch (error: any) {
+          results.errors.push({
+            line: lineNumber,
+            code: row.code || 'N/A',
+            error: error.message || String(error),
+          });
+        }
+      }
+
+      return res.json({
+        message: `Importação concluída: ${results.success.length} sucesso, ${results.errors.length} erros`,
+        results,
+      });
+    } catch (error) {
+      logError('Erro ao importar cupons via CSV', { err: error });
+      return res.status(500).json({ error: 'Erro ao importar cupons via CSV' });
+    }
+  }
+
+  /**
+   * Retorna analytics de cupons para gráficos
+   * GET /api/admin/coupons/analytics?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&groupBy=day|week|month
+   * Permissão: Qualquer ADMIN
+   * MELHORIA: Com cache de 5 minutos para melhorar performance
+   */
+  static async getCouponAnalytics(req: Request, res: Response) {
+    try {
+      const { startDate, endDate, groupBy = 'day' } = req.query;
+
+      // Define período padrão: últimos 30 dias
+      const start = startDate
+        ? new Date(startDate as string)
+        : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const end = endDate ? new Date(endDate as string) : new Date();
+
+      // MELHORIA: Cache key baseado nos parâmetros
+      const { cache } = await import('../utils/cache');
+      const cacheKey = `coupon-analytics:${start.toISOString()}:${end.toISOString()}:${groupBy}`;
+
+      // Tentar buscar do cache primeiro
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+
+      // Buscar usos de cupons no período
+      const usages = await prisma.couponUsage.findMany({
+        where: {
+          usedAt: {
+            gte: start,
+            lte: end,
+          },
+        },
+        include: {
+          coupon: {
+            select: {
+              code: true,
+              discountType: true,
+              discountValue: true,
+              purpose: true, // FASE: Cupons de Upgrade
+              durationDays: true, // FASE: Cupons de Upgrade
+            },
+          },
+        },
+        orderBy: {
+          usedAt: 'asc',
+        },
+      });
+
+      // Agrupar por período
+      const usageByPeriod: Record<string, number> = {};
+      const usageByCoupon: Record<string, { count: number; type: string; value: number }> = {};
+      const usageByType: Record<string, number> = { PERCENTAGE: 0, FIXED: 0 };
+
+      // FASE: Cupons de Upgrade - Métricas por finalidade (purpose)
+      const usageByPurpose: Record<string, number> = { DISCOUNT: 0, TRIAL_UPGRADE: 0 };
+      let totalTrialDaysGranted = 0;
+
+      for (const usage of usages) {
+        const date = new Date(usage.usedAt);
+        let periodKey: string;
+
+        if (groupBy === 'week') {
+          // Agrupar por semana (início da semana)
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          periodKey = weekStart.toISOString().split('T')[0];
+        } else if (groupBy === 'month') {
+          // Agrupar por mês
+          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        } else {
+          // Agrupar por dia (padrão)
+          periodKey = date.toISOString().split('T')[0];
+        }
+
+        usageByPeriod[periodKey] = (usageByPeriod[periodKey] || 0) + 1;
+
+        // Contagem por cupom
+        const couponCode = usage.coupon.code;
+        if (!usageByCoupon[couponCode]) {
+          usageByCoupon[couponCode] = {
+            count: 0,
+            type: usage.coupon.discountType,
+            value: usage.coupon.discountValue,
+          };
+        }
+        usageByCoupon[couponCode].count += 1;
+
+        // Contagem por tipo
+        usageByType[usage.coupon.discountType] += 1;
+
+        // FASE: Cupons de Upgrade - Contagem por finalidade (purpose)
+        const purpose = usage.coupon.purpose || 'DISCOUNT';
+        usageByPurpose[purpose] = (usageByPurpose[purpose] || 0) + 1;
+
+        // Somar dias concedidos em trial upgrades
+        if (purpose === 'TRIAL_UPGRADE' && usage.coupon.durationDays) {
+          totalTrialDaysGranted += usage.coupon.durationDays;
+        }
+      }
+
+      // Converter para arrays para gráficos
+      const timeSeriesData = Object.entries(usageByPeriod)
+        .map(([period, count]) => ({ period, count }))
+        .sort((a, b) => a.period.localeCompare(b.period));
+
+      const topCoupons = Object.entries(usageByCoupon)
+        .map(([code, data]) => ({
+          code,
+          count: data.count,
+          type: data.type,
+          value: data.value,
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10); // Top 10
+
+      const typeDistribution = Object.entries(usageByType).map(([type, count]) => ({
+        type,
+        count,
+      }));
+
+      // Estatísticas gerais
+      const totalCoupons = await prisma.coupon.count();
+      const usedCoupons = await prisma.coupon.count({
+        where: {
+          usageLogs: {
+            some: {},
+          },
+        },
+      });
+
+      const totalUsages = usages.length;
+
+      // MELHORIA: Métricas adicionais
+
+      // Cupons ativos vs inativos
+      const activeCoupons = await prisma.coupon.count({
+        where: { isActive: true },
+      });
+      const inactiveCoupons = totalCoupons - activeCoupons;
+
+      // Cupons expirando nos próximos 7 dias
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+      const expiringSoon = await prisma.coupon.count({
+        where: {
+          expiresAt: {
+            gte: new Date(),
+            lte: sevenDaysFromNow,
+          },
+        },
+      });
+
+      // Cupons próximos do limite (80% ou mais do maxUses)
+      const couponsWithLimit = await prisma.coupon.findMany({
+        where: {
+          maxUses: { not: null },
+          isActive: true,
+        },
+        select: {
+          id: true,
+          usedCount: true,
+          maxUses: true,
+        },
+      });
+      const nearLimit = couponsWithLimit.filter(c =>
+        c.maxUses && c.usedCount >= (c.maxUses * 0.8)
+      ).length;
+
+      // Cupons por tipo de desconto
+      const percentageCoupons = await prisma.coupon.count({
+        where: { discountType: 'PERCENTAGE' },
+      });
+      const fixedCoupons = await prisma.coupon.count({
+        where: { discountType: 'FIXED' },
+      });
+
+      const responseData = {
+        period: {
+          start: start.toISOString(),
+          end: end.toISOString(),
+          groupBy,
+        },
+        stats: {
+          // Estatísticas básicas
+          totalCoupons,
+          usedCoupons,
+          unusedCoupons: totalCoupons - usedCoupons,
+          totalUsages,
+          conversionRate: totalCoupons > 0 ? ((usedCoupons / totalCoupons) * 100).toFixed(2) : '0',
+
+          // MELHORIA: Estatísticas adicionais
+          activeCoupons,
+          inactiveCoupons,
+          expiringSoon,
+          nearLimit,
+
+          // FASE: Cupons de Upgrade - Métricas por finalidade
+          discountCoupons: usageByPurpose.DISCOUNT || 0,
+          trialUpgradeCoupons: usageByPurpose.TRIAL_UPGRADE || 0,
+          totalTrialDaysGranted,
+          percentageCoupons,
+          fixedCoupons,
+        },
+        timeSeries: timeSeriesData,
+        topCoupons,
+        typeDistribution,
+      };
+
+      // MELHORIA: Salvar no cache por 5 minutos (300 segundos)
+      cache.set(cacheKey, responseData, 300);
+
+      return res.json(responseData);
+    } catch (error) {
+      logError('Erro ao buscar analytics de cupons', { err: error });
+      return res.status(500).json({ error: 'Erro ao buscar analytics de cupons' });
+    }
+  }
+
+  /**
+   * GET /api/admin/coupons/:code/detailed-stats
+   * Retorna estatísticas detalhadas de um cupom específico
+   *
+   * FEATURE: Relatório de Conversão por Cupom
+   * - Total de usos ao longo do tempo
+   * - Distribuição por plano
+   * - Top usuários
+   * - Taxa de crescimento
+   */
+  static async getCouponDetailedStats(req: Request, res: Response) {
+    try {
+      const { code } = req.params;
+
+      // Buscar cupom
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: code.toUpperCase() },
+        include: {
+          plan: {
+            select: {
+              name: true,
+              slug: true,
+            },
+          },
+        },
+      });
+
+      if (!coupon) {
+        return res.status(404).json({ error: 'Cupom não encontrado' });
+      }
+
+      // Buscar todos os usos deste cupom
+      const usages = await prisma.couponUsage.findMany({
+        where: { couponId: coupon.id },
+        orderBy: {
+          usedAt: 'asc',
+        },
+      });
+
+      // Buscar dados dos usuários
+      const userIds = [...new Set(usages.map(u => u.userId))];
+      const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      });
+      const userMap = new Map(users.map(u => [u.id, u]));
+
+      // Estatísticas básicas
+      const totalUses = usages.length;
+      const uniqueUsers = new Set(usages.map(u => u.userId)).size;
+
+      // Agrupamento por dia (últimos 30 dias)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const usagesByDay: Record<string, number> = {};
+      const recentUsages = usages.filter(u => new Date(u.usedAt) >= thirtyDaysAgo);
+
+      for (const usage of recentUsages) {
+        const day = new Date(usage.usedAt).toISOString().split('T')[0];
+        usagesByDay[day] = (usagesByDay[day] || 0) + 1;
+      }
+
+      const timelineData = Object.entries(usagesByDay)
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Top usuários que mais usaram
+      const userUsageMap: Record<string, { email: string; name: string; count: number }> = {};
+      for (const usage of usages) {
+        const userId = usage.userId;
+        const user = userMap.get(userId);
+        if (!user) continue; // Pular se usuário não encontrado
+
+        if (!userUsageMap[userId]) {
+          userUsageMap[userId] = {
+            email: user.email,
+            name: user.name,
+            count: 0,
+          };
+        }
+        userUsageMap[userId].count += 1;
+      }
+
+      const topUsers = Object.entries(userUsageMap)
+        .map(([userId, data]) => ({ userId, ...data }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10); // Top 10
+
+      // Distribuição por plano (se o cupom for específico de um plano, mostrar isso)
+      const planDistribution = coupon.plan
+        ? [{ planName: coupon.plan.name, count: totalUses }]
+        : [{ planName: 'Todos os planos', count: totalUses }];
+
+      // Taxa de crescimento (comparação últimos 7 dias vs 7 dias anteriores)
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+      const last7Days = usages.filter(u => new Date(u.usedAt) >= sevenDaysAgo).length;
+      const previous7Days = usages.filter(
+        u => new Date(u.usedAt) >= fourteenDaysAgo && new Date(u.usedAt) < sevenDaysAgo
+      ).length;
+
+      const growthRate =
+        previous7Days > 0
+          ? (((last7Days - previous7Days) / previous7Days) * 100).toFixed(2)
+          : last7Days > 0
+          ? '100.00'
+          : '0.00';
+
+      // Taxa de conversão aproximada (assumindo que maxUses é o objetivo)
+      const conversionRate = coupon.maxUses
+        ? ((totalUses / coupon.maxUses) * 100).toFixed(2)
+        : '100.00';
+
+      // Status de saúde do cupom
+      let healthStatus: 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'POOR' | 'INACTIVE' = 'INACTIVE';
+      if (last7Days >= 10) healthStatus = 'EXCELLENT';
+      else if (last7Days >= 5) healthStatus = 'GOOD';
+      else if (last7Days >= 1) healthStatus = 'AVERAGE';
+      else if (totalUses > 0) healthStatus = 'POOR';
+
+      const healthStatusLabel = {
+        EXCELLENT: 'Excelente',
+        GOOD: 'Bom',
+        AVERAGE: 'Médio',
+        POOR: 'Baixo',
+        INACTIVE: 'Inativo',
+      }[healthStatus];
+
+      return res.json({
+        coupon: {
+          code: coupon.code,
+          description: coupon.description,
+          discountType: coupon.discountType,
+          discountValue: coupon.discountValue,
+          purpose: coupon.purpose || 'DISCOUNT',
+          durationDays: coupon.durationDays,
+          maxUses: coupon.maxUses,
+          usedCount: coupon.usedCount,
+          expiresAt: coupon.expiresAt,
+          isActive: coupon.isActive,
+          plan: coupon.plan,
+        },
+        stats: {
+          totalUses,
+          uniqueUsers,
+          last7Days,
+          previous7Days,
+          growthRate: parseFloat(growthRate),
+          conversionRate: parseFloat(conversionRate),
+          healthStatus,
+          healthStatusLabel,
+          averageUsesPerDay: (totalUses / Math.max(1, Math.ceil((now.getTime() - new Date(coupon.createdAt).getTime()) / (1000 * 60 * 60 * 24)))).toFixed(2),
+        },
+        timeline: timelineData,
+        topUsers,
+        planDistribution,
+      });
+    } catch (error) {
+      logError('Erro ao buscar estatísticas detalhadas do cupom', { err: error });
+      return res.status(500).json({ error: 'Erro ao buscar estatísticas detalhadas do cupom' });
+    }
+  }
+}

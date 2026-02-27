@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, memo } from 'react';
 import {
   Box,
   Heading,
@@ -120,6 +120,54 @@ const getTargetTypeBadgeColor = (targetType: string): string => {
   return colors[targetType] || 'gray';
 };
 
+interface AuditLogRowProps {
+  log: AuditLog;
+  onViewDetails: (log: AuditLog) => void;
+}
+
+const AuditLogRow = memo(({ log, onViewDetails }: AuditLogRowProps) => {
+  const actionColor = getActionBadgeColor(log.action);
+  const targetTypeColor = getTargetTypeBadgeColor(log.targetType);
+  return (
+    <Tr>
+      <Td fontSize="sm">
+        {formatDate(log.createdAt)}
+      </Td>
+      <Td fontSize="sm">
+        <Text fontWeight="medium">{log.adminEmail}</Text>
+      </Td>
+      <Td>
+        <Badge colorScheme={actionColor}>
+          {getActionLabel(log.action)}
+        </Badge>
+      </Td>
+      <Td>
+        <Badge colorScheme={targetTypeColor}>
+          {log.targetType}
+        </Badge>
+      </Td>
+      <Td fontSize="sm" maxW="150px" isTruncated>
+        {log.targetId || '-'}
+      </Td>
+      <Td fontSize="sm">
+        {log.ipAddress || '-'}
+      </Td>
+      <Td>
+        <Button
+          size="sm"
+          colorScheme="blue"
+          variant="outline"
+          onClick={() => onViewDetails(log)}
+        >
+          Detalhes
+        </Button>
+      </Td>
+    </Tr>
+  );
+});
+
+AuditLogRow.displayName = 'AuditLogRow';
+
 export const AdminAuditLogsPage: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [pagination, setPagination] = useState({
@@ -193,10 +241,10 @@ export const AdminAuditLogsPage: React.FC = () => {
     fetchLogs(newPage);
   };
 
-  const handleViewDetails = (log: AuditLog) => {
+  const handleViewDetails = useCallback((log: AuditLog) => {
     setSelectedLog(log);
     onOpen();
-  };
+  }, [onOpen]);
 
   if (loading && logs.length === 0) {
     return (
@@ -211,10 +259,15 @@ export const AdminAuditLogsPage: React.FC = () => {
   if (error) {
     return (
       <AdminLayout>
-        <Alert status="error">
+        <Alert status="error" borderRadius="md">
           <AlertIcon />
-          <AlertTitle>Erro!</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <Box flex={1}>
+            <AlertTitle>Erro ao carregar audit logs</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Box>
+          <Button size="sm" colorScheme="red" variant="outline" onClick={() => fetchLogs()} ml={4}>
+            Tentar Novamente
+          </Button>
         </Alert>
       </AdminLayout>
     );
@@ -345,48 +398,26 @@ export const AdminAuditLogsPage: React.FC = () => {
               <Tbody>
                 {logs.length === 0 ? (
                   <Tr>
-                    <Td colSpan={7} textAlign="center" py={8}>
-                      <Text color="gray.500">
-                        Nenhum audit log encontrado
-                      </Text>
+                    <Td colSpan={7} textAlign="center" py={10}>
+                      <VStack spacing={2}>
+                        <Text color="gray.600" fontWeight="medium">
+                          Nenhum audit log encontrado
+                        </Text>
+                        <Text color="gray.400" fontSize="sm">
+                          {filters.action || filters.targetType || filters.startDate || filters.endDate
+                            ? 'Tente ajustar ou limpar os filtros para ver mais resultados.'
+                            : 'As ações administrativas realizadas no sistema aparecerão aqui.'}
+                        </Text>
+                      </VStack>
                     </Td>
                   </Tr>
                 ) : (
                   logs.map((log) => (
-                    <Tr key={log.id}>
-                      <Td fontSize="sm">
-                        {formatDate(log.createdAt)}
-                      </Td>
-                      <Td fontSize="sm">
-                        <Text fontWeight="medium">{log.adminEmail}</Text>
-                      </Td>
-                      <Td>
-                        <Badge colorScheme={getActionBadgeColor(log.action)}>
-                          {getActionLabel(log.action)}
-                        </Badge>
-                      </Td>
-                      <Td>
-                        <Badge colorScheme={getTargetTypeBadgeColor(log.targetType)}>
-                          {log.targetType}
-                        </Badge>
-                      </Td>
-                      <Td fontSize="sm" maxW="150px" isTruncated>
-                        {log.targetId || '-'}
-                      </Td>
-                      <Td fontSize="sm">
-                        {log.ipAddress || '-'}
-                      </Td>
-                      <Td>
-                        <Button
-                          size="sm"
-                          colorScheme="blue"
-                          variant="outline"
-                          onClick={() => handleViewDetails(log)}
-                        >
-                          Detalhes
-                        </Button>
-                      </Td>
-                    </Tr>
+                    <AuditLogRow
+                      key={log.id}
+                      log={log}
+                      onViewDetails={handleViewDetails}
+                    />
                   ))
                 )}
               </Tbody>

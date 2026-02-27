@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, memo } from 'react';
 import { getToken } from '../../lib/auth';
 import { API_BASE_URL } from '../../constants/app';
 
@@ -24,6 +24,48 @@ interface CouponAnalytics {
     converted: number;
   }>;
 }
+
+interface ChartBarProps {
+  day: {
+    date: string;
+    count: number;
+    converted: number;
+  };
+  maxCount: number;
+}
+
+const ChartBar: React.FC<ChartBarProps> = memo(({ day, maxCount }) => {
+  const dateStr = useMemo(() => {
+    const date = new Date(day.date);
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }, [day.date]);
+
+  const barWidth = useMemo(() => {
+    return maxCount > 0 ? `${Math.min(100, (day.count / maxCount) * 100)}%` : '0%';
+  }, [day.count, maxCount]);
+
+  const percentage = useMemo(() => {
+    return day.count > 0 ? (day.converted / day.count) * 100 : 0;
+  }, [day.count, day.converted]);
+
+  return (
+    <div style={styles.chartBar}>
+      <div style={styles.chartLabel}>{dateStr}</div>
+      <div style={styles.chartBarContainer}>
+        <div
+          style={{
+            ...styles.chartBarFill,
+            width: barWidth,
+          }}
+        />
+      </div>
+      <div style={styles.chartStats}>
+        <span>{day.count} validações</span>
+        <span style={styles.chartConversion}>{day.converted} convertidas ({percentage.toFixed(0)}%)</span>
+      </div>
+    </div>
+  );
+});
 
 export const CouponAnalytics: React.FC = () => {
   const [analytics, setAnalytics] = useState<CouponAnalytics | null>(null);
@@ -59,6 +101,13 @@ export const CouponAnalytics: React.FC = () => {
     const interval = setInterval(fetchAnalytics, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const maxCount = useMemo(
+    () => analytics
+      ? Math.max(...analytics.validationsByDay.map((d) => d.count), 0)
+      : 0,
+    [analytics]
+  );
 
   if (loading) {
     return (
@@ -164,29 +213,9 @@ export const CouponAnalytics: React.FC = () => {
       <div style={styles.section}>
         <h3 style={styles.sectionTitle}>📅 Validações Últimos 7 Dias</h3>
         <div style={styles.chartContainer}>
-          {validationsByDay.map((day: any) => {
-            const date = new Date(day.date);
-            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-            const percentage = day.count > 0 ? (day.converted / day.count) * 100 : 0;
-
-            return (
-              <div key={day.date} style={styles.chartBar}>
-                <div style={styles.chartLabel}>{dateStr}</div>
-                <div style={styles.chartBarContainer}>
-                  <div
-                    style={{
-                      ...styles.chartBarFill,
-                      width: `${Math.min(100, (day.count / Math.max(...validationsByDay.map((d: any) => d.count))) * 100)}%`
-                    }}
-                  />
-                </div>
-                <div style={styles.chartStats}>
-                  <span>{day.count} validações</span>
-                  <span style={styles.chartConversion}>{day.converted} convertidas ({percentage.toFixed(0)}%)</span>
-                </div>
-              </div>
-            );
-          })}
+          {validationsByDay.map((day) => (
+            <ChartBar key={day.date} day={day} maxCount={maxCount} />
+          ))}
         </div>
       </div>
     </div>

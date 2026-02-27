@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Heading, Card, CardBody, Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, Center, VStack, Text, Button, HStack } from '@chakra-ui/react';
+import { Heading, Card, CardBody, Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, Center, VStack, Text, Button, HStack, Alert, AlertIcon, AlertTitle, AlertDescription, Box } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
 import { ExportButton } from '../components/ExportButton';
 import { api } from '../services/api';
@@ -9,6 +9,7 @@ interface Monitor { id: string; name: string; site: string; active: boolean; use
 export const AdminMonitorsPage: React.FC = () => {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
 
   useEffect(() => { loadMonitors(); }, [pagination.page]);
@@ -16,17 +17,28 @@ export const AdminMonitorsPage: React.FC = () => {
   const loadMonitors = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await api.request(`/api/admin/monitors?page=${pagination.page}&limit=20`, { method: 'GET', skipAutoLogout: true });
       setMonitors(response.monitors);
       setPagination(response.pagination);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || 'Erro ao carregar monitores');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return <AdminLayout><Center h="400px"><Spinner size="xl" /></Center></AdminLayout>;
+  if (loading) return (
+    <AdminLayout>
+      <Center h="400px">
+        <VStack spacing={4}>
+          <Spinner size="xl" color="blue.500" />
+          <Text color="gray.500">Carregando monitores...</Text>
+        </VStack>
+      </Center>
+    </AdminLayout>
+  );
 
   return (
     <AdminLayout>
@@ -38,23 +50,47 @@ export const AdminMonitorsPage: React.FC = () => {
             label="Exportar Monitores"
           />
         </HStack>
-        <Card>
-          <CardBody>
-            <Table variant="simple" size="sm">
-              <Thead><Tr><Th>Nome</Th><Th>Site</Th><Th>Usuário</Th><Th>Status</Th></Tr></Thead>
-              <Tbody>
-                {monitors.map(m => (
-                  <Tr key={m.id}>
-                    <Td>{m.name}</Td>
-                    <Td>{m.site}</Td>
-                    <Td>{m.user?.email}</Td>
-                    <Td><Badge colorScheme={m.active ? 'green' : 'gray'}>{m.active ? 'Ativo' : 'Inativo'}</Badge></Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </CardBody>
-        </Card>
+
+        {error && (
+          <Alert status="error" borderRadius="md" mb={4}>
+            <AlertIcon />
+            <Box flex={1}>
+              <AlertTitle>Erro ao carregar monitores</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Box>
+            <Button size="sm" colorScheme="red" variant="outline" onClick={loadMonitors} ml={4}>
+              Tentar Novamente
+            </Button>
+          </Alert>
+        )}
+
+        {!error && !loading && monitors.length === 0 ? (
+          <Alert status="info" borderRadius="md">
+            <AlertIcon />
+            <Box>
+              <AlertTitle>Nenhum monitor encontrado</AlertTitle>
+              <AlertDescription>Ainda não há monitores cadastrados no sistema.</AlertDescription>
+            </Box>
+          </Alert>
+        ) : (
+          <Card>
+            <CardBody>
+              <Table variant="simple" size="sm">
+                <Thead><Tr><Th>Nome</Th><Th>Site</Th><Th>Usuário</Th><Th>Status</Th></Tr></Thead>
+                <Tbody>
+                  {monitors.map(m => (
+                    <Tr key={m.id}>
+                      <Td>{m.name}</Td>
+                      <Td>{m.site}</Td>
+                      <Td>{m.user?.email}</Td>
+                      <Td><Badge colorScheme={m.active ? 'green' : 'gray'}>{m.active ? 'Ativo' : 'Inativo'}</Badge></Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </CardBody>
+          </Card>
+        )}
         {pagination.totalPages > 1 && (
           <HStack justify="center">
             <Button size="sm" onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))} isDisabled={pagination.page === 1}>Anterior</Button>

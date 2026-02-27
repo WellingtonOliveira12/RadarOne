@@ -5,6 +5,8 @@
  * devido a erros transientes (timeouts, problemas de rede, etc.)
  */
 
+import { logInfo } from './loggerHelpers';
+
 export interface RetryOptions {
   retries: number;          // Número máximo de tentativas (além da primeira)
   delayMs: number;          // Delay inicial entre tentativas (em ms)
@@ -102,23 +104,22 @@ export async function retryAsync<T>(
 
     // Se não é transiente, falha imediatamente
     if (!isTransientError(error)) {
-      console.log(`[RETRY] Job ${jobName} - Erro não transiente, não tentando novamente`);
+      logInfo('RETRY: Non-transient error, not retrying', { jobName });
       throw error;
     }
   }
 
   // Tentativas de retry
   for (let attempt = 1; attempt <= retries; attempt++) {
-    console.log(
-      `[RETRY] Job ${jobName} - Tentativa ${attempt}/${retries} falhou. ` +
-      `Aguardando ${currentDelay}ms antes de tentar novamente...`
-    );
+    logInfo('RETRY: Attempt failed, waiting before retry', {
+      jobName, attempt, retries, delayMs: currentDelay
+    });
 
     // Log do erro
     const errorMsg = lastError instanceof Error
       ? lastError.message
       : String(lastError);
-    console.log(`[RETRY] Erro: ${errorMsg}`);
+    logInfo('RETRY: Error details', { jobName, error: errorMsg });
 
     // Callback opcional
     if (onRetry) {
@@ -131,14 +132,14 @@ export async function retryAsync<T>(
     // Tentar executar a operação novamente
     try {
       const result = await operation();
-      console.log(`[RETRY] Job ${jobName} - Sucesso na tentativa ${attempt}/${retries}`);
+      logInfo('RETRY: Success on retry', { jobName, attempt, retries });
       return result;
     } catch (error) {
       lastError = error;
 
       // Se não é transiente, falha imediatamente
       if (!isTransientError(error)) {
-        console.log(`[RETRY] Job ${jobName} - Erro não transiente na tentativa ${attempt}, abortando`);
+        logInfo('RETRY: Non-transient error on attempt, aborting', { jobName, attempt });
         throw error;
       }
 
@@ -148,7 +149,7 @@ export async function retryAsync<T>(
   }
 
   // Todas as tentativas falharam
-  console.log(`[RETRY] Job ${jobName} - Todas as ${retries} tentativas falharam`);
+  logInfo('RETRY: All attempts failed', { jobName, retries });
   throw lastError;
 }
 

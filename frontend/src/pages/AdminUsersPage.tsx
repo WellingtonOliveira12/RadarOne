@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, memo } from 'react';
 import {
   Box,
   Heading,
@@ -93,6 +93,93 @@ const getStatusBadgeColor = (status: string): string => {
   return colors[status] || 'gray';
 };
 
+interface UserRowProps {
+  user: User;
+  onBlock: (user: User) => void;
+  onUnblock: (user: User) => void;
+}
+
+const UserRow = memo(({ user, onBlock, onUnblock }: UserRowProps) => {
+  const activeSubscription = user.subscriptions[0];
+  return (
+    <Tr>
+      <Td>
+        <VStack align="start" spacing={0}>
+          <Text fontWeight="medium">{user.name}</Text>
+          {user.cpfLast4 && (
+            <Text fontSize="xs" color="gray.500">
+              CPF: ***.***.***-{user.cpfLast4}
+            </Text>
+          )}
+        </VStack>
+      </Td>
+      <Td>
+        <Text fontSize="sm">{user.email}</Text>
+      </Td>
+      <Td>
+        <Badge colorScheme={getRoleBadgeColor(user.role)}>
+          {user.role}
+        </Badge>
+      </Td>
+      <Td>
+        {user.blocked ? (
+          <Badge colorScheme="red">Bloqueado</Badge>
+        ) : (
+          <Badge colorScheme="green">Ativo</Badge>
+        )}
+      </Td>
+      <Td>
+        {activeSubscription ? (
+          <VStack align="start" spacing={0}>
+            <Badge colorScheme={getStatusBadgeColor(activeSubscription.status)}>
+              {activeSubscription.status}
+            </Badge>
+            <Text fontSize="xs" color="gray.500">
+              {activeSubscription.plan.name}
+            </Text>
+            <Text fontSize="xs" color="gray.500">
+              Válido até: {formatDate(activeSubscription.validUntil)}
+            </Text>
+          </VStack>
+        ) : (
+          <Badge colorScheme="gray">Sem assinatura</Badge>
+        )}
+      </Td>
+      <Td isNumeric>
+        <Badge colorScheme="purple">{user._count.monitors}</Badge>
+      </Td>
+      <Td>
+        <Text fontSize="sm" color="gray.600">
+          {formatDate(user.createdAt)}
+        </Text>
+      </Td>
+      <Td>
+        <HStack spacing={2}>
+          {user.blocked ? (
+            <Button
+              size="xs"
+              colorScheme="green"
+              onClick={() => onUnblock(user)}
+            >
+              Desbloquear
+            </Button>
+          ) : (
+            <Button
+              size="xs"
+              colorScheme="red"
+              onClick={() => onBlock(user)}
+            >
+              Bloquear
+            </Button>
+          )}
+        </HStack>
+      </Td>
+    </Tr>
+  );
+});
+
+UserRow.displayName = 'UserRow';
+
 export const AdminUsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState({
@@ -166,20 +253,23 @@ export const AdminUsersPage: React.FC = () => {
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
-  const hasActiveFilters = filters.status || filters.role || filters.email;
+  const hasActiveFilters = useMemo(
+    () => Boolean(filters.status || filters.role || filters.email),
+    [filters.status, filters.role, filters.email]
+  );
 
   // Funções para ações (FASE 3.3)
-  const handleOpenBlockModal = (user: User) => {
+  const handleOpenBlockModal = useCallback((user: User) => {
     setSelectedUser(user);
     setActionType('block');
     onOpen();
-  };
+  }, [onOpen]);
 
-  const handleOpenUnblockModal = (user: User) => {
+  const handleOpenUnblockModal = useCallback((user: User) => {
     setSelectedUser(user);
     setActionType('unblock');
     onOpen();
-  };
+  }, [onOpen]);
 
   const handleConfirmAction = async () => {
     if (!selectedUser || !actionType) return;
@@ -345,84 +435,14 @@ export const AdminUsersPage: React.FC = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {users.map((user) => {
-                      const activeSubscription = user.subscriptions[0];
-                      return (
-                        <Tr key={user.id}>
-                          <Td>
-                            <VStack align="start" spacing={0}>
-                              <Text fontWeight="medium">{user.name}</Text>
-                              {user.cpfLast4 && (
-                                <Text fontSize="xs" color="gray.500">
-                                  CPF: ***.***.***-{user.cpfLast4}
-                                </Text>
-                              )}
-                            </VStack>
-                          </Td>
-                          <Td>
-                            <Text fontSize="sm">{user.email}</Text>
-                          </Td>
-                          <Td>
-                            <Badge colorScheme={getRoleBadgeColor(user.role)}>
-                              {user.role}
-                            </Badge>
-                          </Td>
-                          <Td>
-                            {user.blocked ? (
-                              <Badge colorScheme="red">Bloqueado</Badge>
-                            ) : (
-                              <Badge colorScheme="green">Ativo</Badge>
-                            )}
-                          </Td>
-                          <Td>
-                            {activeSubscription ? (
-                              <VStack align="start" spacing={0}>
-                                <Badge colorScheme={getStatusBadgeColor(activeSubscription.status)}>
-                                  {activeSubscription.status}
-                                </Badge>
-                                <Text fontSize="xs" color="gray.500">
-                                  {activeSubscription.plan.name}
-                                </Text>
-                                <Text fontSize="xs" color="gray.500">
-                                  Válido até: {formatDate(activeSubscription.validUntil)}
-                                </Text>
-                              </VStack>
-                            ) : (
-                              <Badge colorScheme="gray">Sem assinatura</Badge>
-                            )}
-                          </Td>
-                          <Td isNumeric>
-                            <Badge colorScheme="purple">{user._count.monitors}</Badge>
-                          </Td>
-                          <Td>
-                            <Text fontSize="sm" color="gray.600">
-                              {formatDate(user.createdAt)}
-                            </Text>
-                          </Td>
-                          <Td>
-                            <HStack spacing={2}>
-                              {user.blocked ? (
-                                <Button
-                                  size="xs"
-                                  colorScheme="green"
-                                  onClick={() => handleOpenUnblockModal(user)}
-                                >
-                                  Desbloquear
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="xs"
-                                  colorScheme="red"
-                                  onClick={() => handleOpenBlockModal(user)}
-                                >
-                                  Bloquear
-                                </Button>
-                              )}
-                            </HStack>
-                          </Td>
-                        </Tr>
-                      );
-                    })}
+                    {users.map((user) => (
+                      <UserRow
+                        key={user.id}
+                        user={user}
+                        onBlock={handleOpenBlockModal}
+                        onUnblock={handleOpenUnblockModal}
+                      />
+                    ))}
                   </Tbody>
                 </Table>
               </Box>

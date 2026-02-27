@@ -58,7 +58,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { AppLayout } from '../components/AppLayout';
 import { api } from '../services/api';
 
@@ -467,7 +467,9 @@ function ConnectionWizard({
             <Alert status="info" borderRadius="md">
               <AlertIcon />
               <Box fontSize="sm">
-                <Text dangerouslySetInnerHTML={{ __html: t('connections.wizard.intro', { site: siteName }) }} />
+                <Text>
+                  <Trans i18nKey="connections.wizard.intro" values={{ site: siteName }} components={{ strong: <strong /> }} />
+                </Text>
                 <Text mt={1} fontWeight="medium">
                   {t('connections.wizard.noPassword')}
                 </Text>
@@ -588,7 +590,9 @@ function ConnectionWizard({
                     </Box>
 
                     <Box>
-                      <Text fontWeight="medium" fontSize="sm" dangerouslySetInnerHTML={{ __html: t('connections.wizard.step3Auto') }} />
+                      <Text fontWeight="medium" fontSize="sm">
+                        <Trans i18nKey="connections.wizard.step3Auto" components={{ code: <code /> }} />
+                      </Text>
                     </Box>
                   </VStack>
                 </TabPanel>

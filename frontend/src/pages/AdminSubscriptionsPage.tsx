@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, memo } from 'react';
 import {
   Box,
   Heading,
@@ -90,6 +90,76 @@ const isExpiringSoon = (validUntil: string): boolean => {
   return daysUntilExpiry <= 7 && daysUntilExpiry > 0;
 };
 
+interface SubscriptionRowProps {
+  subscription: Subscription;
+}
+
+const SubscriptionRow = memo(({ subscription }: SubscriptionRowProps) => {
+  const expiringSoon = useMemo(
+    () => isExpiringSoon(subscription.validUntil),
+    [subscription.validUntil]
+  );
+  const statusColor = getStatusBadgeColor(subscription.status);
+
+  return (
+    <Tr>
+      <Td>
+        <VStack align="start" spacing={0}>
+          <Text fontWeight="medium" fontSize="sm">
+            {subscription.user.name}
+          </Text>
+          <Text fontSize="xs" color="gray.500">
+            {subscription.user.email}
+          </Text>
+        </VStack>
+      </Td>
+      <Td>
+        <VStack align="start" spacing={0}>
+          <Text fontWeight="medium" fontSize="sm">
+            {subscription.plan.name}
+          </Text>
+          <Text fontSize="xs" color="gray.500">
+            Até {subscription.plan.maxMonitors} monitores
+          </Text>
+        </VStack>
+      </Td>
+      <Td>
+        <Badge colorScheme={statusColor}>
+          {subscription.status}
+        </Badge>
+      </Td>
+      <Td isNumeric>
+        <Text fontWeight="semibold" color="green.600" fontSize="sm">
+          {formatCurrency(subscription.plan.priceCents)}
+        </Text>
+      </Td>
+      <Td>
+        <Text fontSize="sm" color="gray.600">
+          {formatDate(subscription.createdAt)}
+        </Text>
+      </Td>
+      <Td>
+        <VStack align="start" spacing={0}>
+          <Text
+            fontSize="sm"
+            color={expiringSoon ? 'orange.600' : 'gray.600'}
+            fontWeight={expiringSoon ? 'semibold' : 'normal'}
+          >
+            {formatDate(subscription.validUntil)}
+          </Text>
+          {expiringSoon && (
+            <Badge colorScheme="orange" fontSize="xs">
+              Expira em breve
+            </Badge>
+          )}
+        </VStack>
+      </Td>
+    </Tr>
+  );
+});
+
+SubscriptionRow.displayName = 'SubscriptionRow';
+
 export const AdminSubscriptionsPage: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [pagination, setPagination] = useState({
@@ -146,17 +216,17 @@ export const AdminSubscriptionsPage: React.FC = () => {
     }
   };
 
-  const handleFilterChange = (key: string, value: string) => {
+  const handleFilterChange = useCallback((key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPagination((prev) => ({ ...prev, page: 1 })); // Reset para página 1
-  };
+  }, []);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilters({ status: '' });
     setPagination((prev) => ({ ...prev, page: 1 }));
-  };
+  }, []);
 
-  const hasActiveFilters = filters.status;
+  const hasActiveFilters = useMemo(() => Boolean(filters.status), [filters.status]);
 
   return (
     <AdminLayout>
@@ -229,19 +299,29 @@ export const AdminSubscriptionsPage: React.FC = () => {
             )}
 
             {error && !loading && (
-              <Alert status="error" borderRadius="md">
+              <Alert status="error" borderRadius="md" mb={4}>
                 <AlertIcon />
-                <Box>
-                  <AlertTitle>Erro</AlertTitle>
+                <Box flex={1}>
+                  <AlertTitle>Erro ao carregar dados</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
                 </Box>
+                <Button size="sm" colorScheme="red" variant="outline" onClick={loadSubscriptions} ml={4}>
+                  Tentar Novamente
+                </Button>
               </Alert>
             )}
 
             {!loading && !error && subscriptions.length === 0 && (
               <Alert status="info" borderRadius="md">
                 <AlertIcon />
-                <AlertTitle>Nenhuma assinatura encontrada</AlertTitle>
+                <Box>
+                  <AlertTitle>Nenhuma assinatura encontrada</AlertTitle>
+                  <AlertDescription>
+                    {hasActiveFilters
+                      ? 'Nenhuma assinatura corresponde aos filtros selecionados. Tente ajustar ou limpar os filtros.'
+                      : 'Ainda não há assinaturas registradas no sistema.'}
+                  </AlertDescription>
+                </Box>
               </Alert>
             )}
 
@@ -259,64 +339,12 @@ export const AdminSubscriptionsPage: React.FC = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {subscriptions.map((subscription) => {
-                      const expiringSoon = isExpiringSoon(subscription.validUntil);
-                      return (
-                        <Tr key={subscription.id}>
-                          <Td>
-                            <VStack align="start" spacing={0}>
-                              <Text fontWeight="medium" fontSize="sm">
-                                {subscription.user.name}
-                              </Text>
-                              <Text fontSize="xs" color="gray.500">
-                                {subscription.user.email}
-                              </Text>
-                            </VStack>
-                          </Td>
-                          <Td>
-                            <VStack align="start" spacing={0}>
-                              <Text fontWeight="medium" fontSize="sm">
-                                {subscription.plan.name}
-                              </Text>
-                              <Text fontSize="xs" color="gray.500">
-                                Até {subscription.plan.maxMonitors} monitores
-                              </Text>
-                            </VStack>
-                          </Td>
-                          <Td>
-                            <Badge colorScheme={getStatusBadgeColor(subscription.status)}>
-                              {subscription.status}
-                            </Badge>
-                          </Td>
-                          <Td isNumeric>
-                            <Text fontWeight="semibold" color="green.600" fontSize="sm">
-                              {formatCurrency(subscription.plan.priceCents)}
-                            </Text>
-                          </Td>
-                          <Td>
-                            <Text fontSize="sm" color="gray.600">
-                              {formatDate(subscription.createdAt)}
-                            </Text>
-                          </Td>
-                          <Td>
-                            <VStack align="start" spacing={0}>
-                              <Text
-                                fontSize="sm"
-                                color={expiringSoon ? 'orange.600' : 'gray.600'}
-                                fontWeight={expiringSoon ? 'semibold' : 'normal'}
-                              >
-                                {formatDate(subscription.validUntil)}
-                              </Text>
-                              {expiringSoon && (
-                                <Badge colorScheme="orange" fontSize="xs">
-                                  Expira em breve
-                                </Badge>
-                              )}
-                            </VStack>
-                          </Td>
-                        </Tr>
-                      );
-                    })}
+                    {subscriptions.map((subscription) => (
+                      <SubscriptionRow
+                        key={subscription.id}
+                        subscription={subscription}
+                      />
+                    ))}
                   </Tbody>
                 </Table>
               </Box>

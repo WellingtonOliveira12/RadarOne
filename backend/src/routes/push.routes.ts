@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { logError } from '../utils/loggerHelpers';
 import { authenticateToken } from '../middlewares/auth.middleware';
 import { saveSubscription, removeSubscription } from '../services/pushService';
 
@@ -27,7 +28,7 @@ router.post('/subscribe', authenticateToken, async (req: Request, res: Response)
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[Push Routes] Erro em /subscribe:', error);
+    logError('Push Routes: Error in /subscribe', { err: String(error) });
     res.status(500).json({ error: error.message || 'Erro interno' });
   }
 });

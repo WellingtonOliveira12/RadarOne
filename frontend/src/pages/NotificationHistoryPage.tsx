@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +27,79 @@ interface NotificationHistoryResponse {
     hasMore: boolean;
   };
 }
+
+// Stable date formatter instance reused across renders
+const DATE_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+function getChannelLabel(channel: NotificationChannel) {
+  return channel === 'EMAIL' ? 'Email' : 'Telegram';
+}
+
+function getChannelIcon(channel: NotificationChannel) {
+  return channel === 'EMAIL' ? '📧' : '💬';
+}
+
+function getStatusBadge(status: NotificationStatus) {
+  if (status === 'SUCCESS') {
+    return (
+      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+        Enviado
+      </span>
+    );
+  }
+  return (
+    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+      Falhou
+    </span>
+  );
+}
+
+interface NotificationRowProps {
+  notification: NotificationLog;
+}
+
+const NotificationRow = memo(function NotificationRow({ notification }: NotificationRowProps) {
+  const formattedDate = useMemo(
+    () => DATE_FORMATTER.format(new Date(notification.createdAt)),
+    [notification.createdAt]
+  );
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        {formattedDate}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <span className="flex items-center gap-2">
+          {getChannelIcon(notification.channel)}
+          {getChannelLabel(notification.channel)}
+        </span>
+      </td>
+      <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
+        <div className="truncate" title={notification.title}>
+          {notification.title}
+        </div>
+        {notification.error && (
+          <div className="text-xs text-red-600 mt-1 truncate" title={notification.error}>
+            Erro: {notification.error}
+          </div>
+        )}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {notification.target}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm">
+        {getStatusBadge(notification.status)}
+      </td>
+    </tr>
+  );
+});
 
 export function NotificationHistoryPage() {
   const { logout } = useAuth();
@@ -75,39 +148,13 @@ export function NotificationHistoryPage() {
     }
   }
 
-  function formatDate(dateString: string) {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  }
+  const handlePrevPage = useCallback(() => {
+    setPage((prev) => prev - 1);
+  }, []);
 
-  function getChannelLabel(channel: NotificationChannel) {
-    return channel === 'EMAIL' ? 'Email' : 'Telegram';
-  }
-
-  function getChannelIcon(channel: NotificationChannel) {
-    return channel === 'EMAIL' ? '📧' : '💬';
-  }
-
-  function getStatusBadge(status: NotificationStatus) {
-    if (status === 'SUCCESS') {
-      return (
-        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-          Enviado
-        </span>
-      );
-    }
-    return (
-      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-        Falhou
-      </span>
-    );
-  }
+  const handleNextPage = useCallback(() => {
+    setPage((prev) => prev + 1);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -132,8 +179,17 @@ export function NotificationHistoryPage() {
       {/* Conteúdo */}
       <main className="container mx-auto px-4 py-8">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start justify-between gap-4">
+            <div className="text-red-700">
+              <p className="font-semibold">Erro ao carregar notificações</p>
+              <p className="text-sm mt-1">{error}</p>
+            </div>
+            <button
+              onClick={() => fetchNotifications(page)}
+              className="shrink-0 px-3 py-1.5 text-sm font-medium text-red-700 border border-red-400 rounded-md hover:bg-red-100 transition-colors"
+            >
+              Tentar Novamente
+            </button>
           </div>
         )}
 
@@ -143,10 +199,10 @@ export function NotificationHistoryPage() {
             <p className="mt-4 text-gray-600">Carregando notificações...</p>
           </div>
         ) : notifications.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-gray-600 text-lg">Nenhuma notificação encontrada.</p>
-            <p className="text-gray-500 mt-2">
-              Quando você receber notificações, elas aparecerão aqui.
+          <div className="bg-white rounded-lg shadow p-10 text-center">
+            <p className="text-gray-700 text-lg font-medium">Nenhuma notificação encontrada</p>
+            <p className="text-gray-500 mt-2 text-sm">
+              As notificações enviadas por email e Telegram aparecerão aqui assim que forem geradas pelos seus monitores.
             </p>
           </div>
         ) : (
@@ -181,33 +237,7 @@ export function NotificationHistoryPage() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {notifications.map((notification) => (
-                      <tr key={notification.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(notification.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className="flex items-center gap-2">
-                            {getChannelIcon(notification.channel)}
-                            {getChannelLabel(notification.channel)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
-                          <div className="truncate" title={notification.title}>
-                            {notification.title}
-                          </div>
-                          {notification.error && (
-                            <div className="text-xs text-red-600 mt-1 truncate" title={notification.error}>
-                              Erro: {notification.error}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {notification.target}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {getStatusBadge(notification.status)}
-                        </td>
-                      </tr>
+                      <NotificationRow key={notification.id} notification={notification} />
                     ))}
                   </tbody>
                 </table>
@@ -218,7 +248,7 @@ export function NotificationHistoryPage() {
             {totalPages > 1 && (
               <div className="mt-6 flex items-center justify-between">
                 <button
-                  onClick={() => setPage(page - 1)}
+                  onClick={handlePrevPage}
                   disabled={page === 1}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -228,7 +258,7 @@ export function NotificationHistoryPage() {
                   Página {page} de {totalPages}
                 </span>
                 <button
-                  onClick={() => setPage(page + 1)}
+                  onClick={handleNextPage}
                   disabled={page === totalPages}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

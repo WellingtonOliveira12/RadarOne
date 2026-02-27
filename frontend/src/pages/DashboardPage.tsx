@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -17,7 +17,7 @@ import {
   Spinner,
   Flex,
 } from '@chakra-ui/react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
@@ -99,16 +99,32 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  const getDaysUntilExpiry = () => {
+  const daysLeft = useMemo(() => {
     if (!subscription?.validUntil) return 0;
     const now = new Date();
     const expiry = new Date(subscription.validUntil);
     const diffTime = expiry.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }, [subscription?.validUntil]);
 
-  const getStatusBadge = () => {
+  const showExpiryWarning = useMemo(() => daysLeft <= 5 && daysLeft > 0, [daysLeft]);
+
+  const monitorsPercentage = useMemo(() => {
+    if (!subscription || subscription.plan.maxMonitors === 999) return 0;
+    return (stats.monitorsCount / subscription.plan.maxMonitors) * 100;
+  }, [subscription, stats.monitorsCount]);
+
+  const sitesPercentage = useMemo(() => {
+    if (!subscription || subscription.plan.maxSites === 999) return 0;
+    return (stats.sitesCount / subscription.plan.maxSites) * 100;
+  }, [subscription, stats.sitesCount]);
+
+  const usageWarningPercent = useMemo(() => {
+    if (!subscription || subscription.plan.maxMonitors === 999) return 0;
+    return Math.round((stats.monitorsCount / subscription.plan.maxMonitors) * 100);
+  }, [subscription, stats.monitorsCount]);
+
+  const statusBadge = useMemo(() => {
     if (!subscription) return null;
 
     const statusConfig: Record<string, { colorScheme: string; label: string }> = {
@@ -127,7 +143,7 @@ export const DashboardPage: React.FC = () => {
         {config.label}
       </Badge>
     );
-  };
+  }, [subscription, t]);
 
   if (loading) {
     return (
@@ -139,9 +155,6 @@ export const DashboardPage: React.FC = () => {
       </AppLayout>
     );
   }
-
-  const daysLeft = getDaysUntilExpiry();
-  const showExpiryWarning = daysLeft <= 5 && daysLeft > 0;
 
   return (
     <AppLayout>
@@ -185,14 +198,16 @@ export const DashboardPage: React.FC = () => {
                     {subscription.plan.name}
                   </Heading>
                 </Box>
-                {getStatusBadge()}
+                {statusBadge}
               </Flex>
 
               {/* Trial Info */}
               {subscription.isTrial && (
                 <Alert status="info" borderRadius="md" mb={4}>
                   <AlertIcon />
-                  <AlertDescription dangerouslySetInnerHTML={{ __html: t('dashboard.trialInfo', { days: daysLeft }) }} />
+                  <AlertDescription>
+                    <Trans i18nKey="dashboard.trialInfo" values={{ days: daysLeft }} components={{ strong: <strong /> }} />
+                  </AlertDescription>
                 </Alert>
               )}
 
@@ -229,7 +244,7 @@ export const DashboardPage: React.FC = () => {
                   </Text>
                   {subscription.plan.maxMonitors !== 999 && (
                     <Progress
-                      value={(stats.monitorsCount / subscription.plan.maxMonitors) * 100}
+                      value={monitorsPercentage}
                       colorScheme="blue"
                       size="sm"
                       borderRadius="full"
@@ -249,7 +264,7 @@ export const DashboardPage: React.FC = () => {
                   </Text>
                   {subscription.plan.maxSites !== 999 && (
                     <Progress
-                      value={(stats.sitesCount / subscription.plan.maxSites) * 100}
+                      value={sitesPercentage}
                       colorScheme="blue"
                       size="sm"
                       borderRadius="full"
@@ -368,7 +383,7 @@ export const DashboardPage: React.FC = () => {
               <Alert status="warning" borderRadius="lg">
                 <AlertIcon />
                 <AlertDescription flex={1}>
-                  {t('dashboard.usageWarning', { percent: Math.round((stats.monitorsCount / subscription.plan.maxMonitors) * 100) })}
+                  {t('dashboard.usageWarning', { percent: usageWarningPercent })}
                 </AlertDescription>
                 <Button
                   as={RouterLink}

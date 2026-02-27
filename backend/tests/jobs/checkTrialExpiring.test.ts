@@ -24,6 +24,7 @@ const { mockPrismaSubscription, mockPrisma } = vi.hoisted(() => ({
 // Criar referência circular
 Object.assign(mockPrisma, {
   subscription: mockPrismaSubscription,
+  $queryRaw: vi.fn().mockResolvedValue([{ count: BigInt(0) }]),
 });
 
 // Mock do emailService usando vi.hoisted()
@@ -43,8 +44,15 @@ const { mockRetryAsync } = vi.hoisted(() => ({
 }));
 
 // Aplicar mocks antes de importar o job
-vi.mock('../../src/server', () => ({
+vi.mock('../../src/lib/prisma', () => ({
   prisma: mockPrisma,
+}));
+
+vi.mock('../../src/utils/loggerHelpers', () => ({
+  logInfo: vi.fn(),
+  logError: vi.fn(),
+  logWarning: vi.fn(),
+  logSimpleInfo: vi.fn(),
 }));
 
 vi.mock('../../src/services/emailService', () => ({
@@ -254,8 +262,12 @@ describe('checkTrialExpiring Job', () => {
     mockPrismaSubscription.findMany.mockRejectedValue(mockError);
     mockRetryAsync.mockRejectedValue(mockError);
 
-    // Act & Assert
-    await expect(checkTrialExpiring()).rejects.toThrow('Database error');
+    // Act
+    const result = await checkTrialExpiring();
+
+    // Assert - Job now returns error result instead of throwing
+    expect(result.errorCount).toBeGreaterThanOrEqual(1);
+    expect(result.summary).toContain('Database error');
     expect(mockCaptureJobException).toHaveBeenCalledWith(
       mockError,
       expect.objectContaining({

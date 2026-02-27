@@ -117,7 +117,7 @@ export async function checkTrialUpgradeExpiring(): Promise<JobRunResult> {
                 targetId: subscription.id,
                 adminId: 'SYSTEM',
                 adminEmail: 'system@radarone.com',
-                beforeData: null,
+                beforeData: undefined,
                 afterData: {
                   userEmail: subscription.user.email,
                   planName: subscription.plan.name,

@@ -1,9 +1,10 @@
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { logInfo, logError } from '../utils/loggerHelpers';
+import { AUTH_CONFIG } from '../config/appConfig';
 
-const REFRESH_TOKEN_EXPIRY_DAYS = 7;
-const MAX_TOKENS_PER_USER = 5; // Máximo de sessões simultâneas
+const REFRESH_TOKEN_EXPIRY_DAYS = AUTH_CONFIG.refreshTokenExpiryDays;
+const MAX_TOKENS_PER_USER = AUTH_CONFIG.maxTokensPerUser;
 
 /**
  * Gera hash SHA256 de um token (nunca armazena plain text no banco)
@@ -170,7 +171,7 @@ export async function cleanupExpiredTokens(): Promise<number> {
     where: {
       OR: [
         { expiresAt: { lt: new Date() } },
-        { revokedAt: { not: null }, createdAt: { lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+        { revokedAt: { not: null }, createdAt: { lt: new Date(Date.now() - AUTH_CONFIG.revokedTokenCleanupDays * 24 * 60 * 60 * 1000) } },
       ],
     },
   });

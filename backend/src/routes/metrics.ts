@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { logInfo, logError } from '../utils/loggerHelpers';
 import { authenticateToken } from '../middlewares/auth.middleware';
 import { prisma } from '../lib/prisma';
 
@@ -97,7 +98,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
 
     res.json(overview);
   } catch (error: any) {
-    console.error('Error fetching overview metrics:', error);
+    logError('Error fetching overview metrics', { err: String(error) });
     res.status(500).json({ error: 'Erro ao buscar métricas' });
   }
 });
@@ -188,7 +189,7 @@ router.get('/performance', authenticateToken, async (req, res) => {
 
     res.json(performance);
   } catch (error: any) {
-    console.error('Error fetching performance metrics:', error);
+    logError('Error fetching performance metrics', { err: String(error) });
     res.status(500).json({ error: 'Erro ao buscar métricas de performance' });
   }
 });
@@ -255,7 +256,7 @@ router.get('/timeline', authenticateToken, async (req, res) => {
 
     res.json(timeline);
   } catch (error: any) {
-    console.error('Error fetching timeline metrics:', error);
+    logError('Error fetching timeline metrics', { err: String(error) });
     res.status(500).json({ error: 'Erro ao buscar timeline' });
   }
 });
@@ -333,7 +334,7 @@ router.get('/errors', authenticateToken, async (req, res) => {
 
     res.json(errors);
   } catch (error: any) {
-    console.error('Error fetching error metrics:', error);
+    logError('Error fetching error metrics', { err: String(error) });
     res.status(500).json({ error: 'Erro ao buscar erros' });
   }
 });
@@ -417,7 +418,7 @@ router.get('/sessions', authenticateToken, async (req, res) => {
 
     res.json(sessionMetrics);
   } catch (error: any) {
-    console.error('Error fetching session metrics:', error);
+    logError('Error fetching session metrics', { err: String(error) });
     res.status(500).json({ error: 'Erro ao buscar métricas de sessões' });
   }
 });

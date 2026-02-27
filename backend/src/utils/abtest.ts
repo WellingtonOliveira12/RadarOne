@@ -7,6 +7,8 @@
  * - Logs para tracking manual
  */
 
+import { logInfo } from './loggerHelpers';
+
 /**
  * Variantes de subject lines para emails
  */
@@ -75,7 +77,7 @@ export function getEmailSubject(
   const subject = subjectFn(couponCode, discountText);
 
   // Log para tracking (pode ser integrado com analytics posteriormente)
-  console.log(`[A/B TEST] Email subject: ${testKey} = Variant ${variant}`);
+  logInfo('A/B TEST: Email subject variant selected', { testKey, variant });
 
   return { subject, variant };
 }

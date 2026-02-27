@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { Container } from '@chakra-ui/react';
 import { api } from '../services/api';
 import { AppLayout } from '../components/AppLayout';
@@ -174,7 +174,9 @@ export const TelegramConnectionPage: React.FC = () => {
               </div>
               <div style={styles.checkItem}>
                 <span style={styles.checkIcon}>✅</span>
-                <span dangerouslySetInnerHTML={{ __html: t('telegramConnect.step2', { bot: TELEGRAM_BOT_USERNAME }) }} />
+                <span>
+                  <Trans i18nKey="telegramConnect.step2" values={{ bot: TELEGRAM_BOT_USERNAME }} components={{ strong: <strong /> }} />
+                </span>
               </div>
               <div style={styles.checkItem}>
                 <span style={styles.checkIcon}>✅</span>
@@ -286,11 +288,15 @@ export const TelegramConnectionPage: React.FC = () => {
                 <li>{t('telegramConnect.modalStep1')}</li>
                 <li>{t('telegramConnect.modalStep2')}</li>
                 <li>{t('telegramConnect.modalStep3')}</li>
-                <li dangerouslySetInnerHTML={{ __html: t('telegramConnect.modalStep4', { bot: TELEGRAM_BOT_USERNAME }) }} />
+                <li>
+                  <Trans i18nKey="telegramConnect.modalStep4" values={{ bot: TELEGRAM_BOT_USERNAME }} components={{ strong: <strong /> }} />
+                </li>
                 <li>{t('telegramConnect.modalStep5')}</li>
               </ol>
 
-              <div style={styles.modalTip} dangerouslySetInnerHTML={{ __html: t('telegramConnect.modalTip') }} />
+              <div style={styles.modalTip}>
+                <Trans i18nKey="telegramConnect.modalTip" components={{ strong: <strong /> }} />
+              </div>
             </div>
 
             <button

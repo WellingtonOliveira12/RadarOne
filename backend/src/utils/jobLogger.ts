@@ -56,7 +56,7 @@ export async function startJobRun(
 
     return jobRun.id;
   } catch (error) {
-    logError(`[JOB] Erro ao registrar início do job ${jobName}`, { error });
+    logError(`[JOB] Erro ao registrar início do job ${jobName}`, { err: String(error) });
     throw error;
   }
 }
@@ -127,7 +127,7 @@ export async function completeJobRun(
       );
     }
   } catch (error) {
-    logError(`[JOB] Erro ao finalizar job ${jobRunId}`, { error });
+    logError(`[JOB] Erro ao finalizar job ${jobRunId}`, { err: String(error) });
   }
 }
 
@@ -180,7 +180,7 @@ export async function failJobRun(
       jobRunId
     );
   } catch (error) {
-    logError(`[JOB] Erro ao registrar falha do job ${jobRunId}`, { error });
+    logError(`[JOB] Erro ao registrar falha do job ${jobRunId}`, { err: String(error) });
   }
 }
 
@@ -241,7 +241,7 @@ async function createJobAlert(
       severity,
     });
   } catch (error) {
-    logError(`[JOB] Erro ao criar alerta para job ${jobName}`, { error });
+    logError(`[JOB] Erro ao criar alerta para job ${jobName}`, { err: String(error) });
   }
 }
 

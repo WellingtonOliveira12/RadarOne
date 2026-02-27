@@ -1,5 +1,6 @@
 import { logInfo, logError } from './loggerHelpers';
 import { prisma } from '../lib/prisma';
+import { Prisma } from '@prisma/client';
 
 /**
  * Tipos de ação para audit log
@@ -56,11 +57,11 @@ export interface LogAdminActionParams {
   adminEmail: string;
   action: string;
   targetType: keyof typeof AuditTargetType;
-  targetId?: string;
-  beforeData?: any;
-  afterData?: any;
-  ipAddress?: string;
-  userAgent?: string;
+  targetId?: string | null;
+  beforeData?: Prisma.InputJsonValue | null;
+  afterData?: Prisma.InputJsonValue | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
 }
 
 /**
@@ -106,8 +107,8 @@ export async function logAdminAction(params: LogAdminActionParams) {
         action,
         targetType,
         targetId: targetId || null,
-        beforeData: beforeData || null,
-        afterData: afterData || null,
+        beforeData: beforeData || undefined,
+        afterData: afterData || undefined,
         ipAddress: ipAddress || null,
         userAgent: userAgent || null,
       },

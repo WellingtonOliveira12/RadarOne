@@ -8,6 +8,7 @@
  */
 
 import { UserSessionStatus } from '@prisma/client';
+import { logInfo, logError } from '../utils/loggerHelpers';
 import {
   encryptStorageState,
   decryptStorageState,
@@ -168,7 +169,7 @@ export async function saveSession(
     },
   });
 
-  console.log(`SESSION_SERVICE: Sessão salva para user=${userId} site=${site} cookies=${meta.cookiesCount}`);
+  logInfo('SESSION_SERVICE: Session saved', { userId, site, cookiesCount: meta.cookiesCount });
 
   return {
     success: true,
@@ -285,7 +286,7 @@ export async function loadSession(
       error: null,
     };
   } catch (e: any) {
-    console.error(`SESSION_SERVICE: Erro ao descriptografar sessão: ${e.message}`);
+    logError('SESSION_SERVICE: Failed to decrypt session', { err: e.message });
     return {
       success: false,
       storageState: null,
@@ -334,10 +335,10 @@ export async function markSessionNeedsReauth(
       },
     });
 
-    console.log(`SESSION_SERVICE: Sessão marcada como NEEDS_REAUTH user=${userId} site=${site} reason=${reason}`);
+    logInfo('SESSION_SERVICE: Session marked NEEDS_REAUTH', { userId, site, reason });
     return true;
   } catch (e: any) {
-    console.error(`SESSION_SERVICE: Erro ao marcar NEEDS_REAUTH: ${e.message}`);
+    logError('SESSION_SERVICE: Failed to mark NEEDS_REAUTH', { err: e.message });
     return false;
   }
 }

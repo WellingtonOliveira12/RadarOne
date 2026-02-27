@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { sendEmail } from './emailService';
+import { logInfo, logError } from '../utils/loggerHelpers';
 
 interface CreateSupportTicketData {
   userId?: string;
@@ -57,14 +58,14 @@ ${data.message}
       html: emailHtml
     });
 
-    console.log('[SupportService] Ticket criado e e-mail enviado', { ticketId: ticket.id, category: data.category });
+    logInfo('[SupportService] Ticket criado e e-mail enviado', { ticketId: ticket.id, category: data.category });
 
     return {
       success: true,
       ticketId: ticket.id
     };
   } catch (error: any) {
-    console.error('[SupportService] Erro ao criar ticket', { error: error.message });
+    logError('[SupportService] Erro ao criar ticket', { error: error.message });
     return {
       success: false,
       error: error.message
@@ -85,7 +86,7 @@ export async function getUserTickets(userId: string): Promise<any[]> {
 
     return tickets;
   } catch (error: any) {
-    console.error('[SupportService] Erro ao buscar tickets', { userId, error: error.message });
+    logError('[SupportService] Erro ao buscar tickets', { userId, error: error.message });
     return [];
   }
 }

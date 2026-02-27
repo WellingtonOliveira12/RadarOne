@@ -5,7 +5,7 @@
  * - Análise de tendências e performance
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   Heading,
@@ -35,6 +35,7 @@ import {
   HStack,
   Select,
   Divider,
+  Button,
 } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
 import { api } from '../services/api';
@@ -167,6 +168,67 @@ export const AdminStatsPage: React.FC = () => {
     }
   };
 
+  // Memoized coupon percentage calculations — placed before early returns to satisfy Rules of Hooks
+  const couponUsagePercent = useMemo(() => {
+    if (!stats) return '0%';
+    return stats.coupons.total > 0
+      ? `${((stats.coupons.used / stats.coupons.total) * 100).toFixed(1)}%`
+      : '0%';
+  }, [stats?.coupons.used, stats?.coupons.total]);
+
+  const couponActivationPercent = useMemo(() => {
+    if (!stats) return '0%';
+    return stats.coupons.total > 0
+      ? `${((stats.coupons.active / stats.coupons.total) * 100).toFixed(1)}%`
+      : '0%';
+  }, [stats?.coupons.active, stats?.coupons.total]);
+
+  // Memoized strategic metric calculations
+  const blockRatePercent = useMemo(() => {
+    if (!stats) return '0%';
+    return stats.users.total > 0
+      ? `${((stats.users.blocked / stats.users.total) * 100).toFixed(1)}%`
+      : '0%';
+  }, [stats?.users.blocked, stats?.users.total]);
+
+  const isHighBlockRate = useMemo(() => {
+    if (!stats) return false;
+    return stats.users.total > 0 && stats.users.blocked / stats.users.total > 0.1;
+  }, [stats?.users.blocked, stats?.users.total]);
+
+  const activationPercent = useMemo(() => {
+    if (!stats) return '0%';
+    return stats.users.total > 0
+      ? `${((stats.users.active / stats.users.total) * 100).toFixed(1)}%`
+      : '0%';
+  }, [stats?.users.active, stats?.users.total]);
+
+  const monitorsPerUser = useMemo(() => {
+    if (!stats) return '0';
+    return stats.users.active > 0
+      ? (stats.monitors.total / stats.users.active).toFixed(1)
+      : '0';
+  }, [stats?.monitors.total, stats?.users.active]);
+
+  const trialPercent = useMemo(() => {
+    if (!stats) return '0% do total';
+    const totalSubs = Object.values(stats.subscriptions.byStatus).reduce((a, b) => a + b, 0);
+    const trialCount = stats.subscriptions.byStatus['TRIAL'] || 0;
+    return totalSubs > 0
+      ? `${((trialCount / totalSubs) * 100).toFixed(1)}% do total`
+      : '0% do total';
+  }, [stats?.subscriptions.byStatus]);
+
+  const churnRateColor = useMemo(() => {
+    if (!temporalStats) return 'green.600';
+    return temporalStats.subscriptions.churnRate.current > 10 ? 'red.600' : 'green.600';
+  }, [temporalStats?.subscriptions.churnRate.current]);
+
+  const jobErrorRateColor = useMemo(() => {
+    if (!temporalStats) return 'green.600';
+    return temporalStats.jobs.current.errorRate > 5 ? 'red.600' : 'green.600';
+  }, [temporalStats?.jobs.current.errorRate]);
+
   if (loading) {
     return (
       <AdminLayout>
@@ -185,10 +247,13 @@ export const AdminStatsPage: React.FC = () => {
       <AdminLayout>
         <Alert status="error" borderRadius="md">
           <AlertIcon />
-          <Box>
+          <Box flex={1}>
             <AlertTitle>Erro ao carregar estatísticas</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Box>
+          <Button size="sm" colorScheme="red" variant="outline" onClick={loadAllStats} ml={4}>
+            Tentar Novamente
+          </Button>
         </Alert>
       </AdminLayout>
     );
@@ -326,11 +391,7 @@ export const AdminStatsPage: React.FC = () => {
                     </StatLabel>
                     <StatNumber
                       fontSize="3xl"
-                      color={
-                        temporalStats.subscriptions.churnRate.current > 10
-                          ? 'red.600'
-                          : 'green.600'
-                      }
+                      color={churnRateColor}
                     >
                       {temporalStats.subscriptions.churnRate.current.toFixed(1)}%
                     </StatNumber>
@@ -373,9 +434,7 @@ export const AdminStatsPage: React.FC = () => {
                     </StatLabel>
                     <StatNumber
                       fontSize="3xl"
-                      color={
-                        temporalStats.jobs.current.errorRate > 5 ? 'red.600' : 'green.600'
-                      }
+                      color={jobErrorRateColor}
                     >
                       {temporalStats.jobs.current.errorRate.toFixed(1)}%
                     </StatNumber>
@@ -525,9 +584,7 @@ export const AdminStatsPage: React.FC = () => {
                       {stats.coupons.used}
                     </StatNumber>
                     <StatHelpText fontSize="xs">
-                      {stats.coupons.total > 0
-                        ? `${((stats.coupons.used / stats.coupons.total) * 100).toFixed(1)}%`
-                        : '0%'}{' '}
+                      {couponUsagePercent}{' '}
                       de utilização
                     </StatHelpText>
                   </Stat>
@@ -554,9 +611,7 @@ export const AdminStatsPage: React.FC = () => {
                       Taxa de Ativação
                     </StatLabel>
                     <StatNumber fontSize="3xl" color="blue.600">
-                      {stats.coupons.total > 0
-                        ? `${((stats.coupons.active / stats.coupons.total) * 100).toFixed(1)}%`
-                        : '0%'}
+                      {couponActivationPercent}
                     </StatNumber>
                     <StatHelpText fontSize="xs">
                       {stats.coupons.active} cupons ativos
@@ -623,15 +678,9 @@ export const AdminStatsPage: React.FC = () => {
                     </StatLabel>
                     <StatNumber
                       fontSize="3xl"
-                      color={
-                        stats.users.total > 0 && stats.users.blocked / stats.users.total > 0.1
-                          ? 'red.600'
-                          : 'green.600'
-                      }
+                      color={isHighBlockRate ? 'red.600' : 'green.600'}
                     >
-                      {stats.users.total > 0
-                        ? `${((stats.users.blocked / stats.users.total) * 100).toFixed(1)}%`
-                        : '0%'}
+                      {blockRatePercent}
                     </StatNumber>
                     <StatHelpText fontSize="xs">
                       {stats.users.blocked} de {stats.users.total} usuários
@@ -646,9 +695,7 @@ export const AdminStatsPage: React.FC = () => {
                       Taxa de Ativação
                     </StatLabel>
                     <StatNumber fontSize="3xl" color="green.600">
-                      {stats.users.total > 0
-                        ? `${((stats.users.active / stats.users.total) * 100).toFixed(1)}%`
-                        : '0%'}
+                      {activationPercent}
                     </StatNumber>
                     <StatHelpText fontSize="xs">
                       {stats.users.active} usuários ativos
@@ -663,9 +710,7 @@ export const AdminStatsPage: React.FC = () => {
                       Monitores/Usuário
                     </StatLabel>
                     <StatNumber fontSize="3xl" color="purple.600">
-                      {stats.users.active > 0
-                        ? (stats.monitors.total / stats.users.active).toFixed(1)
-                        : '0'}
+                      {monitorsPerUser}
                     </StatNumber>
                     <StatHelpText fontSize="xs">Média por usuário ativo</StatHelpText>
                   </Stat>
@@ -681,16 +726,7 @@ export const AdminStatsPage: React.FC = () => {
                       {stats.subscriptions.byStatus['TRIAL'] || 0}
                     </StatNumber>
                     <StatHelpText fontSize="xs">
-                      {(() => {
-                        const totalSubs = Object.values(stats.subscriptions.byStatus).reduce(
-                          (a, b) => a + b,
-                          0
-                        );
-                        const trialCount = stats.subscriptions.byStatus['TRIAL'] || 0;
-                        return totalSubs > 0
-                          ? `${((trialCount / totalSubs) * 100).toFixed(1)}% do total`
-                          : '0% do total';
-                      })()}
+                      {trialPercent}
                     </StatHelpText>
                   </Stat>
                 </Box>

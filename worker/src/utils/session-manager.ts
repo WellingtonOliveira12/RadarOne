@@ -38,8 +38,8 @@ export interface UserSession {
   cookies: any;
   localStorage?: any;
   metadata?: any;
-  expiresAt: Date;
-  lastUsedAt: Date;
+  expiresAt: Date | null;
+  lastUsedAt: Date | null;
 }
 
 class SessionManager {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, useCallback, useMemo, memo, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Container } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
@@ -93,6 +93,58 @@ const DEFAULT_FILTERS: StructuredFilters = {
   category: '',
 };
 
+interface MonitorRowProps {
+  monitor: Monitor;
+  onEdit: (monitor: Monitor) => void;
+  onDelete: (id: string) => void;
+  t: (key: string) => string;
+}
+
+const MonitorRow = memo(function MonitorRow({ monitor, onEdit, onDelete, t }: MonitorRowProps) {
+  return (
+    <tr key={monitor.id} style={rowStyles.tr}>
+      <td style={rowStyles.td}>{monitor.name}</td>
+      <td style={rowStyles.td}>{SITE_OPTIONS.find((opt) => opt.value === monitor.site)?.label ?? monitor.site}</td>
+      <td style={rowStyles.td}>
+        {monitor.mode === 'STRUCTURED_FILTERS' ? (
+          <span style={rowStyles.badgeFilters}>{t('monitors.filters')}</span>
+        ) : (
+          <span style={rowStyles.badgeUrl}>{t('monitors.urlBadge')}</span>
+        )}
+      </td>
+      <td style={rowStyles.tdUrl}>
+        {monitor.searchUrl ? (
+          <a
+            href={monitor.searchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={rowStyles.link}
+          >
+            {monitor.searchUrl}
+          </a>
+        ) : (
+          <span style={rowStyles.noUrl}>-</span>
+        )}
+      </td>
+      <td style={rowStyles.tdCenter}>
+        {monitor.active ? (
+          <span style={rowStyles.badgeActive}>✅ {t('monitors.active')}</span>
+        ) : (
+          <span style={rowStyles.badgeInactive}>❌ {t('monitors.inactive')}</span>
+        )}
+      </td>
+      <td style={rowStyles.tdCenter}>
+        <button onClick={() => onEdit(monitor)} style={rowStyles.editBtn}>
+          {t('monitors.edit')}
+        </button>
+        <button onClick={() => onDelete(monitor.id)} style={rowStyles.deleteBtn}>
+          {t('monitors.delete')}
+        </button>
+      </td>
+    </tr>
+  );
+});
+
 export function MonitorsPage() {
   useAuth(); // Required for protected route
   const { t, i18n } = useTranslation();
@@ -124,8 +176,8 @@ export function MonitorsPage() {
   // Dirty flag: true se o usuário editou manualmente a URL base
   const [urlBaseManuallyEdited, setUrlBaseManuallyEdited] = useState(false);
 
-  // Lista de países (reativa ao idioma)
-  const countryList = getCountryList(i18n.language);
+  // Lista de países (reativa ao idioma) — memoized to avoid recalculating on every render
+  const countryList = useMemo(() => getCountryList(i18n.language), [i18n.language]);
 
   useEffect(() => {
     fetchMonitors();
@@ -282,7 +334,7 @@ export function MonitorsPage() {
     setUrlBaseManuallyEdited(false);
   }
 
-  function handleEdit(monitor: Monitor) {
+  const handleEdit = useCallback((monitor: Monitor) => {
     setName(monitor.name);
     setSite(monitor.site);
     setMode(monitor.mode || 'URL_ONLY');
@@ -300,9 +352,9 @@ export function MonitorsPage() {
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  }, []);
 
-  async function handleDelete(id: string) {
+  const handleDelete = useCallback(async (id: string) => {
     const confirmed = window.confirm(t('monitors.confirmDelete'));
     if (!confirmed) return;
 
@@ -320,7 +372,7 @@ export function MonitorsPage() {
       const errorMessage = err.data?.message || err.message || t('monitors.errorDelete');
       setError(errorMessage);
     }
-  }
+  }, [t]);
 
   return (
     <AppLayout>
@@ -738,49 +790,13 @@ export function MonitorsPage() {
               </thead>
               <tbody>
                 {monitors.map((monitor) => (
-                  <tr key={monitor.id} style={styles.tr}>
-                    <td style={styles.td}>{monitor.name}</td>
-                    <td style={styles.td}>{getSiteLabel(monitor.site)}</td>
-                    <td style={styles.td}>
-                      {monitor.mode === 'STRUCTURED_FILTERS' ? (
-                        <span style={styles.badgeFilters}>{t('monitors.filters')}</span>
-                      ) : (
-                        <span style={styles.badgeUrl}>{t('monitors.urlBadge')}</span>
-                      )}
-                    </td>
-                    <td style={styles.tdUrl}>
-                      {monitor.searchUrl ? (
-                        <a
-                          href={monitor.searchUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={styles.link}
-                        >
-                          {monitor.searchUrl}
-                        </a>
-                      ) : (
-                        <span style={styles.noUrl}>-</span>
-                      )}
-                    </td>
-                    <td style={styles.tdCenter}>
-                      {monitor.active ? (
-                        <span style={styles.badgeActive}>✅ {t('monitors.active')}</span>
-                      ) : (
-                        <span style={styles.badgeInactive}>❌ {t('monitors.inactive')}</span>
-                      )}
-                    </td>
-                    <td style={styles.tdCenter}>
-                      <button onClick={() => handleEdit(monitor)} style={styles.editBtn}>
-                        {t('monitors.edit')}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(monitor.id)}
-                        style={styles.deleteBtn}
-                      >
-                        {t('monitors.delete')}
-                      </button>
-                    </td>
-                  </tr>
+                  <MonitorRow
+                    key={monitor.id}
+                    monitor={monitor}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    t={t}
+                  />
                 ))}
               </tbody>
             </table>
@@ -790,6 +806,95 @@ export function MonitorsPage() {
     </AppLayout>
   );
 }
+
+// Styles used by MonitorRow (defined before styles to avoid TDZ in component)
+const rowStyles = {
+  tr: {
+    borderBottom: '1px solid #e5e7eb',
+  },
+  td: {
+    padding: '12px 16px',
+    fontSize: '14px',
+    color: '#1f2937',
+  },
+  tdUrl: {
+    padding: '12px 16px',
+    fontSize: '14px',
+    color: '#1f2937',
+    maxWidth: '300px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  tdCenter: {
+    padding: '12px 16px',
+    fontSize: '14px',
+    color: '#1f2937',
+    textAlign: 'center' as const,
+  },
+  badgeFilters: {
+    backgroundColor: '#dbeafe',
+    color: '#1e40af',
+    padding: '3px 10px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600' as const,
+  },
+  badgeUrl: {
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    padding: '3px 10px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600' as const,
+  },
+  badgeActive: {
+    backgroundColor: '#d1fae5',
+    color: '#065f46',
+    padding: '3px 10px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600' as const,
+  },
+  badgeInactive: {
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    padding: '3px 10px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600' as const,
+  },
+  noUrl: {
+    color: '#9ca3af',
+    fontSize: '13px',
+  },
+  link: {
+    color: '#3b82f6',
+    textDecoration: 'underline',
+    fontWeight: '600' as const,
+  },
+  editBtn: {
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    fontSize: '13px',
+    fontWeight: '500' as const,
+    cursor: 'pointer',
+    marginRight: '8px',
+  },
+  deleteBtn: {
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    fontSize: '13px',
+    fontWeight: '500' as const,
+    cursor: 'pointer',
+  },
+};
 
 const styles = {
   breadcrumb: {

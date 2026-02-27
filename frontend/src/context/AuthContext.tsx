@@ -185,7 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             // Esgotou tentativas — NÃO limpar auth em erro de rede/timeout
             // O token pode ser válido, o servidor é que está indisponível
             console.warn(`[AuthContext] Servidor indisponível após ${maxAttempts} tentativas, mantendo sessão local`);
-            // Mantém token no localStorage e user=null temporariamente
+            // Mantém user=null temporariamente
             // Na próxima navegação ou refresh, tentará novamente
             return;
           }

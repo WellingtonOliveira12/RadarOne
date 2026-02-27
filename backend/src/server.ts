@@ -91,9 +91,6 @@ import supportRoutes from './routes/support.routes';
 import pushRoutes from './routes/push.routes';
 import sessionRoutes from './routes/session.routes';
 
-// Importa controller do Telegram (para handler de debug explícito)
-import { TelegramController } from './controllers/telegram.controller';
-
 // Importa middleware de autenticação
 import { authenticateToken } from './middlewares/auth.middleware';
 
@@ -111,6 +108,9 @@ import { startScheduler } from './jobs/scheduler';
 
 // Importa middleware de erro padronizado
 import { errorHandler } from './middlewares/errorHandler.middleware';
+
+// Importa middleware de segurança (CSP)
+import { securityHeaders, cspReportHandler } from './middlewares/securityHeaders.middleware';
 
 const app: Application = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -157,6 +157,9 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Security headers (CSP + X-Content-Type-Options + X-Frame-Options)
+app.use(securityHeaders);
 
 // Rate limiting global (120 req/min por IP)
 app.use(apiRateLimiter);
@@ -297,6 +300,9 @@ app.get('/api/_routes', (req: Request, res: Response) => {
   });
 });
 
+// CSP violation report endpoint (browsers POST here automatically)
+app.post('/api/_csp-report', express.json({ type: 'application/csp-report' }), cspReportHandler);
+
 // ============================================
 // ROTAS PRINCIPAIS
 // ============================================
@@ -311,29 +317,6 @@ app.use('/api/metrics', metricsRoutes); // Métricas (protegida - auth + admin n
 app.use('/api/dev', devRoutes); // Rotas de desenvolvimento (apenas em dev)
 app.use('/api/webhooks', webhookRoutes); // Webhooks (SEM autenticação JWT - usa HMAC)
 app.use('/api/telegram', telegramRoutes); // Telegram webhook (SEM JWT - usa secret)
-
-// ============================================
-// DEBUG: Handler explícito temporário para webhook do Telegram
-// Este handler garante que /api/telegram/webhook sempre responda
-// Se este handler funcionar mas o router não, significa que telegramRoutes não está sendo carregado
-// REMOVER após confirmar que router está funcionando
-// ============================================
-app.post('/api/telegram/webhook', (req: Request, res: Response, next: NextFunction) => {
-  // Log para confirmar que o handler explícito foi chamado
-  logInfo('DEBUG: Hit explicit /api/telegram/webhook handler (BYPASS)', {
-    method: req.method,
-    path: req.path,
-    query: req.query,
-    headers: {
-      'content-type': req.get('content-type'),
-      'user-agent': req.get('user-agent')
-    }
-  });
-
-  // Se chegou aqui, significa que o problema foi o router não estar montado
-  // Chama o controller diretamente
-  TelegramController.handleWebhook(req, res).catch(next);
-});
 
 app.use('/api/coupons', couponRoutes); // Cupons (validate público, apply protegido)
 app.use('/api/notifications', authenticateToken, notificationRoutes); // Configurações de notificações (protegido)

@@ -64,7 +64,7 @@ export class CaptchaSolver {
 
       // Tenta extrair sitekey automaticamente se não fornecido
       if (!sitekey) {
-        sitekey = await this.extractSiteKey(page);
+        sitekey = await this.extractSiteKey(page) ?? undefined;
       }
 
       if (!sitekey) {

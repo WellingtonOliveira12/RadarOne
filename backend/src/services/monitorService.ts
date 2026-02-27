@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { MonitorSite, MonitorMode } from '@prisma/client';
 import { canUserCreateMonitor, canUserUseSite } from './planService';
+import { logInfo, logError } from '../utils/loggerHelpers';
 
 /**
  * Serviço de Monitores - RadarOne
@@ -55,7 +56,7 @@ export async function listMonitors(userId: string) {
 
     return monitors;
   } catch (error) {
-    console.error('Error listing monitors:', error);
+    logError('Error listing monitors', { err: String(error) });
     throw new Error('Falha ao listar monitores');
   }
 }
@@ -75,7 +76,7 @@ export async function getMonitorById(userId: string, monitorId: string) {
 
     return monitor;
   } catch (error) {
-    console.error('Error getting monitor:', error);
+    logError('Error getting monitor', { err: String(error) });
     throw new Error('Falha ao buscar monitor');
   }
 }
@@ -140,10 +141,10 @@ export async function createMonitor(
       },
     });
 
-    console.log(`Monitor created: ${monitor.id} for user ${userId}`);
+    logInfo('Monitor created', { monitorId: monitor.id, userId });
     return monitor;
   } catch (error) {
-    console.error('Error creating monitor:', error);
+    logError('Error creating monitor', { err: String(error) });
     throw error;
   }
 }
@@ -214,10 +215,10 @@ export async function updateMonitor(
       },
     });
 
-    console.log(`Monitor updated: ${monitor.id}`);
+    logInfo('Monitor updated', { monitorId: monitor.id });
     return monitor;
   } catch (error) {
-    console.error('Error updating monitor:', error);
+    logError('Error updating monitor', { err: String(error) });
     throw error;
   }
 }
@@ -239,9 +240,9 @@ export async function deleteMonitor(userId: string, monitorId: string) {
       where: { id: monitorId },
     });
 
-    console.log(`Monitor deleted: ${monitorId}`);
+    logInfo('Monitor deleted', { monitorId });
   } catch (error) {
-    console.error('Error deleting monitor:', error);
+    logError('Error deleting monitor', { err: String(error) });
     throw error;
   }
 }
@@ -287,12 +288,10 @@ export async function toggleMonitorActive(userId: string, monitorId: string) {
       data: { active: newActiveState },
     });
 
-    console.log(
-      `Monitor ${monitorId} ${newActiveState ? 'activated' : 'deactivated'}`
-    );
+    logInfo('Monitor toggled', { monitorId, active: newActiveState });
     return monitor;
   } catch (error) {
-    console.error('Error toggling monitor active state:', error);
+    logError('Error toggling monitor active state', { err: String(error) });
     throw error;
   }
 }
@@ -311,7 +310,7 @@ export async function countActiveMonitors(userId: string): Promise<number> {
 
     return count;
   } catch (error) {
-    console.error('Error counting active monitors:', error);
+    logError('Error counting active monitors', { err: String(error) });
     return 0;
   }
 }
@@ -329,7 +328,7 @@ export async function getUserSites(userId: string): Promise<MonitorSite[]> {
 
     return monitors.map((m) => m.site);
   } catch (error) {
-    console.error('Error getting user sites:', error);
+    logError('Error getting user sites', { err: String(error) });
     return [];
   }
 }

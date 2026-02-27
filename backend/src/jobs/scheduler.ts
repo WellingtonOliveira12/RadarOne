@@ -8,6 +8,7 @@ import { checkAbandonedCoupons } from './checkAbandonedCoupons';
 import { checkSessionExpiring } from './checkSessionExpiring';
 import { withJobLogging, JobNames, JobName } from '../utils/jobLogger';
 import { logInfo, logError, logSimpleInfo, logWarning } from '../utils/loggerHelpers';
+import { SCHEDULER_CONFIG } from '../config/appConfig';
 
 // Para warmup ping (evitar sleep do Render)
 import http from 'http';
@@ -55,7 +56,7 @@ async function warmupPing(): Promise<{ success: boolean; latencyMs: number; erro
   return new Promise((resolve) => {
     const client = healthUrl.startsWith('https') ? https : http;
 
-    const req = client.get(healthUrl, { timeout: 10000 }, (res) => {
+    const req = client.get(healthUrl, { timeout: SCHEDULER_CONFIG.healthCheckTimeoutMs }, (res) => {
       const latencyMs = Date.now() - startTime;
 
       if (res.statusCode === 200) {
@@ -99,7 +100,7 @@ export function startScheduler() {
   // Render free tier dorme após 15 min de inatividade
   // Apenas em produção (quando PUBLIC_URL está configurado)
   if (process.env.NODE_ENV === 'production') {
-    cron.schedule('*/10 * * * *', async () => {
+    cron.schedule(SCHEDULER_CONFIG.warmupPingCron, async () => {
       await warmupPing();
     });
     logSimpleInfo('   warmupPing - A cada 10 minutos (evita sleep do Render)');
@@ -112,7 +113,7 @@ export function startScheduler() {
   // - Envia email de aviso 3 dias antes do trial expirar
   // - Expira trials que já passaram da data de expiração
   // - Envia email de trial expirado
-  cron.schedule('0 9 * * *', async () => {
+  cron.schedule(SCHEDULER_CONFIG.checkTrialExpiringCron, async () => {
     await withJobLogging(
       JobNames.CHECK_TRIAL_EXPIRING,
       'SCHEDULER',
@@ -128,7 +129,7 @@ export function startScheduler() {
       }
     );
   }, {
-    timezone: 'America/Sao_Paulo'
+    timezone: SCHEDULER_CONFIG.timezone
   });
 
   // ============================================
@@ -138,7 +139,7 @@ export function startScheduler() {
   // - Verifica assinaturas ACTIVE com validUntil < now
   // - Atualiza status para EXPIRED
   // - Envia email de renovação
-  cron.schedule('0 10 * * *', async () => {
+  cron.schedule(SCHEDULER_CONFIG.checkSubscriptionExpiredCron, async () => {
     await withJobLogging(
       JobNames.CHECK_SUBSCRIPTION_EXPIRED,
       'SCHEDULER',
@@ -154,7 +155,7 @@ export function startScheduler() {
       }
     );
   }, {
-    timezone: 'America/Sao_Paulo'
+    timezone: SCHEDULER_CONFIG.timezone
   });
 
   // ============================================
@@ -163,7 +164,7 @@ export function startScheduler() {
   // Executa no dia 1 de cada mês às 3h da manhã
   // - Reseta o contador queriesUsed para 0
   // - Apenas para assinaturas com status ACTIVE
-  cron.schedule('0 3 1 * *', async () => {
+  cron.schedule(SCHEDULER_CONFIG.resetMonthlyQueriesCron, async () => {
     await withJobLogging(
       JobNames.RESET_MONTHLY_QUERIES,
       'SCHEDULER',
@@ -179,7 +180,7 @@ export function startScheduler() {
       }
     );
   }, {
-    timezone: 'America/Sao_Paulo'
+    timezone: SCHEDULER_CONFIG.timezone
   });
 
   // ============================================
@@ -189,7 +190,7 @@ export function startScheduler() {
   // - Verifica cupons expirando em 3 dias
   // - Verifica cupons próximos do limite de usos (>80%)
   // - Cria alertas automáticos no painel admin
-  cron.schedule('0 11 * * *', async () => {
+  cron.schedule(SCHEDULER_CONFIG.checkCouponAlertsCron, async () => {
     await withJobLogging(
       JobNames.CHECK_COUPON_ALERTS,
       'SCHEDULER',
@@ -200,7 +201,7 @@ export function startScheduler() {
       }
     );
   }, {
-    timezone: 'America/Sao_Paulo'
+    timezone: SCHEDULER_CONFIG.timezone
   });
 
   // ============================================
@@ -210,7 +211,7 @@ export function startScheduler() {
   // - Verifica subscriptions TRIAL criadas por cupons
   // - Notifica usuários que têm trial upgrade expirando em 1, 3 ou 7 dias
   // - Envia emails de lembrete para incentivar assinatura
-  cron.schedule('0 12 * * *', async () => {
+  cron.schedule(SCHEDULER_CONFIG.checkTrialUpgradeExpiringCron, async () => {
     await withJobLogging(
       JobNames.CHECK_TRIAL_UPGRADE_EXPIRING,
       'SCHEDULER',
@@ -226,7 +227,7 @@ export function startScheduler() {
       }
     );
   }, {
-    timezone: 'America/Sao_Paulo'
+    timezone: SCHEDULER_CONFIG.timezone
   });
 
   // ============================================
@@ -236,7 +237,7 @@ export function startScheduler() {
   // - Verifica cupons DISCOUNT validados há 24h que não foram usados
   // - Envia email de lembrete com link para checkout
   // - Ajuda a recuperar vendas abandonadas
-  cron.schedule('0 13 * * *', async () => {
+  cron.schedule(SCHEDULER_CONFIG.checkAbandonedCouponsCron, async () => {
     await withJobLogging(
       JobNames.CHECK_ABANDONED_COUPONS,
       'SCHEDULER',
@@ -252,7 +253,7 @@ export function startScheduler() {
       }
     );
   }, {
-    timezone: 'America/Sao_Paulo'
+    timezone: SCHEDULER_CONFIG.timezone
   });
 
   // ============================================
@@ -262,7 +263,7 @@ export function startScheduler() {
   // - Verifica sessões de login (Mercado Livre, etc.) que expiram em 3 dias
   // - Notifica usuários via Telegram e Email
   // - Evita interrupções no monitoramento
-  cron.schedule('0 14 * * *', async () => {
+  cron.schedule(SCHEDULER_CONFIG.checkSessionExpiringCron, async () => {
     await withJobLogging(
       JobNames.CHECK_SESSION_EXPIRING,
       'SCHEDULER',
@@ -278,7 +279,7 @@ export function startScheduler() {
       }
     );
   }, {
-    timezone: 'America/Sao_Paulo'
+    timezone: SCHEDULER_CONFIG.timezone
   });
 
   logSimpleInfo('Jobs agendados:');

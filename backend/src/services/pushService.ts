@@ -9,6 +9,7 @@
 
 import webPush from 'web-push';
 import { prisma } from '../lib/prisma';
+import { logInfo, logError, logWarning } from '../utils/loggerHelpers';
 
 // Configurar VAPID keys
 // Gerar com: npx web-push generate-vapid-keys
@@ -18,9 +19,9 @@ const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:contato@radarone.com.
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-  console.log('[PushService] VAPID configurado');
+  logInfo('PushService: VAPID configured', {});
 } else {
-  console.warn('[PushService] VAPID keys não configuradas - push notifications desabilitadas');
+  logWarning('PushService: VAPID keys not configured - push notifications disabled', {});
 }
 
 export interface PushPayload {
@@ -29,13 +30,11 @@ export interface PushPayload {
   icon?: string;
   url?: string;
   couponCode?: string;
-  type?: 'coupon_reminder' | 'new_listing' | 'trial_expiring' | 'general';
-  requireInteraction?: boolean;
-  tag?: string;
+  type?: 'new_ad' | 'coupon' | 'system';
 }
 
 /**
- * Salvar subscription de um usuário
+ * Salvar ou atualizar subscription de push para um usuário
  */
 export async function saveSubscription(
   userId: string,
@@ -44,13 +43,12 @@ export async function saveSubscription(
   auth: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Verificar se já existe subscription com este endpoint
+    // Verificar se subscription já existe
     const existing = await prisma.pushSubscription.findUnique({
       where: { endpoint },
     });
 
     if (existing) {
-      // Atualizar subscription existente
       await prisma.pushSubscription.update({
         where: { endpoint },
         data: {
@@ -61,9 +59,8 @@ export async function saveSubscription(
         },
       });
 
-      console.log(`[PushService] Subscription atualizada: ${endpoint.substring(0, 50)}...`);
+      logInfo('PushService: Subscription updated', { userId });
     } else {
-      // Criar nova subscription
       await prisma.pushSubscription.create({
         data: {
           userId,
@@ -73,12 +70,12 @@ export async function saveSubscription(
         },
       });
 
-      console.log(`[PushService] Nova subscription criada: ${endpoint.substring(0, 50)}...`);
+      logInfo('PushService: New subscription created', { userId });
     }
 
     return { success: true };
   } catch (error: any) {
-    console.error('[PushService] Erro ao salvar subscription:', error);
+    logError('PushService: Error saving subscription', { err: error.message });
     return { success: false, error: error.message };
   }
 }
@@ -92,10 +89,10 @@ export async function removeSubscription(endpoint: string): Promise<{ success: b
       where: { endpoint },
     });
 
-    console.log(`[PushService] Subscription removida: ${endpoint.substring(0, 50)}...`);
+    logInfo('PushService: Subscription removed', {});
     return { success: true };
   } catch (error) {
-    console.error('[PushService] Erro ao remover subscription:', error);
+    logError('PushService: Error removing subscription', { err: String(error) });
     return { success: false };
   }
 }
@@ -108,27 +105,25 @@ export async function sendPushToUser(
   payload: PushPayload
 ): Promise<{ success: boolean; sentCount: number; error?: string }> {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    console.warn('[PushService] Push desabilitado - VAPID keys não configuradas');
+    logWarning('PushService: Push disabled - VAPID keys not configured', {});
     return { success: false, sentCount: 0, error: 'VAPID keys não configuradas' };
   }
 
   try {
-    // Buscar todas as subscriptions do usuário
     const subscriptions = await prisma.pushSubscription.findMany({
       where: { userId },
     });
 
     if (subscriptions.length === 0) {
-      console.log(`[PushService] Usuário ${userId} não tem subscriptions ativas`);
+      logInfo('PushService: No active subscriptions for user', { userId });
       return { success: true, sentCount: 0 };
     }
 
-    console.log(`[PushService] Enviando push para ${subscriptions.length} device(s) do usuário ${userId}`);
+    logInfo('PushService: Sending push', { userId, deviceCount: subscriptions.length });
 
     let sentCount = 0;
     const failedEndpoints: string[] = [];
 
-    // Enviar para cada subscription
     for (const sub of subscriptions) {
       try {
         const pushSubscription = {
@@ -141,31 +136,28 @@ export async function sendPushToUser(
 
         await webPush.sendNotification(pushSubscription, JSON.stringify(payload));
         sentCount++;
-        console.log(`[PushService] ✅ Push enviado: ${sub.endpoint.substring(0, 50)}...`);
       } catch (error: any) {
-        console.error(`[PushService] ❌ Erro ao enviar push:`, error);
+        logError('PushService: Error sending push to device', { err: error.message });
 
-        // Se subscription expirou (410 Gone), remover do banco
         if (error.statusCode === 410) {
-          console.log(`[PushService] Subscription expirada, removendo: ${sub.endpoint.substring(0, 50)}...`);
+          logInfo('PushService: Subscription expired, removing', {});
           failedEndpoints.push(sub.endpoint);
         }
       }
     }
 
-    // Remover subscriptions expiradas
     if (failedEndpoints.length > 0) {
       await prisma.pushSubscription.deleteMany({
         where: {
           endpoint: { in: failedEndpoints },
         },
       });
-      console.log(`[PushService] ${failedEndpoints.length} subscription(s) expirada(s) removida(s)`);
+      logInfo('PushService: Expired subscriptions removed', { count: failedEndpoints.length });
     }
 
     return { success: sentCount > 0, sentCount };
   } catch (error: any) {
-    console.error('[PushService] Erro ao enviar push:', error);
+    logError('PushService: Error sending push', { err: error.message });
     return { success: false, sentCount: 0, error: error.message };
   }
 }
@@ -178,24 +170,16 @@ export async function sendAbandonedCouponPush(
   couponCode: string,
   discountText: string,
   isSecondReminder: boolean = false
-): Promise<{ success: boolean; sentCount: number }> {
-  const title = isSecondReminder
-    ? '⏰ ÚLTIMA CHANCE - Seu cupom expira em breve!'
-    : '💰 Não esqueça seu cupom de desconto!';
-
-  const body = isSecondReminder
-    ? `Cupom ${couponCode} (${discountText} OFF) - Esta é sua última chance!`
-    : `Você validou o cupom ${couponCode} (${discountText} de desconto) mas ainda não finalizou a compra!`;
-
+): Promise<{ success: boolean; sentCount: number; error?: string }> {
   const payload: PushPayload = {
-    title,
-    body,
-    icon: '/favicon.ico',
+    title: isSecondReminder ? '⏰ Último aviso!' : '🎁 Cupom esperando por você!',
+    body: isSecondReminder
+      ? `Seu cupom ${couponCode} com ${discountText} de desconto expira em breve!`
+      : `Você tem um cupom ${couponCode} com ${discountText} de desconto. Use agora!`,
+    icon: '/icons/coupon-192.png',
     url: `/plans?coupon=${couponCode}`,
     couponCode,
-    type: 'coupon_reminder',
-    requireInteraction: isSecondReminder,
-    tag: `coupon-${couponCode}`,
+    type: 'coupon',
   };
 
   return sendPushToUser(userId, payload);
@@ -208,7 +192,7 @@ export async function broadcastPush(
   userIds: string[],
   payload: PushPayload
 ): Promise<{ success: boolean; totalSent: number }> {
-  console.log(`[PushService] Broadcasting push para ${userIds.length} usuário(s)`);
+  logInfo('PushService: Broadcasting push', { userCount: userIds.length });
 
   let totalSent = 0;
 
@@ -217,6 +201,6 @@ export async function broadcastPush(
     totalSent += result.sentCount;
   }
 
-  console.log(`[PushService] Broadcast concluído: ${totalSent} notificação(ões) enviada(s)`);
+  logInfo('PushService: Broadcast complete', { totalSent });
   return { success: totalSent > 0, totalSent };
 }

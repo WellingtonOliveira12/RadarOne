@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import {
   Box,
   Container,
@@ -269,11 +269,9 @@ export const LandingPage: React.FC = () => {
             {(['benefitAlerts', 'benefitMarketplaces', 'benefitFilters', 'benefitProfit', 'benefitTrial', 'benefitNoCatch'] as const).map((key, i) => (
               <ListItem key={key} display="flex" alignItems="flex-start" gap={3}>
                 <Text fontSize="2xl">{['⚡', '📱', '🎯', '💰', '✅', '🔒'][i]}</Text>
-                <Text
-                  fontSize="md"
-                  color="gray.700"
-                  dangerouslySetInnerHTML={{ __html: t(`landing.${key}`) }}
-                />
+                <Text fontSize="md" color="gray.700">
+                  <Trans i18nKey={`landing.${key}`} components={{ strong: <strong /> }} />
+                </Text>
               </ListItem>
             ))}
           </List>
@@ -297,8 +295,9 @@ export const LandingPage: React.FC = () => {
             color="whiteAlpha.900"
             mb={8}
             lineHeight="tall"
-            dangerouslySetInnerHTML={{ __html: t('landing.ctaSubtitle') }}
-          />
+          >
+            <Trans i18nKey="landing.ctaSubtitle" components={{ strong: <strong /> }} />
+          </Text>
           <Button
             as={RouterLink}
             to="/register"

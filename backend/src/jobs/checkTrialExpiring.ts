@@ -3,6 +3,7 @@ import { sendTrialEndingEmail, sendTrialExpiredEmail } from '../services/emailSe
 import { captureJobException } from '../monitoring/sentry';
 import { retryAsync } from '../utils/retry';
 import { logInfo, logError, logSimpleInfo } from '../utils/loggerHelpers';
+import { NOTIFICATION_CONFIG } from '../config/appConfig';
 
 /**
  * Resultado padronizado de um job
@@ -26,7 +27,7 @@ export interface JobRunResult {
  * RETORNO: Agora retorna um objeto padronizado para logging
  */
 
-const DAYS_BEFORE_WARNING = 3; // Avisar 3 dias antes de expirar
+const DAYS_BEFORE_WARNING = NOTIFICATION_CONFIG.trialWarningDaysBefore;
 
 async function checkTrialExpiring(): Promise<JobRunResult> {
   logSimpleInfo('Verificando trials expirando...');

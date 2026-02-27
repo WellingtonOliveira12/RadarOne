@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { renderTestEmailTemplate, renderNewAdEmailTemplate } from '../templates/email/baseTemplate';
 import { getEmailSubject, getSubjectTestKey } from '../utils/abtest';
+import { logInfo, logError, logWarning } from '../utils/loggerHelpers';
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -24,7 +25,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
 
   // Se não houver API key configurada, retornar erro amigável
   if (!resend) {
-    console.warn('[EmailService] RESEND_API_KEY não configurado. Email não enviado.');
+    logWarning('EmailService: RESEND_API_KEY not configured', {});
     return {
       success: false,
       error: 'Serviço de e-mail não configurado. Configure RESEND_API_KEY nas variáveis de ambiente.'
@@ -39,14 +40,14 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
       html
     });
 
-    console.log('[EmailService] Email enviado com sucesso', { to, subject, messageId: result.data?.id });
+    logInfo('[EmailService] Email enviado com sucesso', { to, subject, messageId: result.data?.id });
 
     return {
       success: true,
       messageId: result.data?.id
     };
   } catch (error: any) {
-    console.error('[EmailService] Erro ao enviar email', { to, subject, error: error.message });
+    logError('[EmailService] Erro ao enviar email', { to, subject, error: error.message });
 
     return {
       success: false,
@@ -165,7 +166,7 @@ export async function sendTrialUpgradeExpiringEmail(
  * Envia email de boas-vindas
  */
 export async function sendWelcomeEmail(to: string, name: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] Enviando email de boas-vindas', { to, name });
+  logInfo('[EmailService] Enviando email de boas-vindas', { to, name });
 
   const html = renderTestEmailTemplate(name);
 
@@ -177,27 +178,27 @@ export async function sendWelcomeEmail(to: string, name: string): Promise<{ succ
 }
 
 export async function sendPasswordResetEmail(to: string, resetToken: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendPasswordResetEmail stub chamado', { to });
+  logInfo('[EmailService] sendPasswordResetEmail stub chamado', { to });
   return { success: true };
 }
 
 export async function sendPasswordChangedEmail(to: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendPasswordChangedEmail stub chamado', { to });
+  logInfo('[EmailService] sendPasswordChangedEmail stub chamado', { to });
   return { success: true };
 }
 
 export async function sendTrialStartedEmail(to: string, planName: string, trialEndsAt: Date): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendTrialStartedEmail stub chamado', { to, planName });
+  logInfo('[EmailService] sendTrialStartedEmail stub chamado', { to, planName });
   return { success: true };
 }
 
 export async function sendTrialEndingEmail(to: string, name: string, daysRemaining: number, planName: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendTrialEndingEmail stub chamado', { to, name, daysRemaining, planName });
+  logInfo('[EmailService] sendTrialEndingEmail stub chamado', { to, name, daysRemaining, planName });
   return { success: true };
 }
 
 export async function sendTrialExpiredEmail(to: string, name: string, planName: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendTrialExpiredEmail stub chamado', { to, name, planName });
+  logInfo('[EmailService] sendTrialExpiredEmail stub chamado', { to, name, planName });
   return { success: true };
 }
 
@@ -223,7 +224,7 @@ export async function sendAbandonedCouponEmail(
   description: string,
   isSecondReminder: boolean = false
 ): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] Enviando email de cupom abandonado', {
+  logInfo('[EmailService] Enviando email de cupom abandonado', {
     to,
     couponCode,
     reminder: isSecondReminder ? '2º' : '1º',
@@ -236,7 +237,7 @@ export async function sendAbandonedCouponEmail(
   const subjectTestKey = getSubjectTestKey(category, isSecondReminder);
   const { subject, variant } = getEmailSubject(subjectTestKey, couponCode, discountText);
 
-  console.log(`[EmailService] A/B Test Subject: ${subjectTestKey} = Variant ${variant}`);
+  logInfo('EmailService: A/B Test Subject selected', { subjectTestKey, variant });
 
   // Mensagens personalizadas por categoria de desconto
   const categoryMessages = {
@@ -343,12 +344,12 @@ export async function sendAbandonedCouponEmail(
 }
 
 export async function sendSubscriptionExpiredEmail(to: string, name: string, planName: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendSubscriptionExpiredEmail stub chamado', { to, name, planName });
+  logInfo('[EmailService] sendSubscriptionExpiredEmail stub chamado', { to, name, planName });
   return { success: true };
 }
 
 export async function sendNewListingEmail(to: string, listingTitle: string, listingUrl: string): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] Enviando email de novo anúncio', { to, listingTitle });
+  logInfo('[EmailService] Enviando email de novo anúncio', { to, listingTitle });
 
   const html = renderNewAdEmailTemplate({
     userName: 'Usuário',
@@ -365,6 +366,6 @@ export async function sendNewListingEmail(to: string, listingTitle: string, list
 }
 
 export async function sendMonthlyQueriesResetReport(to: string, resetCount: number): Promise<{ success: boolean; error?: string }> {
-  console.log('[EmailService] sendMonthlyQueriesResetReport stub chamado', { to, resetCount });
+  logInfo('[EmailService] sendMonthlyQueriesResetReport stub chamado', { to, resetCount });
   return { success: true };
 }

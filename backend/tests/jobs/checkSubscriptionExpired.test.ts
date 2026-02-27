@@ -42,8 +42,15 @@ const { mockRetryAsync } = vi.hoisted(() => ({
 }));
 
 // Aplicar mocks antes de importar o job
-vi.mock('../../src/server', () => ({
+vi.mock('../../src/lib/prisma', () => ({
   prisma: mockPrisma,
+}));
+
+vi.mock('../../src/utils/loggerHelpers', () => ({
+  logInfo: vi.fn(),
+  logError: vi.fn(),
+  logWarning: vi.fn(),
+  logSimpleInfo: vi.fn(),
 }));
 
 vi.mock('../../src/services/emailService', () => ({
@@ -202,10 +209,12 @@ describe('checkSubscriptionExpired Job', () => {
     mockPrismaSubscription.findMany.mockRejectedValue(mockError);
     mockRetryAsync.mockRejectedValue(mockError);
 
-    // Act & Assert
-    await expect(checkSubscriptionExpired()).rejects.toThrow(
-      'Database connection timeout'
-    );
+    // Act
+    const result = await checkSubscriptionExpired();
+
+    // Assert - Job now returns error result instead of throwing
+    expect(result.errorCount).toBeGreaterThanOrEqual(1);
+    expect(result.summary).toContain('Database connection timeout');
     expect(mockCaptureJobException).toHaveBeenCalledWith(
       mockError,
       expect.objectContaining({
@@ -265,6 +274,7 @@ describe('checkSubscriptionExpired Job', () => {
     expect(mockPrismaSubscription.findMany).toHaveBeenCalledWith({
       where: {
         status: 'ACTIVE',
+        isLifetime: false,
         validUntil: {
           lt: expect.any(Date),
         },

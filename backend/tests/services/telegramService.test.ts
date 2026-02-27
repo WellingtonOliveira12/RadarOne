@@ -68,7 +68,7 @@ const { mockSendTelegramMessage } = vi.hoisted(() => ({
 }));
 
 // Aplicar mocks antes de importar o service
-vi.mock('../../src/server', () => ({
+vi.mock('../../src/lib/prisma', () => ({
   prisma: mockPrisma,
 }));
 
@@ -76,6 +76,12 @@ vi.mock('axios', () => ({
   default: {
     post: vi.fn().mockResolvedValue({ data: { ok: true, result: { message_id: 123 } } }),
   },
+}));
+
+vi.mock('../../src/utils/loggerHelpers', () => ({
+  logInfo: vi.fn(),
+  logError: vi.fn(),
+  logWarning: vi.fn(),
 }));
 
 // Importar service após os mocks

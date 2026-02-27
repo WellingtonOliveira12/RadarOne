@@ -4,6 +4,7 @@ import { captureJobException } from '../monitoring/sentry';
 import { retryAsync } from '../utils/retry';
 import { JobRunResult } from './checkTrialExpiring';
 import { logInfo, logError, logSimpleInfo } from '../utils/loggerHelpers';
+import { PLAN_CONFIG } from '../config/appConfig';
 
 /**
  * Job: Reset mensal de queries
@@ -67,7 +68,7 @@ async function resetMonthlyQueries(): Promise<JobRunResult> {
 
     // Enviar e-mail de relatório para o admin
     try {
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@radarone.com';
+      const adminEmail = PLAN_CONFIG.adminEmail;
       await sendMonthlyQueriesResetReport(adminEmail, result.count);
       logSimpleInfo('E-mail de relatório enviado com sucesso');
       emailSent = true;

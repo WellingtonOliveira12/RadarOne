@@ -299,7 +299,7 @@ export async function checkCouponAlerts(): Promise<JobRunResult> {
       },
     };
   } catch (error) {
-    logWarning('[JOB] ❌ Erro ao verificar cupons para alertas:', error);
+    logWarning('[JOB] ❌ Erro ao verificar cupons para alertas', { err: String(error) });
 
     // Retorna formato padronizado mesmo em caso de erro
     return {

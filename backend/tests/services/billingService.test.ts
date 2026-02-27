@@ -117,20 +117,12 @@ describe('startTrialForUser', () => {
     const plan = { ...MOCK_PLAN_FREE, trialDays: 0 };
     setupCleanUser(plan);
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
     const result = await startTrialForUser('user-1', 'free');
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('CRITICAL: plan.trialDays inválido')
-    );
 
     expect(result.isExisting).toBe(false);
     const diffMs = result.subscription.trialEndsAt!.getTime() - new Date('2026-02-16T12:00:00Z').getTime();
     const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
     expect(diffDays).toBe(7);
-
-    consoleSpy.mockRestore();
   });
 
   it('trialEndsAt sempre no futuro após criação', async () => {

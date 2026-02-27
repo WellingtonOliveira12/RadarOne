@@ -15,6 +15,8 @@ import {
   Center,
   Alert,
   AlertIcon,
+  AlertTitle,
+  AlertDescription,
   VStack,
   HStack,
   Select,
@@ -215,9 +217,15 @@ export const AdminJobsPage: React.FC = () => {
         </Box>
 
         {error && (
-          <Alert status="error">
+          <Alert status="error" borderRadius="md" mb={4}>
             <AlertIcon />
-            {error}
+            <Box flex={1}>
+              <AlertTitle>Erro ao carregar dados</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Box>
+            <Button size="sm" colorScheme="red" variant="outline" onClick={loadJobs} ml={4}>
+              Tentar Novamente
+            </Button>
           </Alert>
         )}
 
@@ -332,65 +340,74 @@ export const AdminJobsPage: React.FC = () => {
           <CardBody>
             {loading ? (
               <Center py={10}>
-                <Spinner size="xl" color="blue.500" />
+                <VStack spacing={4}>
+                  <Spinner size="xl" color="blue.500" thickness="4px" />
+                  <Text color="gray.600">Carregando execuções de jobs...</Text>
+                </VStack>
               </Center>
             ) : (
               <>
-                <Table variant="simple" size="sm">
-                  <Thead>
-                    <Tr>
-                      <Th>Job</Th>
-                      <Th>Status</Th>
-                      <Th>Inicio</Th>
-                      <Th>Duracao</Th>
-                      <Th>Processados</Th>
-                      <Th>Sucesso/Erro</Th>
-                      <Th>Resumo</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {jobs.length === 0 ? (
-                      <Tr>
-                        <Td colSpan={7} textAlign="center" py={8} color="gray.500">
-                          Nenhuma execucao de job encontrada. Os jobs serao registrados automaticamente a partir de agora.
-                        </Td>
-                      </Tr>
-                    ) : (
-                      jobs.map((job) => (
-                        <JobRow key={job.id} job={job} formatDate={formatDate} formatDuration={formatDuration} getStatusBadge={getStatusBadge} />
-                      ))
+                {!error && jobs.length === 0 ? (
+                  <Alert status="info" borderRadius="md">
+                    <AlertIcon />
+                    <Box>
+                      <AlertTitle>Nenhuma execução encontrada</AlertTitle>
+                      <AlertDescription>
+                        Nenhuma execução de job foi encontrada com os filtros selecionados. Os jobs são registrados automaticamente após a primeira execução.
+                      </AlertDescription>
+                    </Box>
+                  </Alert>
+                ) : (
+                  <>
+                    <Table variant="simple" size="sm">
+                      <Thead>
+                        <Tr>
+                          <Th>Job</Th>
+                          <Th>Status</Th>
+                          <Th>Inicio</Th>
+                          <Th>Duracao</Th>
+                          <Th>Processados</Th>
+                          <Th>Sucesso/Erro</Th>
+                          <Th>Resumo</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {jobs.map((job) => (
+                          <JobRow key={job.id} job={job} formatDate={formatDate} formatDuration={formatDuration} getStatusBadge={getStatusBadge} />
+                        ))}
+                      </Tbody>
+                    </Table>
+
+                    {/* Pagination */}
+                    {pagination.totalPages > 1 && (
+                      <HStack justify="space-between" mt={6}>
+                        <Button
+                          onClick={handlePreviousPage}
+                          isDisabled={pagination.page === 1}
+                          size="sm"
+                          colorScheme="blue"
+                          variant="outline"
+                        >
+                          Anterior
+                        </Button>
+
+                        <Text fontSize="sm" color="gray.600">
+                          Pagina {pagination.page} de {pagination.totalPages} (Total:{' '}
+                          {pagination.total})
+                        </Text>
+
+                        <Button
+                          onClick={handleNextPage}
+                          isDisabled={pagination.page === pagination.totalPages}
+                          size="sm"
+                          colorScheme="blue"
+                          variant="outline"
+                        >
+                          Proximo
+                        </Button>
+                      </HStack>
                     )}
-                  </Tbody>
-                </Table>
-
-                {/* Pagination */}
-                {pagination.totalPages > 1 && (
-                  <HStack justify="space-between" mt={6}>
-                    <Button
-                      onClick={handlePreviousPage}
-                      isDisabled={pagination.page === 1}
-                      size="sm"
-                      colorScheme="blue"
-                      variant="outline"
-                    >
-                      Anterior
-                    </Button>
-
-                    <Text fontSize="sm" color="gray.600">
-                      Pagina {pagination.page} de {pagination.totalPages} (Total:{' '}
-                      {pagination.total})
-                    </Text>
-
-                    <Button
-                      onClick={handleNextPage}
-                      isDisabled={pagination.page === pagination.totalPages}
-                      size="sm"
-                      colorScheme="blue"
-                      variant="outline"
-                    >
-                      Proximo
-                    </Button>
-                  </HStack>
+                  </>
                 )}
               </>
             )}

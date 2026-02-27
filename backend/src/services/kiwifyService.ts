@@ -11,6 +11,7 @@
  */
 
 import { prisma } from '../lib/prisma';
+import { logInfo, logWarning } from '../utils/loggerHelpers';
 
 export interface CheckoutParams {
   userId: string;
@@ -105,13 +106,11 @@ export async function generateCheckoutUrl(params: CheckoutParams): Promise<Check
     // Tentativa 2: Query param 'discount_code' (caso Kiwify use outro nome)
     checkoutUrl.searchParams.set('discount_code', couponCode);
 
-    console.log(`[KIWIFY] Cupom '${couponCode}' adicionado à URL de checkout`);
-    console.warn(
-      '[KIWIFY] ⚠️ Aplicação real do desconto depende da API Kiwify suportar cupons. Verifique documentação Kiwify.'
-    );
+    logInfo('KIWIFY: Coupon added to checkout URL', { couponCode });
+    logWarning('KIWIFY: Discount application depends on Kiwify API coupon support', {});
   }
 
-  console.log('[KIWIFY] Checkout URL gerada:', checkoutUrl.toString());
+  logInfo('KIWIFY: Checkout URL generated', { url: checkoutUrl.toString() });
 
   return {
     checkoutUrl: checkoutUrl.toString(),

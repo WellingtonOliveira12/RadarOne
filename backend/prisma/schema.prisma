@@ -45,15 +45,20 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relações
-  subscriptions        Subscription[]
-  monitors             Monitor[]
-  usageLogs            UsageLog[]
-  telegramAccounts     TelegramAccount[]
-  notificationLogs     NotificationLog[]
-  notificationSettings NotificationSettings?
-  userSessions         UserSession[]
-  refreshTokens        RefreshToken[]
-  siteExecutionStats   SiteExecutionStats[]
+  subscriptions         Subscription[]
+  monitors              Monitor[]
+  usageLogs             UsageLog[]
+  telegramAccounts      TelegramAccount[]
+  notificationLogs      NotificationLog[]
+  notificationSettings  NotificationSettings?
+  userSessions          UserSession[]
+  refreshTokens         RefreshToken[]
+  siteExecutionStats    SiteExecutionStats[]
+  couponUsages          CouponUsage[]
+  couponValidations     CouponValidation[]
+  pushSubscriptions     PushSubscription[]
+  telegramConnectTokens TelegramConnectToken[]
+  auditLogs             AuditLog[]
 
   @@map("users")
 }
@@ -63,16 +68,16 @@ model User {
 // ============================================
 
 model RefreshToken {
-  id          String   @id @default(cuid())
-  userId      String   @map("user_id")
-  tokenHash   String   @unique @map("token_hash") // SHA256 do token (nunca armazena plain text)
-  family      String   // Família do token para detectar replay attacks
-  expiresAt   DateTime @map("expires_at")
-  revokedAt   DateTime? @map("revoked_at") // Se revogado, quando
-  replacedBy  String?  @map("replaced_by") // ID do token que substituiu este
-  userAgent   String?  @map("user_agent")
-  ipAddress   String?  @map("ip_address")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash") // SHA256 do token (nunca armazena plain text)
+  family     String // Família do token para detectar replay attacks
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at") // Se revogado, quando
+  replacedBy String?   @map("replaced_by") // ID do token que substituiu este
+  userAgent  String?   @map("user_agent")
+  ipAddress  String?   @map("ip_address")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -217,6 +222,7 @@ model Subscription {
   @@index([userId])
   @@index([status])
   @@index([validUntil])
+  @@index([userId, status])
   @@map("subscriptions")
 }
 
@@ -275,6 +281,7 @@ model CouponUsage {
 
   // Relações
   coupon Coupon @relation(fields: [couponId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([couponId])
   @@index([userId])
@@ -287,13 +294,16 @@ model CouponValidation {
   couponId             String    @map("coupon_id")
   userId               String?   @map("user_id") // Nullable para usuários não logados
   userEmail            String?   @map("user_email") // Email para envio de notificação
-  purpose              String    // DISCOUNT ou TRIAL_UPGRADE
-  location             String    // plans_page, checkout, etc
+  purpose              String // DISCOUNT ou TRIAL_UPGRADE
+  location             String // plans_page, checkout, etc
   converted            Boolean   @default(false) // True se o cupom foi usado (checkout completado)
   reminderSentAt       DateTime? @map("reminder_sent_at") // Quando 1º email foi enviado (24h)
   secondReminderSentAt DateTime? @map("second_reminder_sent_at") // Quando 2º email foi enviado (48h)
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  // Relações
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([couponId])
   @@index([userId])
@@ -305,13 +315,16 @@ model CouponValidation {
 
 // Subscrições de Push Notification (Web Push API)
 model PushSubscription {
-  id         String   @id @default(cuid())
-  userId     String   @map("user_id")
-  endpoint   String   @unique // URL do push service
-  p256dh     String   // Chave pública para criptografia
-  auth       String   // Chave de autenticação
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique // URL do push service
+  p256dh    String // Chave pública para criptografia
+  auth      String // Chave de autenticação
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("push_subscriptions")
@@ -355,9 +368,9 @@ model Monitor {
   priceMax Float? @map("price_max")
 
   // Filtros de Localização (globais)
-  country     String?                              // ISO-3166-1 alpha-2 (ex: BR, US) ou null = sem filtro
-  stateRegion String? @map("state_region")         // "SP", "NY", etc.
-  city        String?                              // "São Paulo", "New York"
+  country     String? // ISO-3166-1 alpha-2 (ex: BR, US) ou null = sem filtro
+  stateRegion String? @map("state_region") // "SP", "NY", etc.
+  city        String? // "São Paulo", "New York"
 
   // Campos adicionais (compatibilidade com worker)
   keywords        String[] @default([])
@@ -383,6 +396,8 @@ model Monitor {
   @@index([userId])
   @@index([active])
   @@index([site])
+  @@index([userId, active])
+  @@index([lastCheckedAt])
   @@map("monitors")
 }
 
@@ -412,6 +427,8 @@ model AdSeen {
 
   @@unique([monitorId, externalId])
   @@index([monitorId])
+  @@index([monitorId, alertSent])
+  @@index([firstSeenAt])
   @@map("ads_seen")
 }
 
@@ -428,7 +445,7 @@ model MonitorLog {
   alertsSent    Int       @default(0) @map("alerts_sent")
   error         String?
   executionTime Int?      @map("execution_time")
-  diagnosis     Json?     // DiagnosisRecord structured diagnosis
+  diagnosis     Json? // DiagnosisRecord structured diagnosis
   createdAt     DateTime  @default(now()) @map("created_at")
 
   // Relações
@@ -436,6 +453,7 @@ model MonitorLog {
 
   @@index([monitorId])
   @@index([createdAt])
+  @@index([monitorId, status])
   @@map("monitor_logs")
 }
 
@@ -443,7 +461,7 @@ enum LogStatus {
   SUCCESS
   ERROR
   PARTIAL
-  SKIPPED  // Monitor pulado por falta de sessão ou needs_reauth (NÃO é erro)
+  SKIPPED // Monitor pulado por falta de sessão ou needs_reauth (NÃO é erro)
 }
 
 // ============================================
@@ -451,32 +469,32 @@ enum LogStatus {
 // ============================================
 
 enum UserSessionStatus {
-  ACTIVE      // Sessão válida e funcionando
-  EXPIRED     // Expirou por tempo
+  ACTIVE // Sessão válida e funcionando
+  EXPIRED // Expirou por tempo
   NEEDS_REAUTH // Site pediu login novamente
-  INVALID     // Arquivo inválido/corrompido
+  INVALID // Arquivo inválido/corrompido
 }
 
 model UserSession {
-  id          String   @id @default(cuid())
-  userId      String   @map("user_id")
-  site        String   // Ex: "MERCADO_LIVRE", "SUPERBID"
-  domain      String   // Ex: "mercadolivre.com.br"
+  id           String  @id @default(cuid())
+  userId       String  @map("user_id")
+  site         String // Ex: "MERCADO_LIVRE", "SUPERBID"
+  domain       String // Ex: "mercadolivre.com.br"
   accountLabel String? @map("account_label") // Rótulo para múltiplas contas (futuro)
 
   // Status da sessão (novo sistema)
-  status      UserSessionStatus @default(ACTIVE)
+  status UserSessionStatus @default(ACTIVE)
 
   // Dados criptografados - NOVO SISTEMA (AES-256-GCM)
   // Formato: storageState completo do Playwright { cookies: [], origins: [] }
   encryptedStorageState String? @map("encrypted_storage_state") @db.Text
 
   // Campos para sistema LEGADO (mantidos para compatibilidade)
-  cookies     Json?    // Usado pelo session-manager.ts legado
-  localStorage Json?   @map("local_storage")
+  cookies      Json? // Usado pelo session-manager.ts legado
+  localStorage Json? @map("local_storage")
 
   // Metadados
-  metadata    Json?    // cookieCount, uploadedAt, lastErrorReason, cooldownNotifiedAt, etc.
+  metadata Json? // cookieCount, uploadedAt, lastErrorReason, cooldownNotifiedAt, etc.
 
   // Controle de tempo
   expiresAt   DateTime? @map("expires_at")
@@ -564,6 +582,7 @@ model NotificationLog {
   @@index([userId])
   @@index([createdAt])
   @@index([status])
+  @@index([userId, channel])
   @@map("notification_logs")
 }
 
@@ -572,13 +591,16 @@ model NotificationLog {
 // ============================================
 
 model TelegramConnectToken {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  token     String   @unique // Token único para deep link
+  id        String      @id @default(cuid())
+  userId    String      @map("user_id")
+  token     String      @unique // Token único para deep link
   status    TokenStatus @default(PENDING)
-  expiresAt DateTime @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime    @map("expires_at")
+  usedAt    DateTime?   @map("used_at")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -598,16 +620,16 @@ enum TokenStatus {
 // ============================================
 
 model SupportTicket {
-  id            String   @id @default(cuid())
-  userId        String?  @map("user_id") // Nullable para usuários não logados
+  id            String       @id @default(cuid())
+  userId        String?      @map("user_id") // Nullable para usuários não logados
   email         String
   category      String
   subject       String
-  message       String   @db.Text
-  attachmentUrl String?  @map("attachment_url")
+  message       String       @db.Text
+  attachmentUrl String?      @map("attachment_url")
   status        TicketStatus @default(OPEN)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
 
   @@index([userId])
   @@index([status])
@@ -638,6 +660,8 @@ model AuditLog {
   ipAddress  String?  @map("ip_address")
   userAgent  String?  @map("user_agent")
   createdAt  DateTime @default(now()) @map("created_at")
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Restrict)
 
   @@index([adminId])
   @@index([action])
@@ -672,17 +696,17 @@ model SystemSetting {
 // ============================================
 
 model AdminAlert {
-  id        String       @id @default(cuid())
+  id        String        @id @default(cuid())
   type      String // JOB_FAILURE, WEBHOOK_ERROR, SPIKE_MONITORS, MASS_EXPIRATION
   severity  AlertSeverity @default(INFO)
   title     String
-  message   String       @db.Text
+  message   String        @db.Text
   source    String? // Nome do job, webhook, etc que gerou o alerta
   metadata  Json? // Dados adicionais (erro, contagem, etc)
-  isRead    Boolean      @default(false) @map("is_read")
-  readBy    String?      @map("read_by") // ID do admin que leu
-  readAt    DateTime?    @map("read_at")
-  createdAt DateTime     @default(now()) @map("created_at")
+  isRead    Boolean       @default(false) @map("is_read")
+  readBy    String?       @map("read_by") // ID do admin que leu
+  readAt    DateTime?     @map("read_at")
+  createdAt DateTime      @default(now()) @map("created_at")
 
   @@index([isRead])
   @@index([severity])
@@ -706,29 +730,29 @@ enum AlertSeverity {
  * Cada execução de job cria um registro nesta tabela
  */
 model JobRun {
-  id            String       @id @default(cuid())
-  jobName       String       @map("job_name") // checkTrialExpiring, resetMonthlyQueries, etc
-  status        JobRunStatus @default(RUNNING)
+  id      String       @id @default(cuid())
+  jobName String       @map("job_name") // checkTrialExpiring, resetMonthlyQueries, etc
+  status  JobRunStatus @default(RUNNING)
 
   // Timing
-  startedAt     DateTime     @default(now()) @map("started_at")
-  completedAt   DateTime?    @map("completed_at")
-  durationMs    Int?         @map("duration_ms") // Duração em milissegundos
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  durationMs  Int?      @map("duration_ms") // Duração em milissegundos
 
   // Resultados
-  processedCount Int         @default(0) @map("processed_count") // Registros processados
-  successCount   Int         @default(0) @map("success_count") // Operações bem-sucedidas
-  errorCount     Int         @default(0) @map("error_count") // Erros encontrados
+  processedCount Int @default(0) @map("processed_count") // Registros processados
+  successCount   Int @default(0) @map("success_count") // Operações bem-sucedidas
+  errorCount     Int @default(0) @map("error_count") // Erros encontrados
 
   // Detalhes
-  summary       String?      @db.Text // Resumo da execução
-  errorMessage  String?      @map("error_message") @db.Text // Mensagem de erro se falhou
-  metadata      Json?        // Dados adicionais (emails enviados, etc)
+  summary      String? @db.Text // Resumo da execução
+  errorMessage String? @map("error_message") @db.Text // Mensagem de erro se falhou
+  metadata     Json? // Dados adicionais (emails enviados, etc)
 
   // Controle
-  triggeredBy   String?      @map("triggered_by") // SCHEDULER, MANUAL, API
+  triggeredBy String? @map("triggered_by") // SCHEDULER, MANUAL, API
 
-  createdAt     DateTime     @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([jobName])
   @@index([status])
@@ -738,11 +762,11 @@ model JobRun {
 }
 
 enum JobRunStatus {
-  RUNNING   // Em execução
-  SUCCESS   // Concluído com sucesso
-  PARTIAL   // Concluído com alguns erros
-  FAILED    // Falhou completamente
-  TIMEOUT   // Timeout
+  RUNNING // Em execução
+  SUCCESS // Concluído com sucesso
+  PARTIAL // Concluído com alguns erros
+  FAILED // Falhou completamente
+  TIMEOUT // Timeout
 }
 
 // ============================================
@@ -754,13 +778,13 @@ enum JobRunStatus {
  * Pool de contas por site para distribuição de carga
  */
 model ScraperAccount {
-  id       String @id @default(cuid())
-  site     String // MERCADO_LIVRE, SUPERBID, etc
-  label    String // Nome amigável (ex: "ML Account 1")
+  id    String @id @default(cuid())
+  site  String // MERCADO_LIVRE, SUPERBID, etc
+  label String // Nome amigável (ex: "ML Account 1")
 
   // Credenciais (criptografadas)
   username       String // Email ou username
-  passwordEnc    String @map("password_enc") // Senha criptografada (AES-256)
+  passwordEnc    String  @map("password_enc") // Senha criptografada (AES-256)
   totpSecretEnc  String? @map("totp_secret_enc") // Segredo TOTP criptografado
   otpEmail       String? @map("otp_email") // Email para receber OTP (se diferente)
   otpEmailPwdEnc String? @map("otp_email_pwd_enc") // Senha do email OTP
@@ -779,8 +803,8 @@ model ScraperAccount {
   consecutiveFailures Int       @default(0) @map("consecutive_failures")
 
   // Limites e Rate Limiting
-  maxRequestsPerHour Int @default(100) @map("max_requests_per_hour")
-  requestsThisHour   Int @default(0) @map("requests_this_hour")
+  maxRequestsPerHour Int       @default(100) @map("max_requests_per_hour")
+  requestsThisHour   Int       @default(0) @map("requests_this_hour")
   hourResetAt        DateTime? @map("hour_reset_at")
 
   // Controle
@@ -790,8 +814,8 @@ model ScraperAccount {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relações
-  sessions  ScraperSession[]
-  authLogs  ScraperAuthLog[]
+  sessions ScraperSession[]
+  authLogs ScraperAuthLog[]
 
   @@unique([site, username])
   @@index([site])
@@ -825,9 +849,9 @@ model ScraperSession {
   accountId String @map("account_id")
 
   // Estado da sessão
-  isAuthenticated   Boolean   @default(false) @map("is_authenticated")
-  lastValidatedAt   DateTime? @map("last_validated_at")
-  expiresAt         DateTime? @map("expires_at")
+  isAuthenticated Boolean   @default(false) @map("is_authenticated")
+  lastValidatedAt DateTime? @map("last_validated_at")
+  expiresAt       DateTime? @map("expires_at")
 
   // Caminho do userDataDir (persistente)
   userDataDir String @map("user_data_dir")
@@ -861,9 +885,9 @@ model ScraperAuthLog {
   message String?
 
   // Contexto
-  url       String?
-  pageType  String? @map("page_type") // LOGIN_PAGE, MFA_PAGE, CONTENT, etc
-  duration  Int? // Duração em ms
+  url      String?
+  pageType String? @map("page_type") // LOGIN_PAGE, MFA_PAGE, CONTENT, etc
+  duration Int? // Duração em ms
 
   // Não logar credenciais - apenas metadados seguros
   metadata Json?
@@ -876,6 +900,7 @@ model ScraperAuthLog {
   @@index([accountId])
   @@index([event])
   @@index([createdAt])
+  @@index([accountId, success])
   @@map("scraper_auth_logs")
 }
 
@@ -896,25 +921,26 @@ enum PageType {
 }
 
 model SiteExecutionStats {
-  id          String      @id @default(cuid())
-  site        MonitorSite
-  monitorId   String      @map("monitor_id")
-  userId      String      @map("user_id")
-  startedAt   DateTime    @map("started_at")
-  finishedAt  DateTime    @map("finished_at")
-  durationMs  Int         @map("duration_ms")
-  pageType    PageType    @map("page_type")
-  adsFound    Int         @default(0) @map("ads_found")
-  success     Boolean     @default(false)
-  errorCode   String?     @map("error_code")
-  createdAt   DateTime    @default(now()) @map("created_at")
+  id         String      @id @default(cuid())
+  site       MonitorSite
+  monitorId  String      @map("monitor_id")
+  userId     String      @map("user_id")
+  startedAt  DateTime    @map("started_at")
+  finishedAt DateTime    @map("finished_at")
+  durationMs Int         @map("duration_ms")
+  pageType   PageType    @map("page_type")
+  adsFound   Int         @default(0) @map("ads_found")
+  success    Boolean     @default(false)
+  errorCode  String?     @map("error_code")
+  createdAt  DateTime    @default(now()) @map("created_at")
 
-  monitor     Monitor     @relation(fields: [monitorId], references: [id], onDelete: Cascade)
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([site])
   @@index([createdAt])
   @@index([success])
   @@index([site, createdAt])
+  @@index([userId])
   @@map("site_execution_stats")
 }

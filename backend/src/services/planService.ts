@@ -1,4 +1,6 @@
 import { prisma } from '../lib/prisma';
+import { logError } from '../utils/loggerHelpers';
+import { PLAN_CONFIG } from '../config/appConfig';
 
 export type PlanLimits = {
   maxMonitors: number;
@@ -53,10 +55,10 @@ export async function getUserPlanLimits(userId: string): Promise<PlanLimits> {
       };
     }
 
-    return { maxMonitors: 1, maxSites: 1, maxAlertsPerDay: 3, multiSite: false };
+    return { maxMonitors: PLAN_CONFIG.defaultLimits.maxMonitors, maxSites: PLAN_CONFIG.defaultLimits.maxSites, maxAlertsPerDay: PLAN_CONFIG.defaultLimits.maxAlertsPerDay, multiSite: false };
   } catch (error) {
-    console.error('[PLAN] Erro:', error);
-    return { maxMonitors: 1, maxSites: 1, maxAlertsPerDay: 3, multiSite: false };
+    logError('PLAN: Error getting plan limits', { err: String(error) });
+    return { maxMonitors: PLAN_CONFIG.defaultLimits.maxMonitors, maxSites: PLAN_CONFIG.defaultLimits.maxSites, maxAlertsPerDay: PLAN_CONFIG.defaultLimits.maxAlertsPerDay, multiSite: false };
   }
 }
 

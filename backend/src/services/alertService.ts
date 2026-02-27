@@ -55,7 +55,7 @@ export async function createAlert(params: CreateAlertParams): Promise<AdminAlert
         title,
         message,
         source: source || null,
-        metadata: metadata || null,
+        metadata: metadata || undefined,
       },
     });
 

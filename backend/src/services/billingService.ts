@@ -2,6 +2,8 @@ import { prisma } from '../lib/prisma';
 import { Plan, Coupon, Subscription } from '@prisma/client';
 import { sendTrialStartedEmail } from './emailService';
 import { ErrorCodes } from '../constants/errorCodes';
+import { logInfo, logError } from '../utils/loggerHelpers';
+import { PLAN_CONFIG } from '../config/appConfig';
 
 /**
  * Serviço de Billing e Assinaturas (SaaS Ready)
@@ -133,14 +135,13 @@ export async function startTrialForUser(
   }
 
   // GUARD RAIL: trialDays deve ser >= 1. Se for 0/null/negativo, usar fallback de 7 dias.
-  const FALLBACK_TRIAL_DAYS = 7;
+  const FALLBACK_TRIAL_DAYS = PLAN_CONFIG.fallbackTrialDays;
   const effectiveTrialDays = (plan.trialDays && plan.trialDays >= 1) ? plan.trialDays : FALLBACK_TRIAL_DAYS;
 
   if (plan.trialDays < 1) {
-    console.error(
-      `[BILLING] CRITICAL: plan.trialDays inválido (${plan.trialDays}) para plano "${plan.slug}". ` +
-      `Usando fallback de ${FALLBACK_TRIAL_DAYS} dias. Corrija o banco!`
-    );
+    logError('BILLING: plan.trialDays invalid, using fallback', {
+      trialDays: plan.trialDays, planSlug: plan.slug, fallback: FALLBACK_TRIAL_DAYS
+    });
   }
 
   const now = new Date();
@@ -178,9 +179,7 @@ export async function startTrialForUser(
           (sub.trialEndsAt && sub.trialEndsAt >= now) ||
           !sub.trialEndsAt;
         if (stillValid) {
-          console.log(
-            `[TRIAL] Idempotente: userId=${userId}, planSlug=${planSlug}, existingSubId=${sub.id}`
-          );
+          logInfo('TRIAL idempotent: existing valid trial', { userId, planSlug, subId: sub.id });
           return { subscription: sub as Subscription, isExisting: true };
         }
       }
@@ -191,9 +190,7 @@ export async function startTrialForUser(
           (sub.validUntil && sub.validUntil >= now) ||
           !sub.validUntil;
         if (stillValid) {
-          console.log(
-            `[TRIAL] Rejeitado: userId=${userId} já possui subscription ACTIVE (subId=${sub.id})`
-          );
+          logInfo('TRIAL rejected: user has active subscription', { userId, subId: sub.id });
           throw new TrialBusinessError(
             'Você já possui uma assinatura ativa.',
             ErrorCodes.SUBSCRIPTION_ALREADY_ACTIVE
@@ -213,9 +210,7 @@ export async function startTrialForUser(
     });
 
     if (previousTrial) {
-      console.log(
-        `[TRIAL] Rejeitado: userId=${userId} já usou trial do plano ${planSlug} (subId=${previousTrial.id})`
-      );
+      logInfo('TRIAL rejected: already used trial for plan', { userId, planSlug, subId: previousTrial.id });
       throw new TrialBusinessError(
         'Você já utilizou o período de teste deste plano.',
         ErrorCodes.TRIAL_ALREADY_USED
@@ -253,11 +248,7 @@ export async function startTrialForUser(
   // Log estruturado de diagnóstico (fora da transação)
   if (!result.isExisting) {
     const diffDays = Math.round((trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    console.log(
-      `[TRIAL] Criado: userId=${userId}, plan=${plan.slug}, ` +
-      `trialDays=${effectiveTrialDays}, trialEndsAt=${trialEndsAt.toISOString()}, ` +
-      `now=${now.toISOString()}, diffDays=${diffDays}`
-    );
+    logInfo('TRIAL created', { userId, plan: plan.slug, trialDays: effectiveTrialDays, diffDays });
 
     // Enviar e-mail de trial iniciado (não bloqueia se falhar)
     const sub = result.subscription as any;
@@ -267,7 +258,7 @@ export async function startTrialForUser(
         plan.name,
         sub.trialEndsAt
       ).catch((err: any) => {
-        console.error('[BILLING] Erro ao enviar e-mail de trial iniciado:', err);
+        logError('BILLING: Failed to send trial started email', { err: String(err) });
       });
     }
   }
@@ -312,7 +303,7 @@ export async function activatePaidSubscription(
     include: { plan: true }
   });
 
-  console.log('[BILLING] Assinatura ativada:', userId, plan.name);
+  logInfo('BILLING: Subscription activated', { userId, plan: plan.name });
 
   return subscription;
 }
@@ -333,7 +324,7 @@ export async function checkAndExpireSubscriptions(): Promise<number> {
   });
 
   if (result.count > 0) {
-    console.log('[BILLING] Assinaturas expiradas:', result.count);
+    logInfo('BILLING: Subscriptions expired', { count: result.count });
   }
 
   return result.count;
@@ -362,7 +353,7 @@ export async function sendPreExpiryNotifications(daysBeforeExpiry: number = 3): 
     }
   });
 
-  console.log('[BILLING] Assinaturas próximas do vencimento:', subscriptions.length);
+  logInfo('BILLING: Pre-expiry subscriptions found', { count: subscriptions.length });
 
   // TODO: Implementar envio real via notificationService
 
