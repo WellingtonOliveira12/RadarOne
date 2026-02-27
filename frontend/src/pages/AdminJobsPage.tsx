@@ -55,7 +55,7 @@ interface JobRun {
   summary: string | null;
   errorMessage: string | null;
   triggeredBy: string | null;
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
 }
 
 interface JobStats {
@@ -146,8 +146,9 @@ export const AdminJobsPage: React.FC = () => {
       setStats(response.stats);
       setPagination(response.pagination);
       setError('');
-    } catch (err: any) {
-      setError(err.message || 'Erro ao carregar execuções de jobs');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || 'Erro ao carregar execuções de jobs');
       console.error('Erro ao carregar jobs:', err);
     } finally {
       setLoading(false);

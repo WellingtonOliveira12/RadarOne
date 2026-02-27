@@ -43,8 +43,9 @@ export const TelegramConnectionPage: React.FC = () => {
         skipAutoLogout: true,
       });
       setStatus(data);
-    } catch (err: any) {
-      setError(err.message || t('telegramConnect.loadError'));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || t('telegramConnect.loadError'));
     } finally {
       setLoading(false);
     }
@@ -58,8 +59,9 @@ export const TelegramConnectionPage: React.FC = () => {
     try {
       const data = await api.post('/api/telegram/connect-token', {});
       setTokenData(data);
-    } catch (err: any) {
-      setError(err.message || t('telegramConnect.generateError'));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || t('telegramConnect.generateError'));
     } finally {
       setGenerating(false);
     }
@@ -75,8 +77,9 @@ export const TelegramConnectionPage: React.FC = () => {
       setSuccess(t('telegramConnect.disconnected'));
       setTokenData(null);
       loadStatus();
-    } catch (err: any) {
-      setError(err.message || t('telegramConnect.disconnectError'));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || t('telegramConnect.disconnectError'));
     }
   };
 

@@ -20,7 +20,7 @@ const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
  */
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
 
   const rawData = window.atob(base64);
   const buffer = new ArrayBuffer(rawData.length);
@@ -145,9 +145,10 @@ export async function subscribeToPushNotifications(): Promise<{
 
     console.log('[Push] Subscription salva no backend');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Push] Erro ao criar subscription:', error);
-    return { success: false, error: error.message };
+    const message = error instanceof Error ? error.message : 'Erro desconhecido';
+    return { success: false, error: message };
   }
 }
 
@@ -184,9 +185,10 @@ export async function unsubscribeFromPushNotifications(): Promise<{
 
     console.log('[Push] Unsubscribed');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Push] Erro ao unsubscribe:', error);
-    return { success: false, error: error.message };
+    const message = error instanceof Error ? error.message : 'Erro desconhecido';
+    return { success: false, error: message };
   }
 }
 

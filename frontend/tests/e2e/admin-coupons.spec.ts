@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearStorage, loginReal, waitForToast } from './helpers';
+import { clearStorage, loginReal } from './helpers';
 
 /**
  * Testes E2E do Admin Coupons Management
@@ -333,7 +333,6 @@ test.describe('Admin Coupons Management', () => {
     if (hasPagination > 0) {
       // Verificar botões de navegação
       const prevButton = page.locator('button:has-text("Anterior")');
-      const nextButton = page.locator('button:has-text("Próximo")');
 
       // Na primeira página, "Anterior" deve estar desabilitado
       await expect(prevButton).toBeDisabled();
@@ -589,10 +588,6 @@ test.describe('Admin Coupons Management', () => {
     const csvContent = `code,description,discountType,discountValue,maxUses,expiresAt,planSlug
 CSV1${uniqueSuffix},Cupom CSV 1,PERCENTAGE,10,100,2027-12-31,
 CSV2${uniqueSuffix},Cupom CSV 2,FIXED,5000,50,2027-12-31,`;
-
-    // Criar blob e file
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const file = new File([blob], 'coupons.csv', { type: 'text/csv' });
 
     // Upload do arquivo
     const fileInput = page.locator('input[type="file"]');

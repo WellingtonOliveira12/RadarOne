@@ -96,7 +96,7 @@ export const SubscriptionSettingsPage: React.FC = () => {
         const plansData = await plansResponse.json();
         setAllPlans(plansData);
       }
-    } catch (err: any) {
+    } catch {
       setError('Erro ao carregar dados');
     } finally {
       setLoading(false);
@@ -127,10 +127,11 @@ export const SubscriptionSettingsPage: React.FC = () => {
         isClosable: true,
       });
       loadData();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
       toast({
         title: 'Erro ao alterar plano',
-        description: err.message,
+        description: message,
         status: 'error',
         duration: 5000,
         isClosable: true,

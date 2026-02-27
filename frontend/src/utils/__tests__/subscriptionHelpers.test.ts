@@ -171,7 +171,7 @@ describe('getSubscriptionStatus', () => {
 
   it('status CANCELLED → subscription_required', () => {
     const user = makeUser([makeSub({
-      status: 'CANCELLED' as any,
+      status: 'CANCELLED',
     })]);
     const result = getSubscriptionStatus(user);
     expect(result.hasValidSubscription).toBe(false);

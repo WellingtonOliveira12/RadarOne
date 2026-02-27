@@ -96,7 +96,7 @@ export function initSentry(): void {
 /**
  * Captura uma exceção manualmente
  */
-export function captureException(error: Error, context?: Record<string, any>): void {
+export function captureException(error: Error, context?: Record<string, unknown>): void {
   if (!IS_PROD) {
     console.error('[Sentry] Exception (dev):', error, context);
     return;
@@ -142,7 +142,7 @@ export function clearUserContext(): void {
 /**
  * Adiciona breadcrumb (rastro de eventos)
  */
-export function addBreadcrumb(message: string, data?: Record<string, any>): void {
+export function addBreadcrumb(message: string, data?: Record<string, unknown>): void {
   Sentry.addBreadcrumb({
     message,
     level: 'info',
@@ -172,11 +172,11 @@ export function isSentryInitialized(): boolean {
  */
 if (typeof window !== 'undefined' && IS_PROD && SENTRY_DSN) {
   window.Sentry = {
-    captureException: (error: Error, context?: any) => {
+    captureException: (error: Error, context?: Record<string, unknown>) => {
       Sentry.captureException(error, context);
     },
     captureMessage: (message: string, level?: string) => {
-      Sentry.captureMessage(message, level as any);
+      Sentry.captureMessage(message, level as Sentry.SeverityLevel);
     },
   };
 }

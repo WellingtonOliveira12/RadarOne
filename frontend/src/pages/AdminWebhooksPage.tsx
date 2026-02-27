@@ -20,9 +20,10 @@ export const AdminWebhooksPage: React.FC = () => {
       const response = await api.request(`/api/admin/webhooks?page=${pagination.page}&limit=20`, { method: 'GET', skipAutoLogout: true });
       setLogs(response.logs);
       setPagination(response.pagination);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.response?.data?.error || 'Erro ao carregar logs de webhooks');
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || 'Erro ao carregar logs de webhooks');
     } finally {
       setLoading(false);
     }

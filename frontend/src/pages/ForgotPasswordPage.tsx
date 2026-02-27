@@ -39,11 +39,13 @@ export function ForgotPasswordPage() {
     // Validação com Zod
     try {
       forgotPasswordSchema.parse({ email });
-    } catch (err: any) {
+    } catch (err: unknown) {
       const validationErrors: Record<string, string> = {};
-      err.errors?.forEach((error: any) => {
-        validationErrors[error.path[0]] = error.message;
-      });
+      if (err instanceof Error && 'errors' in err) {
+        (err as { errors: { path: string[]; message: string }[] }).errors?.forEach((error) => {
+          validationErrors[error.path[0]] = error.message;
+        });
+      }
       setErrors(validationErrors);
       setLoading(false);
       return;
@@ -59,14 +61,15 @@ export function ForgotPasswordPage() {
       setSuccess(true);
       showSuccess(t('auth.forgotSuccess'));
       trackEvent('forgot_password_requested', { email: maskEmail(email) });
-    } catch (err: any) {
-      const isEmailNotFound = err.response?.status === 404 && err.response?.data?.errorCode === 'EMAIL_NOT_FOUND';
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { errorCode?: string } }; message?: string };
+      const isEmailNotFound = axiosErr.response?.status === 404 && axiosErr.response?.data?.errorCode === 'EMAIL_NOT_FOUND';
 
       let errorMessage: string;
       if (isEmailNotFound) {
         errorMessage = t('auth.forgotEmailNotFound');
       } else {
-        errorMessage = err.message || t('auth.forgotGenericError');
+        errorMessage = axiosErr.message || t('auth.forgotGenericError');
       }
 
       showError(errorMessage);

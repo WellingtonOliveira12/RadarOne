@@ -227,9 +227,9 @@ export const AdminUsersPage: React.FC = () => {
       const response = await api.request<UsersResponse>(`/api/admin/users?${params.toString()}`, { method: 'GET', skipAutoLogout: true });
       setUsers(response.users);
       setPagination(response.pagination);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar usuários:', err);
-      const errorMessage = err.response?.data?.error || 'Erro ao carregar usuários';
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar usuários';
       setError(errorMessage);
       toast({
         title: 'Erro',
@@ -295,11 +295,12 @@ export const AdminUsersPage: React.FC = () => {
       await loadUsers();
 
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Erro ao ${actionType} usuário:`, err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
       toast({
         title: 'Erro',
-        description: err.response?.data?.error || `Erro ao ${actionType === 'block' ? 'bloquear' : 'desbloquear'} usuário`,
+        description: errorMessage || `Erro ao ${actionType === 'block' ? 'bloquear' : 'desbloquear'} usuário`,
         status: 'error',
         duration: 5000,
         isClosable: true,

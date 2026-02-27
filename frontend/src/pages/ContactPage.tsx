@@ -53,8 +53,9 @@ export const ContactPage: React.FC = () => {
       setSuccess(true);
       setSubject('');
       setMessage('');
-    } catch (err: any) {
-      setError(err.message || t('contact.sendError'));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || t('contact.sendError'));
     } finally {
       setSubmitting(false);
     }

@@ -43,8 +43,8 @@ interface AuditLog {
   action: string;
   targetType: string;
   targetId: string | null;
-  beforeData: any;
-  afterData: any;
+  beforeData: Record<string, unknown> | null;
+  afterData: Record<string, unknown> | null;
   ipAddress: string | null;
   userAgent: string | null;
   createdAt: string;
@@ -207,9 +207,9 @@ export const AdminAuditLogsPage: React.FC = () => {
       const response = await api.request<AuditLogsResponse>(`/api/admin/audit-logs?${params}`, { method: 'GET', skipAutoLogout: true });
       setLogs(response.logs);
       setPagination(response.pagination);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao buscar audit logs:', err);
-      setError(err.message || 'Erro ao carregar audit logs');
+      setError(err instanceof Error ? err.message : 'Erro ao carregar audit logs');
     } finally {
       setLoading(false);
     }

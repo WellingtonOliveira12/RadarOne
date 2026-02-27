@@ -13,8 +13,9 @@ export function HealthCheckPage() {
       setStatus('');
       const data = await api.get<{ status: string; service: string }>('/health');
       setStatus(`${data.status} - ${data.service}`);
-    } catch (err: any) {
-      setError(err.message || 'Erro inesperado');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || 'Erro inesperado');
     } finally {
       setLoading(false);
     }

@@ -55,7 +55,7 @@ test.describe('Auth: Trial Expired → Redirect (NO Logout)', () => {
             'Content-Type': 'application/json',
           },
         });
-      } catch (err) {
+      } catch {
         // Erro esperado, interceptor vai processar
       }
     });
@@ -112,7 +112,7 @@ test.describe('Auth: Trial Expired → Redirect (NO Logout)', () => {
             'Content-Type': 'application/json',
           },
         });
-      } catch (err) {
+      } catch {
         // Erro esperado
       }
     });
@@ -131,16 +131,16 @@ test.describe('Auth: Trial Expired → Redirect (NO Logout)', () => {
 
   test('deve rastrear evento analytics ao redirecionar para /plans', async ({ page }) => {
     // Setup: capturar eventos GA4
-    const analyticsEvents: any[] = [];
-    await page.exposeFunction('captureAnalyticsEvent', (event: any) => {
+    const analyticsEvents: Record<string, unknown>[] = [];
+    await page.exposeFunction('captureAnalyticsEvent', (event: Record<string, unknown>) => {
       analyticsEvents.push(event);
     });
 
     // Interceptar chamadas gtag/GA4
     await page.addInitScript(() => {
-      (window as any).gtag = (...args: any[]) => {
+      (window as Record<string, unknown>).gtag = (...args: unknown[]) => {
         if (args[0] === 'event') {
-          (window as any).captureAnalyticsEvent({
+          (window as Record<string, unknown> & { captureAnalyticsEvent: (e: Record<string, unknown>) => void }).captureAnalyticsEvent({
             event: args[1],
             params: args[2],
           });
@@ -175,7 +175,7 @@ test.describe('Auth: Trial Expired → Redirect (NO Logout)', () => {
             'Content-Type': 'application/json',
           },
         });
-      } catch (err) {
+      } catch {
         // Esperado
       }
     });

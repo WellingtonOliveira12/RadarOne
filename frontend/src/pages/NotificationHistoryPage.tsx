@@ -133,11 +133,12 @@ export function NotificationHistoryPage() {
       setNotifications(response.data);
       setTotalPages(response.pagination.totalPages);
       setTotal(response.pagination.total);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
       console.error('Erro ao buscar notificações:', err);
 
       // Se for erro 401, fazer logout
-      if (err.message?.includes('401') || err.message?.includes('autenticado')) {
+      if (message?.includes('401') || message?.includes('autenticado')) {
         logout();
         return;
       }

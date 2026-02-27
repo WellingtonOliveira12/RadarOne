@@ -221,7 +221,7 @@ export const AdminCouponsPage: React.FC = () => {
       const token = getToken();
       const response = await api.request<{ plans: Plan[] }>('/api/plans', { method: 'GET', token, skipAutoLogout: true });
       setPlans(response.plans || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar planos:', err);
     }
   };
@@ -248,8 +248,9 @@ export const AdminCouponsPage: React.FC = () => {
       setCoupons(response.coupons);
       setPagination(response.pagination);
       setError('');
-    } catch (err: any) {
-      setError(err.message || 'Erro ao carregar cupons');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao carregar cupons';
+      setError(message);
       console.error('Erro ao carregar cupons:', err);
     } finally {
       setLoading(false);
@@ -278,11 +279,11 @@ export const AdminCouponsPage: React.FC = () => {
       );
 
       setAnalytics(response);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar analytics:', err);
       toast({
         title: 'Erro ao carregar analytics',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 3000,
       });
@@ -303,11 +304,11 @@ export const AdminCouponsPage: React.FC = () => {
 
       setDetailedStats(response);
       onDetailsOpen();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar detalhes do cupom:', err);
       toast({
         title: 'Erro ao carregar detalhes',
-        description: err.message || 'Não foi possível carregar os detalhes do cupom',
+        description: err instanceof Error ? err.message : 'Não foi possível carregar os detalhes do cupom',
         status: 'error',
         duration: 3000,
       });
@@ -389,10 +390,10 @@ export const AdminCouponsPage: React.FC = () => {
       onCreateClose();
       resetForm();
       loadCoupons();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao criar cupom',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 5000,
       });
@@ -434,10 +435,10 @@ export const AdminCouponsPage: React.FC = () => {
       setEditingCoupon(null);
       resetForm();
       loadCoupons();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao atualizar cupom',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 5000,
       });
@@ -458,10 +459,10 @@ export const AdminCouponsPage: React.FC = () => {
       });
 
       loadCoupons();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao alterar status',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 5000,
       });
@@ -482,10 +483,10 @@ export const AdminCouponsPage: React.FC = () => {
       });
 
       loadCoupons();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao deletar cupom',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 5000,
       });
@@ -529,10 +530,10 @@ export const AdminCouponsPage: React.FC = () => {
         status: 'success',
         duration: 3000,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao exportar cupons',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 5000,
       });
@@ -627,10 +628,10 @@ export const AdminCouponsPage: React.FC = () => {
 
       setSelectedCouponIds(new Set());
       loadCoupons();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao ativar cupons',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 5000,
       });
@@ -658,10 +659,10 @@ export const AdminCouponsPage: React.FC = () => {
 
       setSelectedCouponIds(new Set());
       loadCoupons();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao desativar cupons',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 5000,
       });
@@ -712,10 +713,10 @@ export const AdminCouponsPage: React.FC = () => {
 
       setSelectedCouponIds(new Set());
       loadCoupons();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao deletar cupons',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 5000,
       });
@@ -766,10 +767,10 @@ export const AdminCouponsPage: React.FC = () => {
       });
 
       loadCoupons();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao importar CSV',
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
         status: 'error',
         duration: 5000,
       });

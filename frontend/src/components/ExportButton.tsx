@@ -87,11 +87,12 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
         duration: 3000,
         isClosable: true,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao exportar:', error);
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
       toast({
         title: 'Erro ao exportar',
-        description: error.message || 'Não foi possível exportar os dados',
+        description: message || 'Não foi possível exportar os dados',
         status: 'error',
         duration: 5000,
         isClosable: true,

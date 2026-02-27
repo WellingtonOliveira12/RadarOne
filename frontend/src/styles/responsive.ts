@@ -178,14 +178,14 @@ export const hideOnMobile = {
   '@media (max-width: 480px)': {
     display: 'none',
   },
-} as any;
+} as Record<string, unknown>;
 
 // Utility: Esconder em desktop
 export const hideOnDesktop = {
   '@media (min-width: 769px)': {
     display: 'none',
   },
-} as any;
+} as Record<string, unknown>;
 
 // Utility: Stack em mobile, row em desktop
 export const stackMobile = {
@@ -195,4 +195,4 @@ export const stackMobile = {
   '@media (min-width: 769px)': {
     flexDirection: 'row',
   },
-} as any;
+} as Record<string, unknown>;

@@ -21,7 +21,7 @@ interface User {
   name: string;
   phone?: string;
   role: 'USER' | 'ADMIN' | 'ADMIN_SUPER' | 'ADMIN_SUPPORT' | 'ADMIN_FINANCE' | 'ADMIN_READ';
-  subscriptions?: any[];
+  subscriptions?: Array<Record<string, unknown>>;
 }
 
 // Erro especial quando 2FA é necessário
@@ -172,12 +172,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               // Não limpa auth — preserva token para próxima tentativa do usuário
             }
             return; // Request completou (sucesso ou erro HTTP), sair do loop
-          } catch (fetchError: any) {
+          } catch (fetchError: unknown) {
             clearTimeout(timeoutId);
-            const isRetryable = fetchError.name === 'AbortError' || fetchError.name === 'TypeError';
+            const fetchErr = fetchError instanceof Error ? fetchError : new Error('Unknown error');
+            const isRetryable = fetchErr.name === 'AbortError' || fetchErr.name === 'TypeError';
 
             if (isRetryable && attempt < maxAttempts - 1) {
-              console.warn(`[AuthContext] Tentativa ${attempt + 1}/${maxAttempts} falhou (${fetchError.name}), retentando em ${retryDelays[attempt]}ms...`);
+              console.warn(`[AuthContext] Tentativa ${attempt + 1}/${maxAttempts} falhou (${fetchErr.name}), retentando em ${retryDelays[attempt]}ms...`);
               await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
               continue;
             }
@@ -213,7 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Login completo (sem 2FA ou 2FA já verificado)
     setToken(response.token);
     // Log de diagnóstico: verificar dados de subscription no login
-    const subs = (response.user as any)?.subscriptions;
+    const subs = (response.user as Record<string, unknown>)?.subscriptions as Array<Record<string, unknown>> | undefined;
     if (subs && subs.length > 0) {
       const s = subs[0];
       console.log(`[AuthContext:login] Subscription: status=${s.status}, trialEndsAt=${s.trialEndsAt}, plan=${s.plan?.slug}`);
@@ -266,6 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

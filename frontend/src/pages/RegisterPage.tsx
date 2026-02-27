@@ -127,11 +127,12 @@ export const RegisterPage: React.FC = () => {
       } else {
         navigate('/plans');
       }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || t('auth.registerError');
-      const errorCode = err.response?.data?.errorCode;
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { status?: number; data?: { error?: string; errorCode?: string } }; message?: string };
+      const errorMessage = apiErr.response?.data?.error || apiErr.message || t('auth.registerError');
+      const errorCode = apiErr.response?.data?.errorCode;
 
-      if (errorCode === 'USER_ALREADY_EXISTS' || err.response?.status === 409) {
+      if (errorCode === 'USER_ALREADY_EXISTS' || apiErr.response?.status === 409) {
         setError('user_exists');
       } else {
         setError(errorMessage);

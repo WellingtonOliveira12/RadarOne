@@ -200,9 +200,9 @@ export const AdminSubscriptionsPage: React.FC = () => {
       );
       setSubscriptions(response.subscriptions);
       setPagination(response.pagination);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar subscriptions:', err);
-      const errorMessage = err.response?.data?.error || 'Erro ao carregar assinaturas';
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar assinaturas';
       setError(errorMessage);
       toast({
         title: 'Erro',

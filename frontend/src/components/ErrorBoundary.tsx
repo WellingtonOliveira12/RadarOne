@@ -238,7 +238,7 @@ export class ErrorBoundary extends Component<Props, State> {
 declare global {
   interface Window {
     Sentry?: {
-      captureException: (error: Error, context?: any) => void;
+      captureException: (error: Error, context?: Record<string, unknown>) => void;
       captureMessage: (message: string, level?: string) => void;
     };
   }

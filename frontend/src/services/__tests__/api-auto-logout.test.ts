@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Mock logout BEFORE importing api
 const mockLogout = vi.fn();
 vi.mock('../../lib/logout', () => ({
-  logout: (...args: any[]) => mockLogout(...args),
+  logout: (...args: unknown[]) => mockLogout(...args),
 }));
 
 vi.mock('../../lib/auth', () => ({
@@ -16,6 +16,13 @@ vi.mock('../../lib/analytics', () => ({
 
 import { api } from '../api';
 
+interface CaughtApiError extends Error {
+  status?: number;
+  errorCode?: string;
+  isNetworkError?: boolean;
+  isColdStart?: boolean;
+}
+
 describe('api auto-logout behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,8 +33,8 @@ describe('api auto-logout behavior', () => {
     vi.restoreAllMocks();
   });
 
-  function mockFetchResponse(status: number, body: any) {
-    (globalThis.fetch as any).mockImplementation(() =>
+  function mockFetchResponse(status: number, body: Record<string, unknown>) {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: status >= 200 && status < 300,
         status,
@@ -38,12 +45,12 @@ describe('api auto-logout behavior', () => {
   }
 
   function mockFetchNetworkError() {
-    (globalThis.fetch as any).mockRejectedValue(new TypeError('Failed to fetch'));
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new TypeError('Failed to fetch'));
   }
 
   function mockFetchTimeout() {
     const error = new DOMException('The operation was aborted', 'AbortError');
-    (globalThis.fetch as any).mockRejectedValue(error);
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(error);
   }
 
   // =====================================================
@@ -133,7 +140,7 @@ describe('api auto-logout behavior', () => {
   // =====================================================
   it('requestWithRetry should retry on network error and succeed', async () => {
     // First call fails, second succeeds
-    (globalThis.fetch as any)
+    (globalThis.fetch as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new TypeError('Failed to fetch'))
       .mockResolvedValueOnce({
         ok: true,
@@ -175,10 +182,11 @@ describe('api auto-logout behavior', () => {
 
     try {
       await api.request('/api/test', { method: 'GET' });
-    } catch (error: any) {
-      expect(error.message).not.toContain('Verifique sua internet');
-      expect(error.message).toContain('Não foi possível conectar ao servidor');
-      expect(error.isColdStart).toBe(true);
+    } catch (error: unknown) {
+      const err = error as CaughtApiError;
+      expect(err.message).not.toContain('Verifique sua internet');
+      expect(err.message).toContain('Não foi possível conectar ao servidor');
+      expect(err.isColdStart).toBe(true);
     }
   });
 
@@ -188,15 +196,15 @@ describe('api auto-logout behavior', () => {
   it('should NOT call logout on 401 with INVALID_2FA_CODE', async () => {
     mockFetchResponse(401, { errorCode: 'INVALID_2FA_CODE', message: 'Código inválido' });
 
-    let caught: any;
+    let caught: CaughtApiError | undefined;
     try {
       await api.request('/api/auth/2fa/verify', { method: 'POST', body: { userId: 'x', code: '000000' }, skipAutoLogout: true });
-    } catch (err: any) {
-      caught = err;
+    } catch (err: unknown) {
+      caught = err as CaughtApiError;
     }
     expect(caught).toBeDefined();
-    expect(caught.message).toBe('Código inválido');
-    expect(caught.errorCode).toBe('INVALID_2FA_CODE');
+    expect(caught!.message).toBe('Código inválido');
+    expect(caught!.errorCode).toBe('INVALID_2FA_CODE');
     expect(mockLogout).not.toHaveBeenCalled();
   });
 
@@ -214,16 +222,16 @@ describe('api auto-logout behavior', () => {
   it('2FA verify error should contain errorCode and message from backend', async () => {
     mockFetchResponse(401, { errorCode: 'INVALID_2FA_CODE', message: 'Código inválido' });
 
-    let caught: any;
+    let caught: CaughtApiError | undefined;
     try {
       await api.request('/api/auth/2fa/verify', { method: 'POST', body: { userId: 'x', code: '000000' }, skipAutoLogout: true });
-    } catch (error: any) {
-      caught = error;
+    } catch (error: unknown) {
+      caught = error as CaughtApiError;
     }
     expect(caught).toBeDefined();
-    expect(caught.errorCode).toBe('INVALID_2FA_CODE');
-    expect(caught.message).toBe('Código inválido');
-    expect(caught.status).toBe(401);
+    expect(caught!.errorCode).toBe('INVALID_2FA_CODE');
+    expect(caught!.message).toBe('Código inválido');
+    expect(caught!.status).toBe(401);
   });
 
   // =====================================================
@@ -240,7 +248,7 @@ describe('api auto-logout behavior', () => {
     });
 
     // Verificar que fetch foi chamado com o header correto
-    const fetchCall = (globalThis.fetch as any).mock.calls[0];
+    const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const fetchOptions = fetchCall[1];
     expect(fetchOptions.headers['Authorization']).toBe('Bearer my-temp-token-123');
   });
@@ -252,46 +260,46 @@ describe('api auto-logout behavior', () => {
   it('401 error should propagate with original status, not become NETWORK_ERROR', async () => {
     mockFetchResponse(401, { errorCode: 'INVALID_2FA_CODE', message: 'Código inválido' });
 
-    let caught: any;
+    let caught: CaughtApiError | undefined;
     try {
       await api.request('/api/test', { method: 'POST', skipAutoLogout: true });
-    } catch (err: any) {
-      caught = err;
+    } catch (err: unknown) {
+      caught = err as CaughtApiError;
     }
     expect(caught).toBeDefined();
-    expect(caught.status).toBe(401);
-    expect(caught.errorCode).not.toBe('NETWORK_ERROR');
-    expect(caught.isNetworkError).toBeUndefined();
+    expect(caught!.status).toBe(401);
+    expect(caught!.errorCode).not.toBe('NETWORK_ERROR');
+    expect(caught!.isNetworkError).toBeUndefined();
   });
 
   it('400 validation error should propagate with original message, not NETWORK_ERROR', async () => {
     mockFetchResponse(400, { errorCode: 'VALIDATION_ERROR', message: 'Dados inválidos' });
 
-    let caught: any;
+    let caught: CaughtApiError | undefined;
     try {
       await api.request('/api/test', { method: 'POST', skipAutoLogout: true });
-    } catch (err: any) {
-      caught = err;
+    } catch (err: unknown) {
+      caught = err as CaughtApiError;
     }
     expect(caught).toBeDefined();
-    expect(caught.status).toBe(400);
-    expect(caught.errorCode).toBe('VALIDATION_ERROR');
-    expect(caught.message).toBe('Dados inválidos');
+    expect(caught!.status).toBe(400);
+    expect(caught!.errorCode).toBe('VALIDATION_ERROR');
+    expect(caught!.message).toBe('Dados inválidos');
   });
 
   it('500 error should propagate with original status, not become NETWORK_ERROR', async () => {
     mockFetchResponse(500, { errorCode: 'INTERNAL_ERROR', message: 'Server error' });
 
-    let caught: any;
+    let caught: CaughtApiError | undefined;
     try {
       await api.request('/api/test', { method: 'POST', skipAutoLogout: true });
-    } catch (err: any) {
-      caught = err;
+    } catch (err: unknown) {
+      caught = err as CaughtApiError;
     }
     expect(caught).toBeDefined();
-    expect(caught.status).toBe(500);
-    expect(caught.errorCode).toBe('INTERNAL_ERROR');
-    expect(caught.isNetworkError).toBeUndefined();
+    expect(caught!.status).toBe(500);
+    expect(caught!.errorCode).toBe('INTERNAL_ERROR');
+    expect(caught!.isNetworkError).toBeUndefined();
   });
 
   it('should NOT call logout on 403 TRIAL_EXPIRED', async () => {

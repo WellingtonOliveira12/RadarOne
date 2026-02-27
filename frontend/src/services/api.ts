@@ -9,7 +9,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface RequestOptions {
   method?: HttpMethod;
-  body?: any;
+  body?: unknown;
   token?: string | null;
   timeout?: number; // Timeout em ms (default: 30000)
   skipAutoLogout?: boolean; // Desabilita logout automático em 401 (para chamadas não-críticas)
@@ -73,7 +73,21 @@ async function refreshAccessToken(): Promise<string | null> {
 export interface ApiError {
   errorCode: string;
   message: string;
-  details?: any;
+  details?: unknown;
+}
+
+/**
+ * Extended Error with API-specific properties
+ * Used internally to attach status, errorCode, etc. to thrown errors
+ */
+interface ApiExtendedError extends Error {
+  status: number;
+  errorCode?: string;
+  isNetworkError?: boolean;
+  isColdStart?: boolean;
+  originalError?: unknown;
+  data?: unknown;
+  response?: { status: number; data: unknown };
 }
 
 /**
@@ -97,7 +111,7 @@ function handleSubscriptionError(errorCode?: string, status?: number): void {
  * Extrai errorCode de forma segura do response
  * Backend padronizado sempre retorna ApiError
  */
-function getErrorCode(data: any): string | undefined {
+function getErrorCode(data: Record<string, unknown>): string | undefined {
   // Priorizar errorCode (padrão novo)
   if (data?.errorCode) {
     return data.errorCode;
@@ -115,7 +129,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function apiRequest<T = any>(
+async function apiRequest<T = unknown>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
@@ -136,7 +150,7 @@ async function apiRequest<T = any>(
   // Timeout configurável para evitar spinner infinito quando backend não responde
   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 
-  let lastError: any = null;
+  let lastError: unknown = null;
 
   // Loop de tentativas (1 + retries)
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -182,21 +196,24 @@ async function apiRequest<T = any>(
       // Se chegou aqui, a requisição foi bem sucedida (mas pode ter erro HTTP)
       return await processResponse<T>(res, options);
 
-    } catch (fetchError: any) {
+    } catch (fetchError: unknown) {
       clearTimeout(timeoutId);
       lastError = fetchError;
 
       // Se o erro veio de processResponse (tem status HTTP), propagar direto
       // Não é erro de rede — é erro de aplicação (401, 400, 500, etc)
-      if (fetchError.status && fetchError.status > 0) {
+      const fetchErr = fetchError as Partial<ApiExtendedError>;
+      if (fetchErr.status && fetchErr.status > 0) {
         throw fetchError;
       }
 
       // Verificar se é erro de rede/timeout que pode ser retentado
+      const errName = fetchError instanceof Error ? fetchError.name : '';
+      const errMessage = fetchError instanceof Error ? fetchError.message : '';
       const isRetryableError =
-        fetchError.name === 'AbortError' || // Timeout
-        fetchError.name === 'TypeError' ||  // Network error (fetch falhou)
-        fetchError.message?.includes('fetch'); // Outros erros de fetch
+        errName === 'AbortError' || // Timeout
+        errName === 'TypeError' ||  // Network error (fetch falhou)
+        errMessage.includes('fetch'); // Outros erros de fetch
 
       // Se ainda tem tentativas e é erro retentável
       if (attempt < maxRetries && isRetryableError) {
@@ -208,12 +225,12 @@ async function apiRequest<T = any>(
       }
 
       // Sem mais tentativas ou erro não retentável
-      if (fetchError.name === 'AbortError') {
-        const error: any = new Error(
+      if (errName === 'AbortError') {
+        const error = new Error(
           maxRetries > 0
             ? 'O servidor não respondeu após várias tentativas. O servidor pode estar iniciando, tente novamente em instantes.'
             : 'O servidor não respondeu. Tente novamente em alguns instantes.'
-        );
+        ) as ApiExtendedError;
         error.status = 0;
         error.errorCode = 'NETWORK_TIMEOUT';
         error.isNetworkError = true;
@@ -222,11 +239,11 @@ async function apiRequest<T = any>(
       }
 
       // Erro de rede genérico (sem internet, DNS, cold start do servidor, etc)
-      const error: any = new Error(
+      const error = new Error(
         maxRetries > 0
           ? 'Não foi possível conectar ao servidor após várias tentativas. O servidor pode estar iniciando, tente novamente em instantes.'
           : 'Não foi possível conectar ao servidor. Tente novamente em alguns instantes.'
-      );
+      ) as ApiExtendedError;
       error.status = 0;
       error.errorCode = 'NETWORK_ERROR';
       error.isNetworkError = true;
@@ -246,12 +263,12 @@ async function apiRequest<T = any>(
 async function processResponse<T>(res: Response, options: RequestOptions): Promise<T> {
 
   const text = await res.text();
-  let data: any;
+  let data: unknown;
 
   // Detectar quando backend retorna HTML em vez de JSON (ex: SPA fallback incorreto)
   const contentType = res.headers.get('content-type') || '';
   if (contentType.includes('text/html') && text.includes('<!doctype html')) {
-    const error: any = new Error('Serviço temporariamente indisponível. Tente novamente.');
+    const error = new Error('Serviço temporariamente indisponível. Tente novamente.') as ApiExtendedError;
     error.status = 503;
     error.errorCode = 'SERVICE_UNAVAILABLE';
     error.isNetworkError = true;
@@ -263,7 +280,7 @@ async function processResponse<T>(res: Response, options: RequestOptions): Promi
   } catch {
     // Se não for JSON válido, pode ser erro de configuração
     if (text.includes('<html') || text.includes('<!DOCTYPE')) {
-      const error: any = new Error('Serviço temporariamente indisponível.');
+      const error = new Error('Serviço temporariamente indisponível.') as ApiExtendedError;
       error.status = 503;
       error.errorCode = 'SERVICE_UNAVAILABLE';
       error.isNetworkError = true;
@@ -275,11 +292,12 @@ async function processResponse<T>(res: Response, options: RequestOptions): Promi
   if (!res.ok) {
     // Backend padronizado: { errorCode, message, details? }
     // Fallback: { error, message } (formato antigo durante migração)
+    const dataObj = (typeof data === 'object' && data !== null ? data : {}) as Record<string, unknown>;
     const msg =
-      (data && (data.message || data.error)) ||
+      (dataObj && ((dataObj.message as string) || (dataObj.error as string))) ||
       `Erro na requisição (${res.status})`;
 
-    const errorCode = getErrorCode(data);
+    const errorCode = getErrorCode(dataObj);
 
     // ============================================
     // REGRA DETERMINÍSTICA (SEM HEURÍSTICA)
@@ -302,7 +320,7 @@ async function processResponse<T>(res: Response, options: RequestOptions): Promi
     }
 
     // 3. Criar erro tipado para propagação
-    const error: any = new Error(msg);
+    const error = new Error(msg) as ApiExtendedError;
     error.status = res.status;
     error.errorCode = errorCode;
     error.message = msg;
@@ -319,7 +337,7 @@ async function processResponse<T>(res: Response, options: RequestOptions): Promi
  * Faz request com retry automático para lidar com cold start do Render
  * Use para operações críticas onde retry faz sentido (ex: login)
  */
-async function apiRequestWithRetry<T = any>(
+async function apiRequestWithRetry<T = unknown>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
@@ -332,23 +350,23 @@ async function apiRequestWithRetry<T = any>(
 }
 
 export const api = {
-  get: <T = any>(path: string, token?: string | null) =>
+  get: <T = unknown>(path: string, token?: string | null) =>
     apiRequest<T>(path, { method: 'GET', token }),
-  post: <T = any>(path: string, body?: any, token?: string | null) =>
+  post: <T = unknown>(path: string, body?: unknown, token?: string | null) =>
     apiRequest<T>(path, { method: 'POST', body, token }),
-  put: <T = any>(path: string, body?: any, token?: string | null) =>
+  put: <T = unknown>(path: string, body?: unknown, token?: string | null) =>
     apiRequest<T>(path, { method: 'PUT', body, token }),
-  patch: <T = any>(path: string, body?: any, token?: string | null) =>
+  patch: <T = unknown>(path: string, body?: unknown, token?: string | null) =>
     apiRequest<T>(path, { method: 'PATCH', body, token }),
-  delete: <T = any>(path: string, token?: string | null) =>
+  delete: <T = unknown>(path: string, token?: string | null) =>
     apiRequest<T>(path, { method: 'DELETE', token }),
 
   // Método com opções completas (para casos especiais)
-  request: <T = any>(path: string, options: RequestOptions) =>
+  request: <T = unknown>(path: string, options: RequestOptions) =>
     apiRequest<T>(path, options),
 
   // Método com retry automático para cold start (login, operações críticas)
-  requestWithRetry: <T = any>(path: string, options: RequestOptions) =>
+  requestWithRetry: <T = unknown>(path: string, options: RequestOptions) =>
     apiRequestWithRetry<T>(path, options),
 };
 

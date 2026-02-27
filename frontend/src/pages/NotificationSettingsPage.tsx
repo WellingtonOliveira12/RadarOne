@@ -54,15 +54,16 @@ export const NotificationSettingsPage: React.FC = () => {
       setEmailEnabled(data.emailEnabled !== false);
       setTelegramEnabled(data.telegramEnabled === true);
       setTelegramUsername(data.telegramUsername || '');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; message?: string };
       const isDev = import.meta.env.DEV;
       if (isDev) {
         console.error('NotificationSettings: Erro ao carregar', {
           endpoint: '/api/notifications/settings',
-          status: err.status,
-          message: err.message
+          status: apiErr.status,
+          message: apiErr.message
         });
-        setError(`${t('notification.errorLoad')} (${err.status || 'Network'})`);
+        setError(`${t('notification.errorLoad')} (${apiErr.status || 'Network'})`);
       } else {
         setError(t('notification.errorLoad'));
       }
@@ -92,16 +93,17 @@ export const NotificationSettingsPage: React.FC = () => {
 
       setSuccess(t('notification.saved'));
       loadSettings();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; message?: string };
       const isDev = import.meta.env.DEV;
       if (isDev) {
         console.error('NotificationSettings: Erro ao salvar', {
           endpoint: '/api/notifications/settings',
-          status: err.status,
-          message: err.message
+          status: apiErr.status,
+          message: apiErr.message
         });
       }
-      setError(err.message || t('notification.errorSave'));
+      setError(apiErr.message || t('notification.errorSave'));
     } finally {
       setSaving(false);
     }
@@ -115,8 +117,9 @@ export const NotificationSettingsPage: React.FC = () => {
       const data = await api.post('/api/notifications/telegram/link-code', {});
       setLinkCodeData(data);
       setShowLinkCodeModal(true);
-    } catch (err: any) {
-      setError(err.message || t('notification.errorLinkCode'));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || t('notification.errorLinkCode'));
     } finally {
       setGeneratingCode(false);
     }
@@ -130,8 +133,9 @@ export const NotificationSettingsPage: React.FC = () => {
     try {
       await api.post('/api/notifications/test-telegram', {});
       setSuccess(t('notification.testSent'));
-    } catch (err: any) {
-      setError(err.message || t('notification.errorTestTelegram'));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || t('notification.errorTestTelegram'));
     } finally {
       setTestingTelegram(false);
     }

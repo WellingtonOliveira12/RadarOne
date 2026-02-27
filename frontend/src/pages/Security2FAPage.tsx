@@ -69,11 +69,12 @@ export const Security2FAPage: React.FC = () => {
         skipAutoLogout: true,
       });
       setStatus(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar status de 2FA:', error);
+      const apiErr = error as { response?: { data?: { error?: string } } };
       toast({
         title: 'Erro',
-        description: error.response?.data?.error || 'Erro ao carregar status de 2FA',
+        description: apiErr.response?.data?.error || 'Erro ao carregar status de 2FA',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -101,10 +102,11 @@ export const Security2FAPage: React.FC = () => {
         duration: 3000,
         isClosable: true,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiErr = error as { response?: { data?: { error?: string } } };
       toast({
         title: 'Erro',
-        description: error.response?.data?.error || 'Erro ao configurar 2FA',
+        description: apiErr.response?.data?.error || 'Erro ao configurar 2FA',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -142,10 +144,11 @@ export const Security2FAPage: React.FC = () => {
       setSetupData(null);
       setVerificationCode('');
       await loadStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiErr = error as { response?: { data?: { error?: string } } };
       toast({
         title: 'Erro',
-        description: error.response?.data?.error || 'Código inválido',
+        description: apiErr.response?.data?.error || 'Código inválido',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -173,11 +176,12 @@ export const Security2FAPage: React.FC = () => {
       setDisablePassword('');
       onDisableClose();
       await loadStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Mostrar erro específico sem fazer logout
-      const errorMessage = error.response?.data?.error ||
-        error.data?.error ||
-        error.message ||
+      const apiErr = error as { response?: { data?: { error?: string } }; data?: { error?: string }; message?: string };
+      const errorMessage = apiErr.response?.data?.error ||
+        apiErr.data?.error ||
+        apiErr.message ||
         'Senha incorreta';
 
       toast({
@@ -211,11 +215,12 @@ export const Security2FAPage: React.FC = () => {
       });
 
       await loadStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Mostrar erro específico sem fazer logout
-      const errorMessage = error.response?.data?.error ||
-        error.data?.error ||
-        error.message ||
+      const apiErr = error as { response?: { data?: { error?: string } }; data?: { error?: string }; message?: string };
+      const errorMessage = apiErr.response?.data?.error ||
+        apiErr.data?.error ||
+        apiErr.message ||
         'Senha incorreta';
 
       toast({

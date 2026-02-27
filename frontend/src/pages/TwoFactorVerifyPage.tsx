@@ -37,7 +37,7 @@ interface VerifyResponse {
   authStep: string;
   message: string;
   token: string;
-  user: any;
+  user: { role?: string };
   warningBackupCode?: boolean;
 }
 
@@ -113,12 +113,13 @@ export function TwoFactorVerifyPage() {
         const isAdmin = response.user?.role?.startsWith('ADMIN');
         navigate(isAdmin ? '/admin/stats' : '/dashboard', { replace: true });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Diferenciar erro de rede vs erro de validação
-      const isNetworkError = err.isNetworkError || err.errorCode === 'NETWORK_ERROR' || err.errorCode === 'NETWORK_TIMEOUT';
+      const apiErr = err as { isNetworkError?: boolean; errorCode?: string; message?: string };
+      const isNetworkError = apiErr.isNetworkError || apiErr.errorCode === 'NETWORK_ERROR' || apiErr.errorCode === 'NETWORK_TIMEOUT';
       const errorMessage = isNetworkError
         ? 'Servidor indisponível. Tente novamente em instantes.'
-        : (err.message || 'Código inválido');
+        : (apiErr.message || 'Código inválido');
       setError(errorMessage);
       showError(errorMessage);
     } finally {

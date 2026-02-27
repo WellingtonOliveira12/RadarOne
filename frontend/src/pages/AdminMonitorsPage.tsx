@@ -21,9 +21,10 @@ export const AdminMonitorsPage: React.FC = () => {
       const response = await api.request(`/api/admin/monitors?page=${pagination.page}&limit=20`, { method: 'GET', skipAutoLogout: true });
       setMonitors(response.monitors);
       setPagination(response.pagination);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Erro ao carregar monitores');
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || 'Erro ao carregar monitores');
     } finally {
       setLoading(false);
     }

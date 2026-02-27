@@ -232,20 +232,21 @@ export function MonitorsPage() {
       });
       setMonitors(data.data);
       setHasSubscription(true);
-    } catch (err: any) {
-      const errorCode = err.errorCode || err.response?.data?.errorCode;
-      if (errorCode === 'NO_SUBSCRIPTION' || err.message?.includes('precisa assinar')) {
+    } catch (err: unknown) {
+      const apiErr = err as { errorCode?: string; response?: { status?: number; data?: { errorCode?: string; error?: string } }; message?: string };
+      const errorCode = apiErr.errorCode || apiErr.response?.data?.errorCode;
+      if (errorCode === 'NO_SUBSCRIPTION' || apiErr.message?.includes('precisa assinar')) {
         setHasSubscription(false);
         setError(t('monitors.subscriptionRequired'));
         return;
       }
 
-      if (err.response?.status === 403 || err.message?.includes('limite')) {
+      if (apiErr.response?.status === 403 || apiErr.message?.includes('limite')) {
         setError(
-          err.response?.data?.error || t('monitors.errorLimitReached')
+          apiErr.response?.data?.error || t('monitors.errorLimitReached')
         );
       } else {
-        setError(err.message || t('monitors.errorFetch'));
+        setError(apiErr.message || t('monitors.errorFetch'));
       }
     } finally {
       setLoadingLista(false);
@@ -275,7 +276,7 @@ export function MonitorsPage() {
         }
       }
 
-      const body: any = {
+      const body: Record<string, unknown> = {
         name,
         site,
         mode,
@@ -307,13 +308,14 @@ export function MonitorsPage() {
       // reset
       resetForm();
       await fetchMonitors();
-    } catch (err: any) {
-      if (err.response?.status === 403 || err.message?.includes('limite')) {
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { status?: number; data?: { error?: string } }; message?: string };
+      if (apiErr.response?.status === 403 || apiErr.message?.includes('limite')) {
         setError(
-          err.response?.data?.error || t('monitors.errorLimitReached')
+          apiErr.response?.data?.error || t('monitors.errorLimitReached')
         );
       } else {
-        setError(err.message || t('monitors.errorSave'));
+        setError(apiErr.message || t('monitors.errorSave'));
       }
     } finally {
       setSaving(false);
@@ -368,8 +370,9 @@ export function MonitorsPage() {
 
       await api.delete(`/api/monitors/${id}`, token);
       await fetchMonitors();
-    } catch (err: any) {
-      const errorMessage = err.data?.message || err.message || t('monitors.errorDelete');
+    } catch (err: unknown) {
+      const apiErr = err as { data?: { message?: string }; message?: string };
+      const errorMessage = apiErr.data?.message || apiErr.message || t('monitors.errorDelete');
       setError(errorMessage);
     }
   }, [t]);

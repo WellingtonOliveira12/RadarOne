@@ -118,7 +118,7 @@ export const PlansPage: React.FC = () => {
       const data = await response.json();
       setPlans(data);
       trackViewPlans();
-    } catch (err: any) {
+    } catch {
       setError(t('plans.loadError'));
     } finally {
       setLoading(false);
@@ -181,8 +181,8 @@ export const PlansPage: React.FC = () => {
       showInfo(`${t('plans.couponSuccessTitle')} ${data.message}`);
       await refetchUser();
 
-    } catch (err: any) {
-      const errorMessage = err.message || t('plans.loadError');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : t('plans.loadError');
       setCouponError(errorMessage);
 
       trackCouponValidationFailed({
@@ -248,8 +248,8 @@ export const PlansPage: React.FC = () => {
 
       showInfo(t('plans.discountValidatedTitle'));
 
-    } catch (err: any) {
-      const errorMessage = err.message || t('plans.loadError');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : t('plans.loadError');
       setDiscountCouponError(errorMessage);
 
       trackCouponValidationFailed({
@@ -326,8 +326,9 @@ export const PlansPage: React.FC = () => {
 
       await refetchUser();
       navigate('/dashboard');
-    } catch (err: any) {
-      setError(t('plans.trialError') + err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(t('plans.trialError') + message);
     } finally {
       setTrialLoading(false);
     }

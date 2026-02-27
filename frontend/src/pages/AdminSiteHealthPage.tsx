@@ -87,8 +87,9 @@ export function AdminSiteHealthPage() {
       setSites(sorted);
       setError(null);
       setLastRefresh(new Date());
-    } catch (err: any) {
-      setError(err.message || 'Erro ao carregar dados');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || 'Erro ao carregar dados');
     } finally {
       setLoading(false);
     }

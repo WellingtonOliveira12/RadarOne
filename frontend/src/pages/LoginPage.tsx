@@ -75,7 +75,7 @@ export function LoginPage() {
       } else {
         navigate('/dashboard', { replace: true });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(coldStartTimer);
 
       // Verificar se é erro de 2FA necessário
@@ -92,10 +92,11 @@ export function LoginPage() {
       }
 
       // Verificar se é erro de cold start para mensagem mais amigável
-      const isColdStartError = err.isColdStart || err.errorCode === 'NETWORK_TIMEOUT';
+      const apiErr = err as { isColdStart?: boolean; errorCode?: string; message?: string };
+      const isColdStartError = apiErr.isColdStart || apiErr.errorCode === 'NETWORK_TIMEOUT';
       const errorMessage = isColdStartError
         ? t('auth.coldStartError')
-        : (err.message || t('auth.loginError'));
+        : (apiErr.message || t('auth.loginError'));
 
       setError(errorMessage);
       showError(errorMessage);

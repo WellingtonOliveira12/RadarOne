@@ -80,17 +80,18 @@ export const DashboardPage: React.FC = () => {
         monitorsCount: subData.usage.monitorsCreated,
         sitesCount: subData.usage.uniqueSitesCount || 0
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; errorCode?: string; message?: string; data?: unknown };
       const isDev = import.meta.env.DEV;
       if (isDev) {
         console.error('Dashboard: Erro ao carregar dados', {
           endpoint: '/api/subscriptions/my',
-          status: err.status,
-          errorCode: err.errorCode,
-          message: err.message,
-          data: err.data
+          status: apiErr.status,
+          errorCode: apiErr.errorCode,
+          message: apiErr.message,
+          data: apiErr.data
         });
-        setError(t('dashboard.errorDev', { status: err.status || 'Network', code: err.errorCode || 'UNKNOWN' }));
+        setError(t('dashboard.errorDev', { status: apiErr.status || 'Network', code: apiErr.errorCode || 'UNKNOWN' }));
       } else {
         setError(t('dashboard.errorProd'));
       }

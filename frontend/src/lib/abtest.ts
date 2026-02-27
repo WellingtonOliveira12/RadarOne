@@ -93,7 +93,7 @@ export function getABMessage(testKey: 'couponUpgradeTitle'): string;
 export function getABMessage(testKey: 'couponUpgradeSubtitle'): string;
 export function getABMessage(testKey: 'couponDiscountTitle'): string;
 export function getABMessage(testKey: 'couponDiscountSubtitle'): string;
-export function getABMessage(testKey: ABTestKey, ...args: any[]): string {
+export function getABMessage(testKey: ABTestKey, ...args: unknown[]): string {
   const variant = getABVariant(testKey);
   const message = AB_TEST_VARIANTS[testKey][variant];
 
@@ -162,7 +162,7 @@ export function getABTestState(): Record<ABTestKey, ABVariant> {
  * Helper para debug em console
  */
 if (import.meta.env.DEV) {
-  (window as any).abtest = {
+  (window as Record<string, unknown>).abtest = {
     getVariant: getABVariant,
     getMessage: getABMessage,
     force: forceABVariant,

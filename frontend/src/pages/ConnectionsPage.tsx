@@ -57,6 +57,7 @@ import {
   FileUp,
   ArrowLeft,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import { AppLayout } from '../components/AppLayout';
@@ -86,6 +87,7 @@ export interface ProviderConfig {
   playwrightCommand: string;       // comando Playwright para gerar sessão
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
   MERCADO_LIVRE: {
     providerKey: 'MERCADO_LIVRE',
@@ -120,6 +122,7 @@ function getProviderConfig(siteId: string): ProviderConfig {
  * @param providerDisplayName - nome do provider para mensagens de erro (ex: 'Mercado Livre')
  * @param loginUrl - URL de login para mensagens de erro (ex: 'mercadolivre.com.br')
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function validateAndNormalizeSessionFile(
   content: string,
   requiredDomains?: string[],
@@ -136,7 +139,7 @@ export function validateAndNormalizeSessionFile(
   const displayName = providerDisplayName || 'Mercado Livre';
   const url = loginUrl || 'mercadolivre.com.br';
 
-  let data: any;
+  let data: unknown;
   try {
     data = JSON.parse(content);
   } catch {
@@ -151,7 +154,7 @@ export function validateAndNormalizeSessionFile(
     if (data.length === 0) {
       return { valid: false, error: `O arquivo está vazio (nenhum cookie encontrado). Faça login no ${displayName} primeiro.` };
     }
-    const hasProvider = data.some((c: any) => matchesDomain(c.domain));
+    const hasProvider = data.some((c: Record<string, unknown>) => matchesDomain(c.domain as string | undefined));
     if (!hasProvider) {
       return {
         valid: false,
@@ -167,20 +170,22 @@ export function validateAndNormalizeSessionFile(
     return { valid: false, error: 'Formato não reconhecido. O arquivo deve ser um JSON de sessão (.json).' };
   }
 
-  if (!data.cookies || !Array.isArray(data.cookies)) {
+  const storageState = data as Record<string, unknown>;
+
+  if (!storageState.cookies || !Array.isArray(storageState.cookies)) {
     return { valid: false, error: 'Arquivo inválido: campo "cookies" não encontrado. Verifique se exportou o arquivo correto.' };
   }
 
-  if (!Array.isArray(data.origins)) {
+  if (!Array.isArray(storageState.origins)) {
     // Tolerante: se não tem origins, cria vazio
-    data.origins = [];
+    storageState.origins = [];
   }
 
-  if (data.cookies.length === 0) {
+  if (storageState.cookies.length === 0) {
     return { valid: false, error: `Nenhum cookie encontrado no arquivo. Faça login no ${displayName} antes de exportar.` };
   }
 
-  const providerCookies = data.cookies.filter((c: any) => matchesDomain(c.domain));
+  const providerCookies = (storageState.cookies as Record<string, unknown>[]).filter((c: Record<string, unknown>) => matchesDomain(c.domain as string | undefined));
 
   if (providerCookies.length === 0) {
     return {
@@ -189,8 +194,8 @@ export function validateAndNormalizeSessionFile(
     };
   }
 
-  const normalized = JSON.stringify({ cookies: data.cookies, origins: data.origins || [] });
-  return { valid: true, cookiesCount: data.cookies.length, normalized };
+  const normalized = JSON.stringify({ cookies: storageState.cookies, origins: storageState.origins || [] });
+  return { valid: true, cookiesCount: (storageState.cookies as unknown[]).length, normalized };
 }
 
 // ============================================================
@@ -230,7 +235,7 @@ interface SessionsResponse {
 
 function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation();
-  const config: Record<string, { colorScheme: string; icon: any }> = {
+  const config: Record<string, { colorScheme: string; icon: LucideIcon }> = {
     ACTIVE: { colorScheme: 'green', icon: CheckCircle },
     NEEDS_REAUTH: { colorScheme: 'orange', icon: AlertTriangle },
     EXPIRED: { colorScheme: 'red', icon: XCircle },
@@ -425,28 +430,29 @@ function ConnectionWizard({
       });
       onUploadSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Differentiate error types for user
       let message: string;
       let details: string | undefined;
 
-      if (error.isNetworkError || error.errorCode === 'NETWORK_ERROR' || error.errorCode === 'NETWORK_TIMEOUT') {
+      const err = error as Record<string, unknown>;
+      if (err.isNetworkError || err.errorCode === 'NETWORK_ERROR' || err.errorCode === 'NETWORK_TIMEOUT') {
         message = t('connections.errors.networkError');
-        details = `Código: ${error.errorCode || 'NETWORK_ERROR'} | Tentativas: 3`;
-      } else if (error.status === 401) {
+        details = `Código: ${(err.errorCode as string) || 'NETWORK_ERROR'} | Tentativas: 3`;
+      } else if (err.status === 401) {
         message = t('connections.errors.authExpired');
-        details = `HTTP 401 — ${error.errorCode || 'INVALID_TOKEN'}`;
+        details = `HTTP 401 — ${(err.errorCode as string) || 'INVALID_TOKEN'}`;
         setUploadError({ message, details, isAuthError: true });
         return;
-      } else if (error.status === 400) {
-        message = error.message || t('connections.errors.rejected');
-        details = `HTTP 400 — ${error.errorCode || 'VALIDATION_ERROR'}`;
-      } else if (error.status >= 500) {
+      } else if (err.status === 400) {
+        message = (err.message as string) || t('connections.errors.rejected');
+        details = `HTTP 400 — ${(err.errorCode as string) || 'VALIDATION_ERROR'}`;
+      } else if (typeof err.status === 'number' && err.status >= 500) {
         message = t('connections.errors.internalServer');
-        details = `HTTP ${error.status} — ${error.errorCode || 'SERVER_ERROR'}`;
+        details = `HTTP ${err.status} — ${(err.errorCode as string) || 'SERVER_ERROR'}`;
       } else {
-        message = error.message || t('connections.errors.unknownUpload');
-        details = error.status ? `HTTP ${error.status}` : undefined;
+        message = (err.message as string) || t('connections.errors.unknownUpload');
+        details = err.status ? `HTTP ${err.status}` : undefined;
       }
 
       setUploadError({ message, details });
@@ -932,19 +938,20 @@ export default function ConnectionsPage() {
       });
       setSessions(data.sessions || []);
       setSupportedSites(data.supportedSites || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Record<string, unknown>;
       let description = t('connections.errors.unknown');
-      if (error.isNetworkError || error.isColdStart) {
+      if (err.isNetworkError || err.isColdStart) {
         description = t('connections.errors.serverUnavailable');
-      } else if (error.status === 401) {
+      } else if (err.status === 401) {
         description = t('connections.errors.sessionExpired');
         setIsSessionExpired(true);
-      } else if (error.status >= 500) {
+      } else if (typeof err.status === 'number' && err.status >= 500) {
         description = t('connections.errors.serverError');
-      } else if (error.status === 404) {
+      } else if (err.status === 404) {
         description = t('connections.errors.notFound');
-      } else if (error.message) {
-        description = error.message;
+      } else if (err.message) {
+        description = err.message as string;
       }
       setFetchError(description);
     } finally {
@@ -969,10 +976,11 @@ export default function ConnectionsPage() {
       });
       toast({ title: t('connections.errors.deleteSuccess'), status: 'success', duration: 3000 });
       fetchSessions();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
       toast({
         title: t('connections.errors.deleteError'),
-        description: error.message,
+        description: message,
         status: 'error',
         duration: 5000,
       });

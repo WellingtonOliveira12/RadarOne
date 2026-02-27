@@ -160,9 +160,10 @@ export const AdminStatsPage: React.FC = () => {
 
       setStats(statsResponse.data);
       setTemporalStats(temporalResponse);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar estatísticas:', err);
-      setError(err.response?.data?.error || 'Erro ao carregar estatísticas do sistema');
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(message || 'Erro ao carregar estatísticas do sistema');
     } finally {
       setLoading(false);
     }

@@ -51,11 +51,13 @@ export function ResetPasswordPage() {
     // Validação com Zod
     try {
       resetPasswordSchema.parse({ password, confirmPassword });
-    } catch (err: any) {
+    } catch (err: unknown) {
       const validationErrors: Record<string, string> = {};
-      err.errors?.forEach((error: any) => {
-        validationErrors[error.path[0]] = error.message;
-      });
+      if (err instanceof Error && 'errors' in err) {
+        (err as { errors: { path: string[]; message: string }[] }).errors?.forEach((error) => {
+          validationErrors[error.path[0]] = error.message;
+        });
+      }
       setErrors(validationErrors);
       setLoading(false);
       showError(Object.values(validationErrors)[0]);
@@ -73,12 +75,13 @@ export function ResetPasswordPage() {
       setSuccess(true);
       showSuccess('Senha redefinida com sucesso. Você já pode fazer login.');
       trackEvent('password_reset_success', { method: 'email_link' });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
       const errorMessage =
-        err.message || 'Não foi possível redefinir a senha. Tente novamente mais tarde ou solicite um novo link.';
+        message || 'Não foi possível redefinir a senha. Tente novamente mais tarde ou solicite um novo link.';
       showError(errorMessage);
       trackEvent('password_reset_failed', {
-        reason: err.message?.includes('inválido') || err.message?.includes('expirado')
+        reason: message?.includes('inválido') || message?.includes('expirado')
           ? 'invalid_or_expired_token'
           : 'unknown_error',
       });

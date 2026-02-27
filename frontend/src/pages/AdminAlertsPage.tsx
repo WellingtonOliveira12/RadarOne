@@ -40,7 +40,7 @@ interface AdminAlert {
   title: string;
   message: string;
   source?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   isRead: boolean;
   readBy?: string;
   readAt?: string;
@@ -88,9 +88,9 @@ export const AdminAlertsPage: React.FC = () => {
       setAlerts(response.alerts);
       setUnreadCount(response.unreadCount);
       setTotal(response.total);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Erro ao carregar alertas');
+      setError(err instanceof Error ? err.message : 'Erro ao carregar alertas');
     } finally {
       setLoading(false);
     }

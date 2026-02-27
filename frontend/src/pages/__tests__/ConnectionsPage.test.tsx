@@ -25,7 +25,7 @@ const renderPage = () =>
   );
 
 const mockSessionsSuccess = () => {
-  (api.requestWithRetry as any).mockResolvedValue({
+  (api.requestWithRetry as ReturnType<typeof vi.fn>).mockResolvedValue({
     success: true,
     sessions: [],
     supportedSites: [
@@ -52,7 +52,7 @@ describe('ConnectionsPage', () => {
   });
 
   it('renderiza cards via fallback quando API falha', async () => {
-    (api.requestWithRetry as any).mockRejectedValue(new Error('Network error'));
+    (api.requestWithRetry as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network error'));
 
     renderPage();
 
@@ -66,7 +66,7 @@ describe('ConnectionsPage', () => {
   });
 
   it('mostra spinner durante loading', () => {
-    (api.requestWithRetry as any).mockReturnValue(new Promise(() => {}));
+    (api.requestWithRetry as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
     renderPage();
     expect(document.querySelector('.chakra-spinner')).toBeTruthy();
     expect(screen.queryByText('Conexões')).not.toBeInTheDocument();
@@ -128,7 +128,7 @@ describe('ConnectionsPage', () => {
   });
 
   it('wizard mostra aviso de servidor quando fetchError existe', async () => {
-    (api.requestWithRetry as any).mockRejectedValue(new Error('Network error'));
+    (api.requestWithRetry as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network error'));
     renderPage();
 
     await waitFor(() => {
@@ -164,10 +164,10 @@ describe('ConnectionsPage', () => {
   });
 
   it('mostra alerta de sessão expirada com botão de login quando API retorna 401', async () => {
-    const error401: any = new Error('Não autenticado');
+    const error401 = new Error('Não autenticado') as Error & { status: number; errorCode: string };
     error401.status = 401;
     error401.errorCode = 'INVALID_TOKEN';
-    (api.requestWithRetry as any).mockRejectedValue(error401);
+    (api.requestWithRetry as ReturnType<typeof vi.fn>).mockRejectedValue(error401);
 
     renderPage();
 
