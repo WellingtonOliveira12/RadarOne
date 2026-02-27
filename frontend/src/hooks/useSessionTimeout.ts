@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 /**
  * Hook para timeout de sessão por inatividade
@@ -25,7 +25,7 @@ export function useSessionTimeout(
   const timeoutMs = timeoutMinutes * 60 * 1000; // Converter minutos para ms
 
   // Resetar timer de inatividade
-  const resetTimer = () => {
+  const resetTimer = useCallback(() => {
     // Limpar timer anterior
     if (timeoutIdRef.current) {
       clearTimeout(timeoutIdRef.current);
@@ -35,7 +35,7 @@ export function useSessionTimeout(
     timeoutIdRef.current = setTimeout(() => {
       onTimeout();
     }, timeoutMs);
-  };
+  }, [onTimeout, timeoutMs]);
 
   useEffect(() => {
     // Lista de eventos que indicam atividade do usuário
@@ -68,5 +68,5 @@ export function useSessionTimeout(
       });
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [timeoutMs, onTimeout]);
+  }, [resetTimer]);
 }

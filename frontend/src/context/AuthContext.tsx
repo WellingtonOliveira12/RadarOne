@@ -4,6 +4,7 @@ import type { LoginTwoFactorRequiredResponse } from '../services/auth';
 import { getToken, setToken, clearAuth } from '../lib/auth';
 import { logout as globalLogout, isLoggingOut, clearLogoutFlag } from '../lib/logout';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
+import type { Subscription } from '../utils/subscriptionHelpers';
 
 /**
  * Contexto de Autenticação
@@ -21,7 +22,7 @@ interface User {
   name: string;
   phone?: string;
   role: 'USER' | 'ADMIN' | 'ADMIN_SUPER' | 'ADMIN_SUPPORT' | 'ADMIN_FINANCE' | 'ADMIN_READ';
-  subscriptions?: Array<Record<string, unknown>>;
+  subscriptions?: Subscription[];
 }
 
 // Erro especial quando 2FA é necessário
@@ -214,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Login completo (sem 2FA ou 2FA já verificado)
     setToken(response.token);
     // Log de diagnóstico: verificar dados de subscription no login
-    const subs = (response.user as Record<string, unknown>)?.subscriptions as Array<Record<string, unknown>> | undefined;
+    const subs = response.user?.subscriptions;
     if (subs && subs.length > 0) {
       const s = subs[0];
       console.log(`[AuthContext:login] Subscription: status=${s.status}, trialEndsAt=${s.trialEndsAt}, plan=${s.plan?.slug}`);

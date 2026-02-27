@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Heading, Card, CardBody, Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, Center, VStack, Text, Button, HStack, Alert, AlertIcon, AlertTitle, AlertDescription, Box } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
 import { api } from '../services/api';
@@ -11,13 +11,11 @@ export const AdminWebhooksPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
 
-  useEffect(() => { loadLogs(); }, [pagination.page]);
-
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.request(`/api/admin/webhooks?page=${pagination.page}&limit=20`, { method: 'GET', skipAutoLogout: true });
+      const response = await api.request<{ logs: WebhookLog[]; pagination: typeof pagination }>(`/api/admin/webhooks?page=${pagination.page}&limit=20`, { method: 'GET', skipAutoLogout: true });
       setLogs(response.logs);
       setPagination(response.pagination);
     } catch (err: unknown) {
@@ -27,7 +25,9 @@ export const AdminWebhooksPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page]);
+
+  useEffect(() => { loadLogs(); }, [loadLogs]);
 
   if (loading) return <AdminLayout><Center h="400px"><VStack spacing={4}><Spinner size="xl" color="blue.500" thickness="4px" /><Text color="gray.600">Carregando webhooks...</Text></VStack></Center></AdminLayout>;
 

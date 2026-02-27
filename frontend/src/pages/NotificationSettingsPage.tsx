@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Container } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
@@ -40,13 +40,9 @@ export const NotificationSettingsPage: React.FC = () => {
   const [generatingCode, setGeneratingCode] = useState(false);
   const [testingTelegram, setTestingTelegram] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
-      const data = await api.request('/api/notifications/settings', {
+      const data = await api.request<NotificationSettings>('/api/notifications/settings', {
         method: 'GET',
         skipAutoLogout: true,
       });
@@ -70,7 +66,11 @@ export const NotificationSettingsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -114,7 +114,7 @@ export const NotificationSettingsPage: React.FC = () => {
     setError('');
 
     try {
-      const data = await api.post('/api/notifications/telegram/link-code', {});
+      const data = await api.post<LinkCodeData>('/api/notifications/telegram/link-code', {});
       setLinkCodeData(data);
       setShowLinkCodeModal(true);
     } catch (err: unknown) {

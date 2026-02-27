@@ -100,7 +100,7 @@ export function getABMessage(testKey: ABTestKey, ...args: unknown[]): string {
   // Se for função, executar com argumentos usando type assertion segura
   if (typeof message === 'function') {
     // TypeScript-safe: sabemos que se message é function, args vem dos overloads
-    return (message as (arg: number) => string)(args[0]);
+    return (message as (arg: number) => string)(args[0] as number);
   }
 
   return message;
@@ -162,7 +162,7 @@ export function getABTestState(): Record<ABTestKey, ABVariant> {
  * Helper para debug em console
  */
 if (import.meta.env.DEV) {
-  (window as Record<string, unknown>).abtest = {
+  (window as unknown as Record<string, unknown>).abtest = {
     getVariant: getABVariant,
     getMessage: getABMessage,
     force: forceABVariant,

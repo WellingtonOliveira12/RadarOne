@@ -110,11 +110,7 @@ export function NotificationHistoryPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  useEffect(() => {
-    fetchNotifications(page);
-  }, [page]);
-
-  async function fetchNotifications(currentPage: number) {
+  const fetchNotifications = useCallback(async (currentPage: number) => {
     try {
       setLoading(true);
       setError('');
@@ -147,7 +143,11 @@ export function NotificationHistoryPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [logout]);
+
+  useEffect(() => {
+    fetchNotifications(page);
+  }, [page, fetchNotifications]);
 
   const handlePrevPage = useCallback(() => {
     setPage((prev) => prev - 1);

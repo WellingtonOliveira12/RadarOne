@@ -2,7 +2,7 @@
  * FASE 4.4 - Página de Configuração de 2FA (Two-Factor Authentication)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -61,7 +61,7 @@ export const Security2FAPage: React.FC = () => {
 
   const toast = useToast();
 
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.request<TwoFactorStatus>('/api/auth/2fa/status', {
@@ -82,11 +82,11 @@ export const Security2FAPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadStatus();
-  }, []);
+  }, [loadStatus]);
 
   const handleSetup2FA = async () => {
     try {

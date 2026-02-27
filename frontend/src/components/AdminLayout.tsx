@@ -46,7 +46,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   useEffect(() => {
     const fetchUnreadAlerts = async () => {
       try {
-        const response = await api.request('/api/admin/alerts/unread-count', {
+        const response = await api.request<{ count: number }>('/api/admin/alerts/unread-count', {
           method: 'GET',
           skipAutoLogout: true,
         });

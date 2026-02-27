@@ -179,13 +179,8 @@ export function MonitorsPage() {
   // Lista de países (reativa ao idioma) — memoized to avoid recalculating on every render
   const countryList = useMemo(() => getCountryList(i18n.language), [i18n.language]);
 
-  useEffect(() => {
-    fetchMonitors();
-    fetchSessionStatus();
-  }, []);
-
   // Busca status das sessões para sites que requerem login
-  async function fetchSessionStatus() {
+  const fetchSessionStatus = useCallback(async () => {
     try {
       const token = getToken();
       if (!token) return;
@@ -212,9 +207,9 @@ export function MonitorsPage() {
     } catch (err) {
       console.error('Erro ao buscar status de sessões:', err);
     }
-  }
+  }, []);
 
-  async function fetchMonitors() {
+  const fetchMonitors = useCallback(async () => {
     try {
       setLoadingLista(true);
       setError('');
@@ -251,7 +246,12 @@ export function MonitorsPage() {
     } finally {
       setLoadingLista(false);
     }
-  }
+  }, [t]);
+
+  useEffect(() => {
+    fetchMonitors();
+    fetchSessionStatus();
+  }, [fetchMonitors, fetchSessionStatus]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -375,7 +375,7 @@ export function MonitorsPage() {
       const errorMessage = apiErr.data?.message || apiErr.message || t('monitors.errorDelete');
       setError(errorMessage);
     }
-  }, [t]);
+  }, [t, fetchMonitors]);
 
   return (
     <AppLayout>

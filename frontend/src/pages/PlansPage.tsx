@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -86,30 +86,7 @@ export const PlansPage: React.FC = () => {
     description: t('plans.subtitle'),
   });
 
-  useEffect(() => {
-    loadPlans();
-
-    if (!sessionStorage.getItem('coupon_ab_tracked')) {
-      trackABVariantShown('couponUpgradeTitle', 'plans_page');
-      trackABVariantShown('couponDiscountTitle', 'plans_page');
-      sessionStorage.setItem('coupon_ab_tracked', 'true');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (reason === 'trial_expired') {
-      const toastShown = sessionStorage.getItem('trial_expired_toast_shown');
-      if (!toastShown) {
-        const message = getABMessage('trialExpiredToast');
-        showInfo(message);
-        sessionStorage.setItem('trial_expired_toast_shown', 'true');
-        trackTrialExpiredToastShown();
-        trackABVariantShown('trialExpiredToast', 'plans_page_toast');
-      }
-    }
-  }, [reason]);
-
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/plans`);
       if (!response.ok) {
@@ -123,7 +100,30 @@ export const PlansPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadPlans();
+
+    if (!sessionStorage.getItem('coupon_ab_tracked')) {
+      trackABVariantShown('couponUpgradeTitle', 'plans_page');
+      trackABVariantShown('couponDiscountTitle', 'plans_page');
+      sessionStorage.setItem('coupon_ab_tracked', 'true');
+    }
+  }, [loadPlans]);
+
+  useEffect(() => {
+    if (reason === 'trial_expired') {
+      const toastShown = sessionStorage.getItem('trial_expired_toast_shown');
+      if (!toastShown) {
+        const message = getABMessage('trialExpiredToast');
+        showInfo(message);
+        sessionStorage.setItem('trial_expired_toast_shown', 'true');
+        trackTrialExpiredToastShown();
+        trackABVariantShown('trialExpiredToast', 'plans_page_toast');
+      }
+    }
+  }, [reason]);
 
   const handleApplyCoupon = async () => {
     if (!user) {

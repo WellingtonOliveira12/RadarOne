@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Loader2, TrendingUp, CheckCircle2, XCircle, Clock, Activity } from 'lucide-react';
 import { api } from '../services/api';
@@ -58,18 +58,14 @@ export function AdminWorkerMetricsPage() {
   const [performance, setPerformance] = useState<PerformanceMetric[]>([]);
   const [errors, setErrors] = useState<ErrorMetric[]>([]);
 
-  useEffect(() => {
-    loadMetrics();
-  }, []);
-
-  const loadMetrics = async () => {
+  const loadMetrics = useCallback(async () => {
     setLoading(true);
 
     try {
       const [overviewRes, performanceRes, errorsRes] = await Promise.all([
-        api.request('/metrics/overview', { method: 'GET', skipAutoLogout: true }),
-        api.request('/metrics/performance?days=30', { method: 'GET', skipAutoLogout: true }),
-        api.request('/metrics/errors?days=7&limit=5', { method: 'GET', skipAutoLogout: true }),
+        api.request<MetricsOverview>('/metrics/overview', { method: 'GET', skipAutoLogout: true }),
+        api.request<PerformanceMetric[]>('/metrics/performance?days=30', { method: 'GET', skipAutoLogout: true }),
+        api.request<ErrorMetric[]>('/metrics/errors?days=7&limit=5', { method: 'GET', skipAutoLogout: true }),
       ]);
 
       setOverview(overviewRes);
@@ -80,7 +76,11 @@ export function AdminWorkerMetricsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadMetrics();
+  }, [loadMetrics]);
 
   if (loading) {
     return (

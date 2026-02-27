@@ -77,7 +77,7 @@ export function AdminSiteHealthPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const data = await api.request('/api/admin/site-health', {
+      const data = await api.request<SiteHealth[]>('/api/admin/site-health', {
         skipAutoLogout: true,
       });
       const sorted = [...data].sort(

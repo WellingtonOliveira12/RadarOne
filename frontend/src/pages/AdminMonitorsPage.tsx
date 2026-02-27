@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Heading, Card, CardBody, Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, Center, VStack, Text, Button, HStack, Alert, AlertIcon, AlertTitle, AlertDescription, Box } from '@chakra-ui/react';
 import { AdminLayout } from '../components/AdminLayout';
 import { ExportButton } from '../components/ExportButton';
@@ -12,13 +12,11 @@ export const AdminMonitorsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
 
-  useEffect(() => { loadMonitors(); }, [pagination.page]);
-
-  const loadMonitors = async () => {
+  const loadMonitors = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.request(`/api/admin/monitors?page=${pagination.page}&limit=20`, { method: 'GET', skipAutoLogout: true });
+      const response = await api.request<{ monitors: Monitor[]; pagination: typeof pagination }>(`/api/admin/monitors?page=${pagination.page}&limit=20`, { method: 'GET', skipAutoLogout: true });
       setMonitors(response.monitors);
       setPagination(response.pagination);
     } catch (err: unknown) {
@@ -28,7 +26,9 @@ export const AdminMonitorsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page]);
+
+  useEffect(() => { loadMonitors(); }, [loadMonitors]);
 
   if (loading) return (
     <AdminLayout>

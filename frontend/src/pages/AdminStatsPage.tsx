@@ -5,7 +5,7 @@
  * - Análise de tendências e performance
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Box,
   Heading,
@@ -144,18 +144,14 @@ export const AdminStatsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAllStats();
-  }, [period]);
-
-  const loadAllStats = async () => {
+  const loadAllStats = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       const [statsResponse, temporalResponse] = await Promise.all([
-        api.request('/api/admin/stats', { method: 'GET', skipAutoLogout: true }),
-        api.request(`/api/admin/stats/temporal?period=${period}`, { method: 'GET', skipAutoLogout: true }),
+        api.request<{ data: SystemStats }>('/api/admin/stats', { method: 'GET', skipAutoLogout: true }),
+        api.request<TemporalStats>(`/api/admin/stats/temporal?period=${period}`, { method: 'GET', skipAutoLogout: true }),
       ]);
 
       setStats(statsResponse.data);
@@ -167,7 +163,11 @@ export const AdminStatsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [period]);
+
+  useEffect(() => {
+    loadAllStats();
+  }, [loadAllStats]);
 
   // Memoized coupon percentage calculations — placed before early returns to satisfy Rules of Hooks
   const couponUsagePercent = useMemo(() => {
@@ -175,14 +175,14 @@ export const AdminStatsPage: React.FC = () => {
     return stats.coupons.total > 0
       ? `${((stats.coupons.used / stats.coupons.total) * 100).toFixed(1)}%`
       : '0%';
-  }, [stats?.coupons.used, stats?.coupons.total]);
+  }, [stats]);
 
   const couponActivationPercent = useMemo(() => {
     if (!stats) return '0%';
     return stats.coupons.total > 0
       ? `${((stats.coupons.active / stats.coupons.total) * 100).toFixed(1)}%`
       : '0%';
-  }, [stats?.coupons.active, stats?.coupons.total]);
+  }, [stats]);
 
   // Memoized strategic metric calculations
   const blockRatePercent = useMemo(() => {
@@ -190,26 +190,26 @@ export const AdminStatsPage: React.FC = () => {
     return stats.users.total > 0
       ? `${((stats.users.blocked / stats.users.total) * 100).toFixed(1)}%`
       : '0%';
-  }, [stats?.users.blocked, stats?.users.total]);
+  }, [stats]);
 
   const isHighBlockRate = useMemo(() => {
     if (!stats) return false;
     return stats.users.total > 0 && stats.users.blocked / stats.users.total > 0.1;
-  }, [stats?.users.blocked, stats?.users.total]);
+  }, [stats]);
 
   const activationPercent = useMemo(() => {
     if (!stats) return '0%';
     return stats.users.total > 0
       ? `${((stats.users.active / stats.users.total) * 100).toFixed(1)}%`
       : '0%';
-  }, [stats?.users.active, stats?.users.total]);
+  }, [stats]);
 
   const monitorsPerUser = useMemo(() => {
     if (!stats) return '0';
     return stats.users.active > 0
       ? (stats.monitors.total / stats.users.active).toFixed(1)
       : '0';
-  }, [stats?.monitors.total, stats?.users.active]);
+  }, [stats]);
 
   const trialPercent = useMemo(() => {
     if (!stats) return '0% do total';
@@ -218,17 +218,17 @@ export const AdminStatsPage: React.FC = () => {
     return totalSubs > 0
       ? `${((trialCount / totalSubs) * 100).toFixed(1)}% do total`
       : '0% do total';
-  }, [stats?.subscriptions.byStatus]);
+  }, [stats]);
 
   const churnRateColor = useMemo(() => {
     if (!temporalStats) return 'green.600';
     return temporalStats.subscriptions.churnRate.current > 10 ? 'red.600' : 'green.600';
-  }, [temporalStats?.subscriptions.churnRate.current]);
+  }, [temporalStats]);
 
   const jobErrorRateColor = useMemo(() => {
     if (!temporalStats) return 'green.600';
     return temporalStats.jobs.current.errorRate > 5 ? 'red.600' : 'green.600';
-  }, [temporalStats?.jobs.current.errorRate]);
+  }, [temporalStats]);
 
   if (loading) {
     return (

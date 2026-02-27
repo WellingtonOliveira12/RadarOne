@@ -206,11 +206,7 @@ export const AdminUsersPage: React.FC = () => {
   const [actionType, setActionType] = useState<'block' | 'unblock' | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    loadUsers();
-  }, [pagination.page, filters]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -241,7 +237,11 @@ export const AdminUsersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, filters, toast]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));

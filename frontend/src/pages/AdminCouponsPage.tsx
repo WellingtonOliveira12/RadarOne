@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -211,12 +211,7 @@ export const AdminCouponsPage: React.FC = () => {
 
   const toast = useToast();
 
-  useEffect(() => {
-    loadCoupons();
-    loadPlans();
-  }, [pagination.page, filterCode, filterStatus, filterType]);
-
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     try {
       const token = getToken();
       const response = await api.request<{ plans: Plan[] }>('/api/plans', { method: 'GET', token, skipAutoLogout: true });
@@ -224,9 +219,9 @@ export const AdminCouponsPage: React.FC = () => {
     } catch (err: unknown) {
       console.error('Erro ao carregar planos:', err);
     }
-  };
+  }, []);
 
-  const loadCoupons = async () => {
+  const loadCoupons = useCallback(async () => {
     try {
       setLoading(true);
       const token = getToken();
@@ -255,7 +250,12 @@ export const AdminCouponsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, filterCode, filterStatus, filterType]);
+
+  useEffect(() => {
+    loadCoupons();
+    loadPlans();
+  }, [loadCoupons, loadPlans]);
 
   const loadAnalytics = async () => {
     try {
@@ -474,7 +474,7 @@ export const AdminCouponsPage: React.FC = () => {
 
     try {
       const token = getToken();
-      const response = await api.delete(`/api/admin/coupons/${coupon.id}`, token);
+      const response = await api.delete<{ message?: string }>(`/api/admin/coupons/${coupon.id}`, token);
 
       toast({
         title: response.message || 'Cupom deletado',

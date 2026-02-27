@@ -189,7 +189,7 @@ export const AdminAuditLogsPage: React.FC = () => {
     endDate: '',
   });
 
-  const fetchLogs = async (page = 1) => {
+  const fetchLogs = useCallback(async (page = 1) => {
     try {
       setLoading(true);
       setError(null);
@@ -213,11 +213,11 @@ export const AdminAuditLogsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, pagination.limit]);
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [fetchLogs]);
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));

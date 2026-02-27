@@ -957,7 +957,7 @@ export default function ConnectionsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchSessions();

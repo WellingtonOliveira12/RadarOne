@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -56,13 +56,9 @@ export const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
-      const subData = await api.request('/api/subscriptions/my', {
+      const subData = await api.request<{ subscription: Subscription; usage: { monitorsCreated: number; uniqueSitesCount?: number } }>('/api/subscriptions/my', {
         method: 'GET',
         skipAutoLogout: true,
       });
@@ -98,7 +94,11 @@ export const DashboardPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const daysLeft = useMemo(() => {
     if (!subscription?.validUntil) return 0;

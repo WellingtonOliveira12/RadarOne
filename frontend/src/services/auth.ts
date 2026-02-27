@@ -1,10 +1,13 @@
 import { api } from './api';
+import type { Subscription } from '../utils/subscriptionHelpers';
 
 export interface User {
   id: string;
   email: string;
   name: string;
+  phone?: string;
   role: 'USER' | 'ADMIN' | 'ADMIN_SUPER' | 'ADMIN_SUPPORT' | 'ADMIN_FINANCE' | 'ADMIN_READ';
+  subscriptions?: Subscription[];
 }
 
 // Constantes para estados de autenticação (deve corresponder ao backend)

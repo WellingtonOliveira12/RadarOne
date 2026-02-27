@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import { Container } from '@chakra-ui/react';
@@ -32,13 +32,9 @@ export const TelegramConnectionPage: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [showWrongBotModal, setShowWrongBotModal] = useState(false);
 
-  useEffect(() => {
-    loadStatus();
-  }, []);
-
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     try {
-      const data = await api.request('/api/telegram/status', {
+      const data = await api.request<TelegramStatus>('/api/telegram/status', {
         method: 'GET',
         skipAutoLogout: true,
       });
@@ -49,7 +45,11 @@ export const TelegramConnectionPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
 
   const handleGenerateToken = async () => {
     setGenerating(true);
@@ -57,7 +57,7 @@ export const TelegramConnectionPage: React.FC = () => {
     setSuccess('');
 
     try {
-      const data = await api.post('/api/telegram/connect-token', {});
+      const data = await api.post<ConnectTokenData>('/api/telegram/connect-token', {});
       setTokenData(data);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro desconhecido';

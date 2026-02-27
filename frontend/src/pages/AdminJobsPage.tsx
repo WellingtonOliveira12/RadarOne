@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -115,11 +115,7 @@ export const AdminJobsPage: React.FC = () => {
   const [selectedJobName, setSelectedJobName] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
 
-  useEffect(() => {
-    loadJobs();
-  }, [pagination.page, selectedJobName, selectedStatus]);
-
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     try {
       setLoading(true);
       const token = getToken();
@@ -153,7 +149,11 @@ export const AdminJobsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.pageSize, selectedJobName, selectedStatus]);
+
+  useEffect(() => {
+    loadJobs();
+  }, [loadJobs]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

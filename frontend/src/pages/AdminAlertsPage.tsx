@@ -69,11 +69,7 @@ export const AdminAlertsPage: React.FC = () => {
   const [filterSeverity, setFilterSeverity] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
 
-  useEffect(() => {
-    loadAlerts();
-  }, [filterType, filterSeverity, filterStatus]);
-
-  const loadAlerts = async () => {
+  const loadAlerts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -84,7 +80,7 @@ export const AdminAlertsPage: React.FC = () => {
       if (filterStatus === 'unread') params.append('isRead', 'false');
       if (filterStatus === 'read') params.append('isRead', 'true');
 
-      const response = await api.request(`/api/admin/alerts?${params.toString()}`, { method: 'GET', skipAutoLogout: true });
+      const response = await api.request<{ alerts: AdminAlert[]; unreadCount: number; total: number }>(`/api/admin/alerts?${params.toString()}`, { method: 'GET', skipAutoLogout: true });
       setAlerts(response.alerts);
       setUnreadCount(response.unreadCount);
       setTotal(response.total);
@@ -94,7 +90,11 @@ export const AdminAlertsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterType, filterSeverity, filterStatus]);
+
+  useEffect(() => {
+    loadAlerts();
+  }, [loadAlerts]);
 
   const markAsRead = useCallback(async (id: string) => {
     try {
@@ -103,7 +103,7 @@ export const AdminAlertsPage: React.FC = () => {
     } catch (err) {
       console.error(err);
     }
-  }, []);
+  }, [loadAlerts]);
 
   const clearFilters = useCallback(() => {
     setFilterType('');

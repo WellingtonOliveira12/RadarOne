@@ -113,7 +113,7 @@ function handleSubscriptionError(errorCode?: string, status?: number): void {
  */
 function getErrorCode(data: Record<string, unknown>): string | undefined {
   // Priorizar errorCode (padrão novo)
-  if (data?.errorCode) {
+  if (typeof data?.errorCode === 'string') {
     return data.errorCode;
   }
 

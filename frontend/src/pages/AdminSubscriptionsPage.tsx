@@ -178,11 +178,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
 
   const toast = useToast();
 
-  useEffect(() => {
-    loadSubscriptions();
-  }, [pagination.page, filters]);
-
-  const loadSubscriptions = async () => {
+  const loadSubscriptions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -214,7 +210,11 @@ export const AdminSubscriptionsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, filters, toast]);
+
+  useEffect(() => {
+    loadSubscriptions();
+  }, [loadSubscriptions]);
 
   const handleFilterChange = useCallback((key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
