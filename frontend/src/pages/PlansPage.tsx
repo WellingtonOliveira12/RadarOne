@@ -336,10 +336,10 @@ export const PlansPage: React.FC = () => {
 
   // Helper: format plan features
   const formatMonitors = (count: number) =>
-    count === 999 ? t('plans.unlimitedMonitors') : `${count} ${count === 1 ? t('plans.monitors', { count }) : t('plans.monitors_plural', { count })}`;
+    count === 999 ? t('plans.unlimitedMonitors') : count === 1 ? t('plans.monitors', { count }) : t('plans.monitors_plural', { count });
 
   const formatSites = (count: number) =>
-    count === 999 ? t('plans.unlimitedSites') : `${count} ${count === 1 ? t('plans.sites', { count }) : t('plans.sites_plural', { count })}`;
+    count === 999 ? t('plans.unlimitedSites') : count === 1 ? t('plans.sites', { count }) : t('plans.sites_plural', { count });
 
   const formatAlerts = (count: number) =>
     count === 999 ? t('plans.unlimitedAlerts') : t('plans.alerts', { count });
