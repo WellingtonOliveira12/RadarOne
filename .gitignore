@@ -94,8 +94,22 @@ AGENTS.md
 
 # Test artifacts (generated on every run)
 frontend/test-results/
+backend/test-results/
+worker/test-results/
 test-results/
 playwright-report/
+*/playwright-report/
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Backup / temp files
+*.bak
+*.backup
+*.orig
+*.tmp
+*.patch
+.trigger-deploy
 
 # Session/prompt files (ephemeral)
 SESSION_STATUS.md
