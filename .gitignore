@@ -77,7 +77,27 @@ logs/
 .idea/
 *.swp
 
-# AIOS Local (AIOS)
-.aios-core/local/
+# AIOS Framework (runtime — never commit)
+.aios-core/
+.aios/
+
+# AI IDE Configurations (AIOS multi-IDE agents)
+.antigravity/
+.codex/
+.cursor/
+.gemini/
+.github/agents/
+AGENTS.md
+
+# Claude Code local settings
 .claude/settings.local.json
-.aios/install-log.txt
+
+# Test artifacts (generated on every run)
+frontend/test-results/
+test-results/
+playwright-report/
+
+# Session/prompt files (ephemeral)
+SESSION_STATUS.md
+CHECKPOINT_SESSAO.md
+PROMPT_PROXIMA_SESSAO*.md
