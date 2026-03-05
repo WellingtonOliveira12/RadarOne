@@ -1,28 +1,42 @@
+# ==============================================================================
+# RadarOne .gitignore — Professional Node.js + TypeScript + Prisma + Playwright
+# ==============================================================================
+
 # Dependencies
 node_modules/
 .pnp
 .pnp.js
 
-# Testing
-coverage/
-
-# Production
+# Production / Build output
 dist/
 build/
+.next/
+.turbo/
+out/
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Testing / Coverage
+coverage/
+test-results/
+*/test-results/
+playwright-report/
+*/playwright-report/
 
 # Environment variables
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 
 # Credentials (NEVER commit)
 ADMIN_CREDENTIALS.md
 *CREDENTIALS*
+*.key
+*.pem
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -30,88 +44,139 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Editor directories and files
+# Editor / IDE
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Prisma
 prisma/*.db
 prisma/*.db-journal
 
-# Playwright browsers (instalados no build)
+# Playwright browsers (installed at build time)
 pw-browsers/
 worker/pw-browsers/
 
 # Docker
 docker-compose.override.yml
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Auth Sessions (NEVER commit - contains cookies)
+# Auth Sessions (NEVER commit — contains cookies)
 sessions/
 worker/sessions/
 *.base64.txt
 *storageState*.json
 
-# Environment & Secrets (AIOS)
-.env.*.local
-*.key
-*.pem
+# Backup / temp / generated files
+*.bak
+*.backup
+*.orig
+*.tmp
+*.patch
+*.dump
+.trigger-deploy
 
-# Dependencies (AIOS)
-node_modules
-
-# Build & Logs (AIOS)
-logs/
-
-# IDE & OS (AIOS)
-.idea/
-*.swp
-
-# AIOS Framework (runtime — never commit)
+# ==============================================================================
+# AIOS Framework + AI IDE Configurations (local tooling — never commit)
+# ==============================================================================
 .aios-core/
 .aios/
-
-# AI IDE Configurations (AIOS multi-IDE agents)
+.claude/
 .antigravity/
 .codex/
 .cursor/
 .gemini/
 .github/agents/
 AGENTS.md
+CLAUDE.md
 
-# Claude Code local settings
-.claude/settings.local.json
+# ==============================================================================
+# Legacy files removed from repo (still on disk — must stay ignored)
+# ==============================================================================
 
-# Test artifacts (generated on every run)
-frontend/test-results/
-backend/test-results/
-worker/test-results/
-test-results/
-playwright-report/
-*/playwright-report/
-
-# TypeScript build cache
-*.tsbuildinfo
-
-# Backup / temp files
-*.bak
-*.backup
-*.orig
-*.tmp
-*.patch
-.trigger-deploy
-
-# Session/prompt files (ephemeral)
+# Root-level legacy reports/docs
+ADMIN_*.md
+ADVANCED_*.md
+ANTES_E_DEPOIS.md
+AUDITORIA_*.md
+CHANGELOG_*.md
+CHECKPOINT_*.md
+COMANDOS_*.md
+COMMIT_AND_DEPLOY.md
+COMPLETION_REPORT.md
+CORRECOES_*.md
+CUPONS_*.md
+CURRENT_*.md
+CUSTOM_*.md
+DEPLOY*.md
+E2E_*.md
+EMAIL_*.md
+EVOLUTIONARY_*.md
+FINAL_*.md
+FRONTEND_*.md
+IMPLEMENTACAO*.md
+INDEX_*.md
+JOBS_*.md
+KIWIFY_*.md
+LOGIN_*.md
+MOBILE_*.md
+PLANEJAMENTO_*.md
+PROMPT_*.md
+QUALITY_*.md
+QUICK_VALIDATION_GUIDE.md
+RADARONE_*.md
+REFERENCES.md
+RELATORIO_*.md
+RENDER_*.md
+RESUMO*.md
+SEMANA2_*.md
 SESSION_STATUS.md
-CHECKPOINT_SESSAO.md
-PROMPT_PROXIMA_SESSAO*.md
+SETUP.md
+STATUS-*.md
+TELEGRAM_*.md
+TESTING_*.md
+VALIDACAO_*.md
+WORKER_*.md
+Logo\ Radar\ One.png
+
+# Root-level legacy scripts
+audit-ga4.sh
+commit-admin-fixes.sh
+monitor-deploy.sh
+QUICK_TEST.sh
+verify-ga4-production.sh
+
+# Root-level legacy configs
+sentry-alerts-config.json
+RadarOne.postman_collection.json
+RadarOne.environment.json
+
+# Orphan subdirectory
+RadarOne/
+
+# Legacy files inside packages
+backend/PRISMA_SETUP.md
+backend/RENDER_SETUP.md
+backend/WEBHOOK_FIX_PATCH.txt
+backend/deploy.sh
+backend/docs/EMAIL_SETUP.md
+backend/migrations/*.sql
+frontend/FRONTEND_SAAS_SUMMARY.md
+worker/src/index.ts
+worker/src/index-original.ts
+
+# Legacy docs (historical fix/report files)
+docs/*_FIX*.md
+docs/*_REPORT*.md
+docs/*_AUDIT*.md
+docs/*_BUGFIX*.md
+docs/RadarOne_Auditoria_*.md
