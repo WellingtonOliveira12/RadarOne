@@ -144,9 +144,22 @@ export class MarketplaceEngine {
       });
 
       // 3.1 Log final URL after redirects (observability for all sites)
+      const finalUrl = page.url();
       console.log(
-        `NAV_FINAL_URL: ${this.config.site} requested=${monitor.searchUrl} final=${page.url()}`
+        `NAV_FINAL_URL: ${this.config.site} requested=${monitor.searchUrl} final=${finalUrl}`
       );
+
+      // 3.2 Early login redirect detection — abort immediately to save memory
+      //     Facebook redirects to /login when session is invalid, and the login
+      //     page is very heavy (can OOM on 512MB instances).
+      if (this.isLoginRedirect(finalUrl)) {
+        console.warn(
+          `EARLY_LOGIN_DETECTED: ${this.config.site} redirected to login page, aborting immediately`
+        );
+        throw new Error(
+          `LOGIN_REQUIRED: ${this.config.site} redirected to login (early detection)`
+        );
+      }
 
       // 4. Wait for render (with jitter to avoid bot detection)
       await page.waitForTimeout(applyJitter(this.config.renderDelay));
@@ -318,6 +331,23 @@ export class MarketplaceEngine {
           `durationMs=${Date.now() - startTime}`
       );
     }
+  }
+
+  /**
+   * Detects if the final URL is a login/auth redirect.
+   * Used for early abort before the page fully loads (prevents OOM on heavy login pages).
+   */
+  private isLoginRedirect(url: string): boolean {
+    const loginIndicators = [
+      '/login',
+      '/checkpoint',
+      '/accounts/login',
+      'login.php',
+      'signin',
+      '/auth/',
+    ];
+    const lower = url.toLowerCase();
+    return loginIndicators.some((indicator) => lower.includes(indicator));
   }
 
   /**
