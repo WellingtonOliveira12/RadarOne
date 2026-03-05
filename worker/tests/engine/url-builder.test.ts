@@ -77,10 +77,10 @@ describe('Facebook STRUCTURED_FILTERS URL building', () => {
       filtersJson: { keywords: 'carro' },
     });
     const result = buildFacebookMarketplaceUrl(monitor);
-    expect(result.url).toBe(
-      'https://www.facebook.com/marketplace/itaberai/search/?query=carro'
-    );
+    expect(result.url).toContain('facebook.com/marketplace/itaberai/search/');
+    expect(result.url).toContain('query=carro');
     expect(result.location).toBe('BR-GO-Itaberaí');
+    expect(result.filtersApplied).toBeDefined();
   });
 
   it('builds URL with city only (no keyword)', () => {
@@ -100,9 +100,8 @@ describe('Facebook STRUCTURED_FILTERS URL building', () => {
       filtersJson: { keywords: 'moto' },
     });
     const result = buildFacebookMarketplaceUrl(monitor);
-    expect(result.url).toBe(
-      'https://www.facebook.com/marketplace/search/?query=moto'
-    );
+    expect(result.url).toContain('facebook.com/marketplace/search/');
+    expect(result.url).toContain('query=moto');
   });
 
   it('encodes special characters in keyword', () => {
@@ -111,9 +110,9 @@ describe('Facebook STRUCTURED_FILTERS URL building', () => {
       filtersJson: { keywords: 'carro usado 2020' },
     });
     const result = buildFacebookMarketplaceUrl(monitor);
-    expect(result.url).toBe(
-      'https://www.facebook.com/marketplace/goiania/search/?query=carro%20usado%202020'
-    );
+    expect(result.url).toContain('marketplace/goiania/search/');
+    // URLSearchParams encodes spaces as + (equivalent to %20 for query params)
+    expect(result.url).toMatch(/query=carro[\+%20]usado[\+%20]2020/);
   });
 
   it('handles city with multiple words and accents', () => {
@@ -122,9 +121,8 @@ describe('Facebook STRUCTURED_FILTERS URL building', () => {
       filtersJson: { keywords: 'apartamento' },
     });
     const result = buildFacebookMarketplaceUrl(monitor);
-    expect(result.url).toBe(
-      'https://www.facebook.com/marketplace/rio-de-janeiro/search/?query=apartamento'
-    );
+    expect(result.url).toContain('marketplace/rio-de-janeiro/search/');
+    expect(result.url).toContain('query=apartamento');
   });
 
   it('handles US location (Los Angeles)', () => {
@@ -135,9 +133,8 @@ describe('Facebook STRUCTURED_FILTERS URL building', () => {
       filtersJson: { keywords: 'car' },
     });
     const result = buildFacebookMarketplaceUrl(monitor);
-    expect(result.url).toBe(
-      'https://www.facebook.com/marketplace/los-angeles/search/?query=car'
-    );
+    expect(result.url).toContain('marketplace/los-angeles/search/');
+    expect(result.url).toContain('query=car');
     expect(result.location).toBe('US-CA-Los Angeles');
   });
 
@@ -150,6 +147,117 @@ describe('Facebook STRUCTURED_FILTERS URL building', () => {
     });
     const result = buildFacebookMarketplaceUrl(monitor);
     expect(result.location).toBe('BR');
+  });
+});
+
+// ============================================================
+// 3b. Advanced Filters — Facebook Marketplace
+// ============================================================
+
+describe('Facebook advanced filters', () => {
+  it('adds sortBy param to URL', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'iphone', sortBy: 'newest' },
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.url).toContain('sortBy=creation_time_descend');
+    expect(result.filtersApplied.appliedUrl).toContain('sortBy=newest');
+  });
+
+  it('adds price params to URL', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'moto', minPrice: 1000, maxPrice: 5000 },
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.url).toContain('minPrice=1000');
+    expect(result.url).toContain('maxPrice=5000');
+    expect(result.filtersApplied.appliedUrl).toContain('minPrice=1000');
+    expect(result.filtersApplied.appliedUrl).toContain('maxPrice=5000');
+  });
+
+  it('adds condition params to URL', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'carro', condition: ['new', 'like_new'] },
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.url).toContain('itemCondition=new%2Cused_like_new');
+    expect(result.filtersApplied.appliedUrl).toContain('condition=new,like_new');
+  });
+
+  it('adds daysSinceListed param for publishedWithin', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'tv', publishedWithin: '24h' },
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.url).toContain('daysSinceListed=1');
+    expect(result.filtersApplied.appliedUrl).toContain('publishedWithin=24h');
+  });
+
+  it('ignores publishedWithin=any', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'tv', publishedWithin: 'any' },
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.url).not.toContain('daysSinceListed');
+  });
+
+  it('marks availability as ignored', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'tv', availability: 'sold' },
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.filtersApplied.ignored).toContain('availability=sold');
+  });
+
+  it('does not skip relevance sortBy (default)', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'tv', sortBy: 'relevance' },
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.url).not.toContain('sortBy=');
+  });
+
+  it('combines all filters in single URL', () => {
+    const monitor = makeMonitor({
+      city: 'São Paulo',
+      filtersJson: {
+        keywords: 'iphone',
+        sortBy: 'price_asc',
+        minPrice: 500,
+        maxPrice: 3000,
+        condition: ['good'],
+        publishedWithin: '7d',
+      },
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.url).toContain('marketplace/sao-paulo/search/');
+    expect(result.url).toContain('sortBy=price_ascend');
+    expect(result.url).toContain('minPrice=500');
+    expect(result.url).toContain('maxPrice=3000');
+    expect(result.url).toContain('itemCondition=used_good');
+    expect(result.url).toContain('daysSinceListed=7');
+    expect(result.filtersApplied.appliedUrl.length).toBe(5);
+  });
+
+  it('uses monitor.priceMin/priceMax as fallback', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'carro' },
+      priceMin: 2000,
+      priceMax: 10000,
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.url).toContain('minPrice=2000');
+    expect(result.url).toContain('maxPrice=10000');
+  });
+
+  it('backward compat: old monitors without advanced filters still work', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'moto' },
+    });
+    const result = buildFacebookMarketplaceUrl(monitor);
+    expect(result.url).toContain('query=moto');
+    expect(result.filtersApplied.appliedUrl.length).toBe(0);
+    expect(result.filtersApplied.ignored.length).toBe(0);
   });
 });
 

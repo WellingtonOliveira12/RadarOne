@@ -80,6 +80,30 @@ export class MonitorRunner {
               monitorId: monitor.id,
               mode: 'STRUCTURED_FILTERS',
             });
+
+            // Log advanced filter application details
+            const fa = buildResult.filtersApplied;
+            if (fa.appliedUrl.length > 0) {
+              log.info('FILTERS_APPLIED_URL', {
+                monitorId: monitor.id,
+                site: monitor.site,
+                filters: fa.appliedUrl,
+              });
+            }
+            if (fa.appliedPostProcess.length > 0) {
+              log.info('FILTERS_APPLIED_POST_PROCESS', {
+                monitorId: monitor.id,
+                site: monitor.site,
+                filters: fa.appliedPostProcess,
+              });
+            }
+            if (fa.ignored.length > 0) {
+              log.info('FILTERS_IGNORED_UNSUPPORTED', {
+                monitorId: monitor.id,
+                site: monitor.site,
+                filters: fa.ignored,
+              });
+            }
           } else if (!monitor.searchUrl) {
             // No URL builder for this site AND no searchUrl → skip
             log.info('MONITOR_SKIPPED: STRUCTURED_FILTERS without URL builder or searchUrl', {

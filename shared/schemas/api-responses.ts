@@ -10,6 +10,7 @@
  */
 
 import { z } from 'zod';
+import { AdvancedFiltersSchema } from './monitor-filters';
 
 // ============================================
 // RESPONSE WRAPPER PADRÃO
@@ -115,12 +116,19 @@ export const MonitorSiteEnum = z.enum([
   'ICARROS', 'ZAP_IMOVEIS', 'VIVA_REAL', 'IMOVELWEB', 'LEILAO', 'OUTRO',
 ]);
 
+export const MonitorModeEnum = z.enum(['URL_ONLY', 'STRUCTURED_FILTERS']);
+
 export const CreateMonitorRequestSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(100),
   site: MonitorSiteEnum,
+  mode: MonitorModeEnum.optional(),
   searchUrl: z.string().url('URL inválida').optional(),
+  filtersJson: AdvancedFiltersSchema.optional(),
   priceMin: z.number().min(0).optional(),
   priceMax: z.number().min(0).optional(),
+  country: z.string().regex(/^[A-Z]{2}$/).nullable().optional(),
+  stateRegion: z.string().min(2).max(40).nullable().optional(),
+  city: z.string().min(2).max(80).nullable().optional(),
   keywords: z.array(z.string()).optional(),
   excludeKeywords: z.array(z.string()).optional(),
 });

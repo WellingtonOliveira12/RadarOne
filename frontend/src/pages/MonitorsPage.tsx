@@ -25,6 +25,11 @@ type MonitorSite =
 
 type MonitorMode = 'URL_ONLY' | 'STRUCTURED_FILTERS';
 
+type SortByValue = 'relevance' | 'newest' | 'price_asc' | 'price_desc';
+type ConditionValue = 'new' | 'like_new' | 'good' | 'fair';
+type PublishedWithinValue = 'any' | '24h' | '7d' | '30d';
+type AvailabilityValue = 'available' | 'sold';
+
 interface StructuredFilters {
   keywords?: string;
   minPrice?: number;
@@ -32,6 +37,11 @@ interface StructuredFilters {
   minYear?: number;
   maxYear?: number;
   category?: string;
+  // Advanced filters (Facebook Marketplace)
+  sortBy?: SortByValue;
+  condition?: ConditionValue[];
+  publishedWithin?: PublishedWithinValue;
+  availability?: AvailabilityValue;
 }
 
 interface Monitor {
@@ -91,7 +101,35 @@ const DEFAULT_FILTERS: StructuredFilters = {
   minYear: undefined,
   maxYear: undefined,
   category: '',
+  sortBy: undefined,
+  condition: undefined,
+  publishedWithin: undefined,
+  availability: undefined,
 };
+
+// Sites that support advanced filters
+const SITES_WITH_ADVANCED_FILTERS: MonitorSite[] = ['FACEBOOK_MARKETPLACE'];
+
+const SORT_BY_OPTIONS: { value: SortByValue; labelKey: string }[] = [
+  { value: 'relevance', labelKey: 'monitors.advancedFilters.sortByRelevance' },
+  { value: 'newest', labelKey: 'monitors.advancedFilters.sortByNewest' },
+  { value: 'price_asc', labelKey: 'monitors.advancedFilters.sortByPriceAsc' },
+  { value: 'price_desc', labelKey: 'monitors.advancedFilters.sortByPriceDesc' },
+];
+
+const CONDITION_OPTIONS: { value: ConditionValue; labelKey: string }[] = [
+  { value: 'new', labelKey: 'monitors.advancedFilters.conditionNew' },
+  { value: 'like_new', labelKey: 'monitors.advancedFilters.conditionLikeNew' },
+  { value: 'good', labelKey: 'monitors.advancedFilters.conditionGood' },
+  { value: 'fair', labelKey: 'monitors.advancedFilters.conditionFair' },
+];
+
+const PUBLISHED_WITHIN_OPTIONS: { value: PublishedWithinValue; labelKey: string }[] = [
+  { value: 'any', labelKey: 'monitors.advancedFilters.publishedAny' },
+  { value: '24h', labelKey: 'monitors.advancedFilters.published24h' },
+  { value: '7d', labelKey: 'monitors.advancedFilters.published7d' },
+  { value: '30d', labelKey: 'monitors.advancedFilters.published30d' },
+];
 
 interface MonitorRowProps {
   monitor: Monitor;
@@ -348,7 +386,10 @@ export function MonitorsPage() {
     setCity(monitor.city || '');
 
     if (monitor.mode === 'STRUCTURED_FILTERS' && monitor.filtersJson) {
-      setFilters(monitor.filtersJson);
+      setFilters({
+        ...DEFAULT_FILTERS,
+        ...monitor.filtersJson,
+      });
     } else {
       setFilters({ ...DEFAULT_FILTERS });
     }
@@ -733,6 +774,75 @@ export function MonitorsPage() {
                 />
                 <p style={styles.helpText}>{t('monitors.baseUrlHint')}</p>
               </div>
+
+              {/* Advanced Filters — Facebook Marketplace only */}
+              {SITES_WITH_ADVANCED_FILTERS.includes(site) && (
+                <div style={styles.advancedFiltersBox}>
+                  <h4 style={styles.advancedFiltersTitle}>{t('monitors.advancedFilters.title')}</h4>
+                  <p style={styles.helpText}>{t('monitors.advancedFilters.subtitle')}</p>
+
+                  <div style={styles.advancedFiltersGrid}>
+                    {/* Sort By */}
+                    <div style={styles.field}>
+                      <label style={styles.labelSmall}>{t('monitors.advancedFilters.sortBy')}</label>
+                      <select
+                        value={filters.sortBy || 'relevance'}
+                        onChange={(e) =>
+                          setFilters({ ...filters, sortBy: e.target.value as SortByValue })
+                        }
+                        style={styles.input}
+                      >
+                        {SORT_BY_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {t(opt.labelKey)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Published Within */}
+                    <div style={styles.field}>
+                      <label style={styles.labelSmall}>{t('monitors.advancedFilters.publishedWithin')}</label>
+                      <select
+                        value={filters.publishedWithin || 'any'}
+                        onChange={(e) =>
+                          setFilters({ ...filters, publishedWithin: e.target.value as PublishedWithinValue })
+                        }
+                        style={styles.input}
+                      >
+                        {PUBLISHED_WITHIN_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {t(opt.labelKey)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Condition (multi-select via checkboxes) */}
+                    <div style={styles.field}>
+                      <label style={styles.labelSmall}>{t('monitors.advancedFilters.condition')}</label>
+                      <div style={styles.checkboxGroup}>
+                        {CONDITION_OPTIONS.map((opt) => (
+                          <label key={opt.value} style={styles.checkboxItem}>
+                            <input
+                              type="checkbox"
+                              checked={filters.condition?.includes(opt.value) || false}
+                              onChange={(e) => {
+                                const current = filters.condition || [];
+                                const updated = e.target.checked
+                                  ? [...current, opt.value]
+                                  : current.filter((c) => c !== opt.value);
+                                setFilters({ ...filters, condition: updated.length > 0 ? updated : undefined });
+                              }}
+                            />
+                            <span>{t(opt.labelKey)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1019,6 +1129,39 @@ const styles = {
   filtersGrid: {
     ...responsive.grid,
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
+  },
+  advancedFiltersBox: {
+    backgroundColor: '#f0fdf4',
+    padding: '16px',
+    borderRadius: '8px',
+    border: '1px solid #bbf7d0',
+    marginTop: '16px',
+  },
+  advancedFiltersTitle: {
+    fontSize: '15px',
+    fontWeight: '600' as const,
+    color: '#166534',
+    marginTop: 0,
+    marginBottom: '4px',
+  },
+  advancedFiltersGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
+    gap: '16px',
+    marginTop: '12px',
+  },
+  checkboxGroup: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '6px',
+    marginTop: '4px',
+  },
+  checkboxItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '13px',
+    cursor: 'pointer',
   },
   checkboxLabel: {
     display: 'flex',

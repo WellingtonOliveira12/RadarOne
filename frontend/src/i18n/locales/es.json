@@ -306,6 +306,28 @@
       "minYear": "Año mínimo",
       "maxYear": "Año máximo"
     },
+    "advancedFilters": {
+      "title": "Filtros avanzados",
+      "subtitle": "Filtros específicos de Facebook Marketplace, aplicados directamente a la búsqueda.",
+      "sortBy": "Clasificar por",
+      "sortByRelevance": "Sugerencias",
+      "sortByNewest": "Más recientes",
+      "sortByPriceAsc": "Menor precio",
+      "sortByPriceDesc": "Mayor precio",
+      "condition": "Condición",
+      "conditionNew": "Nuevo",
+      "conditionLikeNew": "Usado como nuevo",
+      "conditionGood": "Bueno",
+      "conditionFair": "Regular",
+      "publishedWithin": "Fecha de publicación",
+      "publishedAny": "Cualquiera",
+      "published24h": "Últimas 24 horas",
+      "published7d": "Últimos 7 días",
+      "published30d": "Últimos 30 días",
+      "availability": "Disponibilidad",
+      "availabilityAvailable": "Disponibles",
+      "availabilitySold": "Vendidos"
+    },
     "session": {
       "connected": "Cuenta conectada",
       "connectedDesc": "Su cuenta de {{site}} está conectada. El monitor funcionará automáticamente.",

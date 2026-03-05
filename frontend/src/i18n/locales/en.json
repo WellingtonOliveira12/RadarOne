@@ -306,6 +306,28 @@
       "minYear": "Min year",
       "maxYear": "Max year"
     },
+    "advancedFilters": {
+      "title": "Advanced filters",
+      "subtitle": "Facebook Marketplace specific filters, applied directly to the search.",
+      "sortBy": "Sort by",
+      "sortByRelevance": "Suggestions",
+      "sortByNewest": "Newest first",
+      "sortByPriceAsc": "Lowest price",
+      "sortByPriceDesc": "Highest price",
+      "condition": "Condition",
+      "conditionNew": "New",
+      "conditionLikeNew": "Used - Like new",
+      "conditionGood": "Good",
+      "conditionFair": "Fair",
+      "publishedWithin": "Date listed",
+      "publishedAny": "Any time",
+      "published24h": "Last 24 hours",
+      "published7d": "Last 7 days",
+      "published30d": "Last 30 days",
+      "availability": "Availability",
+      "availabilityAvailable": "Available",
+      "availabilitySold": "Sold"
+    },
     "session": {
       "connected": "Account connected",
       "connectedDesc": "Your {{site}} account is connected. The monitor will work automatically.",
