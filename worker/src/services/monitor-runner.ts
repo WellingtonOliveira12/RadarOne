@@ -128,7 +128,7 @@ export class MonitorRunner {
           monitor.site
         );
 
-        // Se não existe sessão e site requer auth → SKIPPED
+        // Se não existe sessão e site requer auth → SKIPPED + notify user
         if (!sessionStatus.exists) {
           log.info('MONITOR_SKIPPED: Sessão necessária mas não configurada', {
             monitorId: monitor.id,
@@ -141,6 +141,9 @@ export class MonitorRunner {
             error: 'SESSION_REQUIRED: Este site requer conexão de conta',
             executionTime: Date.now() - startTime,
           });
+
+          // Notify user proactively that session setup is needed
+          await this.sendSessionRequiredNotification(monitor);
 
           // NÃO incrementa circuit breaker!
           return;
@@ -395,6 +398,80 @@ export class MonitorRunner {
           },
         });
         log.info('REAUTH_NOTIFICATION: Enviado por Email', {
+          monitorId: monitor.id,
+          userId: monitor.userId,
+          site: monitor.site,
+        });
+      } catch (e) {
+        // Ignora erro de notificação
+      }
+    }
+  }
+
+  /** In-memory cooldown map for SESSION_REQUIRED notifications (userId:site → timestamp) */
+  private static sessionRequiredCooldown = new Map<string, number>();
+
+  /**
+   * Sends a proactive notification when a monitor requires session setup.
+   * Uses a 6h in-memory cooldown to avoid spamming.
+   */
+  private static async sendSessionRequiredNotification(monitor: any): Promise<void> {
+    const cooldownKey = `${monitor.userId}:${monitor.site}`;
+    const cooldownMs = 6 * 60 * 60 * 1000; // 6 hours
+    const lastNotified = this.sessionRequiredCooldown.get(cooldownKey);
+
+    if (lastNotified && Date.now() - lastNotified < cooldownMs) {
+      return; // Within cooldown, skip notification
+    }
+
+    this.sessionRequiredCooldown.set(cooldownKey, Date.now());
+
+    const telegramChatId =
+      monitor.user.notificationSettings?.telegramChatId ||
+      monitor.user.telegramAccounts?.[0]?.chatId ||
+      null;
+
+    const siteName = this.formatSiteName(monitor.site);
+    const connectionsUrl = 'https://radarone.com.br/dashboard/connections';
+    const safeName = TelegramService.escapeHtml(monitor.name);
+
+    const telegramMessage =
+      `\u26A0\uFE0F <b>Conexão Necessária — ${siteName}</b>\n\n` +
+      `O monitor "<b>${safeName}</b>" precisa que você conecte sua conta do ${siteName} para funcionar.\n\n` +
+      `<b>O que fazer:</b>\n` +
+      `1. Acesse <a href="${connectionsUrl}">Connections</a>\n` +
+      `2. Conecte sua conta do ${siteName}\n` +
+      `3. Seus monitores começarão a funcionar automaticamente\n\n` +
+      `Sem a conexão, os monitores do ${siteName} ficam pausados.`;
+
+    if (telegramChatId) {
+      try {
+        await TelegramService.sendMessage(telegramChatId, telegramMessage);
+        log.info('SESSION_REQUIRED_NOTIFICATION: Enviado por Telegram', {
+          monitorId: monitor.id,
+          userId: monitor.userId,
+          site: monitor.site,
+        });
+      } catch (e) {
+        // Ignora erro de notificação
+      }
+    }
+
+    if (monitor.user.email && emailService.isEnabled()) {
+      try {
+        await emailService.sendAdAlert({
+          to: monitor.user.email,
+          monitorName: `[CONEXÃO NECESSÁRIA] ${siteName}`,
+          ad: {
+            title: `Conecte sua conta do ${siteName}`,
+            description:
+              `O monitor "${monitor.name}" precisa que você conecte sua conta. ` +
+              `Acesse Connections e conecte sua conta do ${siteName} para ativar o monitoramento.`,
+            url: connectionsUrl,
+            price: undefined,
+          },
+        });
+        log.info('SESSION_REQUIRED_NOTIFICATION: Enviado por Email', {
           monitorId: monitor.id,
           userId: monitor.userId,
           site: monitor.site,

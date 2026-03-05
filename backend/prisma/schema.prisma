@@ -337,7 +337,7 @@ model PushSubscription {
 enum MonitorSite {
   MERCADO_LIVRE
   OLX
-  FACEBOOK_MARKETPLACE // Mantido por compatibilidade - Scraper não disponível
+  FACEBOOK_MARKETPLACE // Requires cookies_required auth (user session upload)
   WEBMOTORS // Portal de veículos
   ICARROS // Portal de veículos
   ZAP_IMOVEIS // Portal de imóveis

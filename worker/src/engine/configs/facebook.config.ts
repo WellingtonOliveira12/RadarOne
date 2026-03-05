@@ -27,29 +27,27 @@ export const facebookConfig: SiteConfig = {
       'a[href*="/marketplace/item/"]',
       'div[data-testid="marketplace_feed_item"]',
       'div[role="listitem"]',
-      'div[class*="x9f619"][class*="x78zum5"]',
     ],
     title: [
       'span[dir="auto"]',
-      'span[class*="x1lliihq"]',
     ],
     price: [
-      'span[class*="x193iq5w"]',
       'span[dir="auto"]',
     ],
     link: [
       'a[href*="/marketplace/item/"]',
     ],
     location: [
-      'span[class*="x1cp"]',
+      'span[dir="auto"]',
     ],
     image: [
       'img[src*="scontent"]',
+      'img[src*="fbcdn"]',
       'img',
     ],
   },
   rateLimit: { tokensPerMin: 5 },
-  timeouts: [8000, 15000, 25000],
+  timeouts: [15000, 25000, 40000],
   navigationTimeout: 60000,
   renderDelay: 4000,
   renderWaitSelector: 'a[href*="/marketplace/item/"]',
@@ -61,7 +59,7 @@ export const facebookConfig: SiteConfig = {
   },
   antiDetection: {
     stealthLevel: 'aggressive',
-    blockImages: true,
+    blockImages: false,
     blockFonts: true,
     blockCSS: false,
     blockMedia: true,
