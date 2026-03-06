@@ -176,6 +176,14 @@ export class MarketplaceEngine {
       // 5. Diagnose page
       const diagnosis = await diagnosePage(page, this.config, monitor.searchUrl!);
 
+      console.log(
+        `PAGE_DIAGNOSIS: ${this.config.site} monitorId=${monitor.id} ` +
+        `pageType=${diagnosis.pageType} finalUrl=${diagnosis.finalUrl} ` +
+        `bodyLength=${diagnosis.bodyLength} loginForm=${diagnosis.signals.hasLoginForm} ` +
+        `loginText=${diagnosis.signals.hasLoginText} checkpoint=${diagnosis.signals.hasCheckpoint} ` +
+        `visibleElements=${diagnosis.signals.visibleElements}`
+      );
+
       // Handle non-content page types
       switch (diagnosis.pageType) {
         case 'LOGIN_REQUIRED':
@@ -336,18 +344,28 @@ export class MarketplaceEngine {
   /**
    * Detects if the final URL is a login/auth redirect.
    * Used for early abort before the page fully loads (prevents OOM on heavy login pages).
+   *
+   * IMPORTANT: Must be precise to avoid false positives. Facebook may include
+   * '/login' in intermediate redirects that resolve to valid pages.
+   * We check the URL pathname (not query params or fragments) to reduce FPs.
    */
   private isLoginRedirect(url: string): boolean {
-    const loginIndicators = [
-      '/login',
-      '/checkpoint',
-      '/accounts/login',
-      'login.php',
-      'signin',
-      '/auth/',
+    let pathname: string;
+    try {
+      pathname = new URL(url).pathname.toLowerCase();
+    } catch {
+      return false;
+    }
+
+    const loginPathPatterns = [
+      /^\/login(\/|\.php)?$/,        // /login, /login/, /login.php
+      /^\/checkpoint(\/)?$/,          // /checkpoint, /checkpoint/
+      /^\/accounts\/login(\/)?$/,     // /accounts/login
+      /^\/signin(\/)?$/,              // /signin
+      /^\/auth\/login(\/)?$/,         // /auth/login
     ];
-    const lower = url.toLowerCase();
-    return loginIndicators.some((indicator) => lower.includes(indicator));
+
+    return loginPathPatterns.some((pattern) => pattern.test(pathname));
   }
 
   /**

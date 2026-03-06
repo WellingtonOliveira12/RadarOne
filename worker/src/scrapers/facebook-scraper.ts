@@ -72,8 +72,43 @@ export async function scrapeFacebook(monitor: MonitorWithFilters): Promise<Scrap
   logMetrics(result);
 
   // Auth errors → throw for circuit breaker
+  // For LOGIN_REQUIRED, confirm with a second attempt before invalidating the session.
+  // Facebook can occasionally show login-like elements on valid pages (transient state).
   if (result.ads.length === 0 && result.diagnosis.pageType === 'LOGIN_REQUIRED') {
-    throw new Error('FB_LOGIN_REQUIRED: Facebook Marketplace requires authentication');
+    console.warn(
+      `FB_LOGIN_REQUIRED_FIRST_ATTEMPT: monitorId=${monitor.id} ` +
+      `finalUrl=${result.diagnosis.finalUrl} bodyLength=${result.diagnosis.bodyLength} ` +
+      `signals=${JSON.stringify(result.diagnosis.signals)}`
+    );
+
+    // Confirmation attempt: re-scrape to rule out transient false positive
+    console.log(`FB_LOGIN_CONFIRM_RETRY: monitorId=${monitor.id} retrying to confirm...`);
+    const confirmResult = await engine.scrape(monitor);
+
+    if (confirmResult.ads.length === 0 && confirmResult.diagnosis.pageType === 'LOGIN_REQUIRED') {
+      console.error(
+        `FB_LOGIN_REQUIRED_CONFIRMED: monitorId=${monitor.id} ` +
+        `finalUrl=${confirmResult.diagnosis.finalUrl} — session is truly invalid`
+      );
+      // Update diagnosis to confirmation attempt
+      (monitor as any).__lastDiagnosis = toDiagnosisRecord(
+        confirmResult,
+        facebookConfig.antiDetection.stealthLevel
+      );
+      throw new Error('FB_LOGIN_REQUIRED: Facebook Marketplace requires authentication (confirmed)');
+    }
+
+    // False positive — use the successful confirmation result
+    console.log(
+      `FB_LOGIN_FALSE_POSITIVE: monitorId=${monitor.id} ` +
+      `confirmAds=${confirmResult.ads.length} confirmPageType=${confirmResult.diagnosis.pageType}`
+    );
+    (monitor as any).__lastDiagnosis = toDiagnosisRecord(
+      confirmResult,
+      facebookConfig.antiDetection.stealthLevel
+    );
+    logMetrics(confirmResult);
+    return confirmResult.ads;
   }
 
   if (result.ads.length === 0 && result.diagnosis.pageType === 'CHECKPOINT') {

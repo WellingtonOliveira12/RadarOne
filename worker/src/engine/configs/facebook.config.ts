@@ -86,7 +86,8 @@ export const facebookConfig: SiteConfig = {
     'log in to continue',
     'you must log in',
     'faça login',
-    'create an account',
+    // NOTE: 'create an account' removed — Facebook shows this in sidebar/footer
+    // even on valid marketplace pages, causing false-positive LOGIN_REQUIRED.
   ],
   checkpointPatterns: [
     'checkpoint',

@@ -152,6 +152,16 @@ export class MonitorRunner {
           monitor.site
         );
 
+        log.info('SESSION_STATUS_CHECK', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          exists: sessionStatus.exists,
+          status: sessionStatus.status || 'N/A',
+          needsAction: sessionStatus.needsAction || false,
+          expiresAt: sessionStatus.expiresAt?.toISOString() || null,
+          lastUsedAt: sessionStatus.lastUsedAt?.toISOString() || null,
+        });
+
         // Se não existe sessão e site requer auth → SKIPPED + notify user
         if (!sessionStatus.exists) {
           log.info('MONITOR_SKIPPED: Sessão necessária mas não configurada', {
@@ -294,22 +304,43 @@ export class MonitorRunner {
       // TRATAMENTO ESPECIAL PARA ERROS DE AUTENTICAÇÃO
       // ═══════════════════════════════════════════════════════════════
       if (isAuthError(error)) {
-        log.warn('MONITOR_AUTH_ERROR: Erro de autenticação detectado', {
+        log.warn('MONITOR_AUTH_ERROR', {
           monitorId: monitor.id,
           site: monitor.site,
+          userId: monitor.userId,
           error: error.message,
+          duration,
         });
 
-        // Marca sessão como NEEDS_REAUTH (com cooldown de notificação)
+        // Marca sessão como NEEDS_REAUTH (com cooldown de notificação de 6h no DB)
         const { notified } = await userSessionService.markNeedsReauth(
           monitor.userId,
           monitor.site,
           error.message
         );
 
+        log.info('SESSION_MARKED_NEEDS_REAUTH', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          userId: monitor.userId,
+          notified,
+          reason: error.message,
+        });
+
         // Envia alerta ao usuário se dentro do cooldown
         if (notified) {
           await this.sendReauthNotification(monitor);
+          log.info('REAUTH_NOTIFICATION_SENT', {
+            monitorId: monitor.id,
+            site: monitor.site,
+            userId: monitor.userId,
+          });
+        } else {
+          log.info('REAUTH_NOTIFICATION_SKIPPED_COOLDOWN', {
+            monitorId: monitor.id,
+            site: monitor.site,
+            userId: monitor.userId,
+          });
         }
 
         // Log como SKIPPED, NÃO como ERROR
@@ -432,23 +463,40 @@ export class MonitorRunner {
     }
   }
 
-  /** In-memory cooldown map for SESSION_REQUIRED notifications (userId:site → timestamp) */
-  private static sessionRequiredCooldown = new Map<string, number>();
-
   /**
    * Sends a proactive notification when a monitor requires session setup.
-   * Uses a 6h in-memory cooldown to avoid spamming.
+   * Uses a 6h DB-persisted cooldown to avoid spamming (survives worker restarts).
+   *
+   * Cooldown key: NotificationLog with title starting with '[SESSION_REQUIRED]'
+   * and the same userId within the last 6 hours.
    */
   private static async sendSessionRequiredNotification(monitor: any): Promise<void> {
-    const cooldownKey = `${monitor.userId}:${monitor.site}`;
     const cooldownMs = 6 * 60 * 60 * 1000; // 6 hours
-    const lastNotified = this.sessionRequiredCooldown.get(cooldownKey);
+    const cooldownTitle = `[SESSION_REQUIRED] ${monitor.site}`;
 
-    if (lastNotified && Date.now() - lastNotified < cooldownMs) {
-      return; // Within cooldown, skip notification
+    // Check DB-persisted cooldown via NotificationLog title convention
+    try {
+      const recentNotification = await prisma.notificationLog.findFirst({
+        where: {
+          userId: monitor.userId,
+          title: cooldownTitle,
+          createdAt: { gte: new Date(Date.now() - cooldownMs) },
+        },
+        select: { id: true },
+      });
+
+      if (recentNotification) {
+        log.info('SESSION_REQUIRED_NOTIFICATION_SKIPPED_COOLDOWN', {
+          monitorId: monitor.id,
+          userId: monitor.userId,
+          site: monitor.site,
+        });
+        return; // Within cooldown, skip notification
+      }
+    } catch (e: any) {
+      // If DB check fails, fall through and send (better to notify than to silently skip)
+      log.warn('SESSION_REQUIRED_COOLDOWN_CHECK_FAILED', { error: e.message });
     }
-
-    this.sessionRequiredCooldown.set(cooldownKey, Date.now());
 
     const telegramChatId =
       monitor.user.notificationSettings?.telegramChatId ||
@@ -503,6 +551,29 @@ export class MonitorRunner {
       } catch (e) {
         // Ignora erro de notificação
       }
+    }
+
+    // Record notification in DB for persistent cooldown (best-effort)
+    try {
+      const channel = telegramChatId ? 'TELEGRAM' : 'EMAIL';
+      const target = telegramChatId
+        ? `***${String(telegramChatId).slice(-4)}`
+        : monitor.user.email
+          ? `***@${monitor.user.email.split('@')[1] || 'unknown'}`
+          : 'unknown';
+
+      await prisma.notificationLog.create({
+        data: {
+          userId: monitor.userId,
+          channel,
+          title: cooldownTitle,
+          message: `Session required for ${this.formatSiteName(monitor.site)}`,
+          target,
+          status: 'SUCCESS',
+        },
+      });
+    } catch {
+      // Best-effort — notification was already sent
     }
   }
 

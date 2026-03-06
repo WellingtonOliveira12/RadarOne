@@ -418,6 +418,14 @@ class UserSessionService {
     try {
       const decrypted = cryptoManager.decrypt(session.encryptedStorageState!);
       storageState = JSON.parse(decrypted);
+      logger.info(
+        {
+          sessionId: session.id,
+          site,
+          cookieCount: storageState.cookies?.length || 0,
+        },
+        'SESSION_DECRYPT_OK'
+      );
     } catch (error: any) {
       const reason = error.message.includes('CRYPTO_KEY_MISSING')
         ? 'key_missing'
