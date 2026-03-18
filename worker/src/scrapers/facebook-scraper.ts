@@ -75,8 +75,26 @@ export async function scrapeFacebook(monitor: MonitorWithFilters): Promise<Scrap
     facebookConfig.antiDetection.stealthLevel
   );
 
-  // Log engine metrics
+  // Log engine metrics + location samples for debugging
   logMetrics(result);
+
+  // Log location samples (first 5 ads) for debugging extraction quality
+  if (result.ads.length > 0) {
+    const locationSamples = result.ads.slice(0, 5).map((ad) => ({
+      title: ad.title?.substring(0, 40),
+      location: ad.location || '(empty)',
+    }));
+    console.log(
+      `FB_LOCATION_SAMPLES: monitorId=${monitor.id} mode=${monitor.mode || 'URL_ONLY'} ` +
+      `city=${monitor.city || 'none'} samples=${JSON.stringify(locationSamples)}`
+    );
+  } else if (result.metrics.adsRaw > 0) {
+    console.log(
+      `FB_LOCATION_ALL_FILTERED: monitorId=${monitor.id} raw=${result.metrics.adsRaw} valid=0 ` +
+      `mode=${monitor.mode || 'URL_ONLY'} city=${monitor.city || 'none'} ` +
+      `skipped=${JSON.stringify(result.metrics.skippedReasons)}`
+    );
+  }
 
   // Auth errors → throw for circuit breaker
   // For LOGIN_REQUIRED, confirm with a second attempt before invalidating the session.

@@ -90,11 +90,29 @@ export async function extractAds(
 
           // Location
           let location = '';
+          // First try specific location selectors
+          let foundViaSelector = false;
           for (const locSel of locationSels) {
+            // Skip the generic span[dir="auto"] when container is <a> — it returns
+            // the title, not location. Facebook uses this selector for ALL text.
+            if (el.tagName === 'A' && locSel === 'span[dir="auto"]') continue;
             const locEl = el.querySelector(locSel);
             if (locEl?.textContent) {
               location = locEl.textContent.trim();
+              foundViaSelector = true;
               break;
+            }
+          }
+          // Fallback for <a> containers with no specific selector match (e.g., Facebook):
+          // Scan spans backwards to find a short text that looks like a location.
+          if (!foundViaSelector && el.tagName === 'A') {
+            const allSpans = Array.from(el.querySelectorAll('span'));
+            for (let si = allSpans.length - 1; si >= 0; si--) {
+              const t = allSpans[si].textContent?.trim() || '';
+              if (t.length >= 3 && t.length <= 40 && !t.includes('R$') && !/^\d/.test(t) && /[a-zA-ZÀ-ú]/.test(t)) {
+                location = t;
+                break;
+              }
             }
           }
 
@@ -156,7 +174,14 @@ export async function extractAds(
     }
 
     // Location filter (best-effort: depends on site exposing ad.location)
-    if (monitor.country) {
+    // For FACEBOOK_MARKETPLACE with STRUCTURED_FILTERS: skip post-process location filter.
+    // Reason: FB uses span[dir="auto"] for ALL text (title, price, location), so querySelector
+    // returns the title text, not the actual location. The URL (/marketplace/{city-slug}/) is
+    // the authoritative location filter for Facebook — the post-filter is redundant and broken.
+    const skipLocationFilter =
+      config.site === 'FACEBOOK_MARKETPLACE' && monitor.mode === 'STRUCTURED_FILTERS';
+
+    if (monitor.country && !skipLocationFilter) {
       const locResult = matchLocation(raw.location, {
         country: monitor.country,
         stateRegion: monitor.stateRegion,
