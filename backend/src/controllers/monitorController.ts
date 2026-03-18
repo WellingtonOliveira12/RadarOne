@@ -112,6 +112,19 @@ export async function createMonitor(
       return;
     }
 
+    // Validate keywords for sites that require them in STRUCTURED_FILTERS mode
+    // OLX needs keywords to build a search URL — without them the monitor is useless
+    if (mode === 'STRUCTURED_FILTERS' && site === 'OLX') {
+      const keywords = filtersJson?.keywords?.trim?.() || filtersJson?.keyword?.trim?.() || '';
+      if (!keywords) {
+        res.status(400).json({
+          error: 'Erro de validação',
+          message: 'OLX com filtros estruturados requer palavras-chave. Preencha o campo "Palavras-chave".',
+        });
+        return;
+      }
+    }
+
     // Validação do enum site
     if (!Object.values(MonitorSite).includes(site)) {
       res.status(400).json({
@@ -232,6 +245,19 @@ export async function updateMonitor(
     if (!id) {
       res.status(400).json({ error: 'ID do monitor é obrigatório' });
       return;
+    }
+
+    // Validate keywords for OLX STRUCTURED_FILTERS on update
+    // Only validates when filtersJson, mode, and site are all provided in the update payload
+    if (mode === 'STRUCTURED_FILTERS' && site === 'OLX' && filtersJson) {
+      const keywords = filtersJson?.keywords?.trim?.() || filtersJson?.keyword?.trim?.() || '';
+      if (!keywords) {
+        res.status(400).json({
+          error: 'Erro de validação',
+          message: 'OLX com filtros estruturados requer palavras-chave. Preencha o campo "Palavras-chave".',
+        });
+        return;
+      }
     }
 
     // Validação do enum site se fornecido

@@ -255,6 +255,7 @@ export function buildSearchUrl(monitor: MonitorWithFilters): UrlBuildResult | nu
  *   2. filtersJson.keyword  (legacy singular form)
  *   3. monitor.keywords[]   (top-level Prisma array field)
  *   4. searchUrl ?q= param  (URL_ONLY → STRUCTURED_FILTERS migration)
+ *   5. monitor.name          (last resort — users often name monitors after the search term)
  */
 function extractKeywords(monitor: MonitorWithFilters): string {
   // 1. filtersJson.keywords (primary)
@@ -286,6 +287,16 @@ function extractKeywords(monitor: MonitorWithFilters): string {
     } catch {
       // Invalid URL — ignore
     }
+  }
+
+  // 5. monitor.name as last resort (e.g., monitor named "Corolla" with empty keywords)
+  // Only for STRUCTURED_FILTERS where the name likely IS the search term.
+  if (monitor.name && monitor.name.trim()) {
+    console.log(
+      `KEYWORDS_FROM_NAME: monitorId=${monitor.id} name=${monitor.name} — ` +
+      `using monitor name as keyword (no other source available)`
+    );
+    return monitor.name.trim();
   }
 
   return '';

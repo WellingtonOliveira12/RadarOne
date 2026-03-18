@@ -116,6 +116,21 @@ export class MonitorRunner {
               executionTime: Date.now() - startTime,
             });
             return;
+          } else if (this.isHomepageUrl(monitor.searchUrl, monitor.site)) {
+            // URL builder returned null AND searchUrl is just a homepage (no search params).
+            // Navigating to a marketplace homepage is useless — wastes browser slot + time.
+            log.warn('MONITOR_SKIPPED_HOMEPAGE_FALLBACK', {
+              monitorId: monitor.id,
+              site: monitor.site,
+              searchUrl: monitor.searchUrl,
+              reason: 'STRUCTURED_FILTERS builder returned null and searchUrl is a homepage without search params',
+            });
+            await this.logExecution(monitor.id, {
+              status: 'SKIPPED',
+              error: `INVALID_CONFIG: ${monitor.site} monitor has no keywords and searchUrl is just the homepage. Add keywords via the dashboard.`,
+              executionTime: Date.now() - startTime,
+            });
+            return;
           }
         } catch (urlBuildError: any) {
           log.error('FB_URL_BUILD_FAILED', urlBuildError, {
@@ -641,6 +656,35 @@ export class MonitorRunner {
       LEILAO: 'Leilão',
     };
     return names[site] || site;
+  }
+
+  /**
+   * Detects if a URL is just a marketplace homepage without search parameters.
+   * These URLs are useless for scraping — they show generic content, not search results.
+   */
+  private static isHomepageUrl(url: string, site: string): boolean {
+    try {
+      const parsed = new URL(url);
+      const hasSearchParams = parsed.searchParams.has('q') ||
+        parsed.searchParams.has('query') ||
+        parsed.searchParams.has('search') ||
+        parsed.search.length > 1; // Has any non-empty query string
+
+      if (hasSearchParams) return false;
+
+      // Check if path is just root or a known homepage path
+      const pathClean = parsed.pathname.replace(/\/+$/, '');
+      const homePaths: Record<string, string[]> = {
+        OLX: ['', '/autos-e-pecas'],
+        FACEBOOK_MARKETPLACE: ['', '/marketplace'],
+        MERCADO_LIVRE: [''],
+      };
+
+      const siteHomePaths = homePaths[site] || [''];
+      return siteHomePaths.includes(pathClean);
+    } catch {
+      return false;
+    }
   }
 
   /**

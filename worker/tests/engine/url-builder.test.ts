@@ -59,14 +59,28 @@ describe('Other marketplaces are not affected', () => {
     expect(result!.location).toBe('BR-GO-Itaberaí');
   });
 
-  it('returns null for OLX without keywords (graceful fallback)', () => {
+  it('returns null for OLX without any keyword source (graceful fallback)', () => {
     const monitor = makeMonitor({
       site: 'OLX',
+      name: '',
       filtersJson: {},
       searchUrl: 'https://www.olx.com.br/',
     });
     const result = buildSearchUrl(monitor);
     expect(result).toBeNull();
+  });
+
+  it('OLX uses monitor.name as keyword when filtersJson is empty (production case)', () => {
+    const monitor = makeMonitor({
+      site: 'OLX',
+      name: 'Corolla',
+      filtersJson: { keywords: '', category: '' },
+      keywords: [],
+      searchUrl: 'https://www.olx.com.br/',
+    });
+    const result = buildSearchUrl(monitor);
+    expect(result).not.toBeNull();
+    expect(result!.url).toBe('https://go.olx.com.br/?q=Corolla');
   });
 
   it('OLX extracts keywords from searchUrl ?q= param', () => {
@@ -119,6 +133,7 @@ describe('Facebook STRUCTURED_FILTERS URL building', () => {
 
   it('builds URL with city only (no keyword)', () => {
     const monitor = makeMonitor({
+      name: '',
       city: 'São Paulo',
       filtersJson: {},
     });
@@ -300,8 +315,9 @@ describe('Facebook advanced filters', () => {
 // ============================================================
 
 describe('Error handling', () => {
-  it('throws when no city AND no keyword provided', () => {
+  it('throws when no city AND no keyword AND no name provided', () => {
     const monitor = makeMonitor({
+      name: '',
       city: '',
       filtersJson: {},
     });
@@ -310,8 +326,9 @@ describe('Error handling', () => {
     );
   });
 
-  it('throws when city is null and keywords empty', () => {
+  it('throws when city is null and keywords empty and name empty', () => {
     const monitor = makeMonitor({
+      name: '',
       city: null,
       filtersJson: { keywords: '' },
     });
@@ -322,6 +339,7 @@ describe('Error handling', () => {
 
   it('error message includes location context', () => {
     const monitor = makeMonitor({
+      name: '',
       country: 'BR',
       stateRegion: 'GO',
       city: null,
@@ -372,8 +390,8 @@ describe('extractKeywords', () => {
     expect(extractKeywords(monitor)).toBe('moto');
   });
 
-  it('returns empty for missing filtersJson', () => {
-    const monitor = makeMonitor({ filtersJson: undefined, searchUrl: '' });
+  it('returns empty for missing filtersJson and empty name', () => {
+    const monitor = makeMonitor({ name: '', filtersJson: undefined, searchUrl: '' });
     expect(extractKeywords(monitor)).toBe('');
   });
 
@@ -413,6 +431,25 @@ describe('extractKeywords', () => {
       searchUrl: 'https://olx.com.br/?q=url-fallback',
     });
     expect(extractKeywords(monitor)).toBe('primary');
+  });
+
+  it('falls back to monitor.name as last resort', () => {
+    const monitor = makeMonitor({
+      name: 'Corolla',
+      filtersJson: { keywords: '', category: '' },
+      keywords: [],
+      searchUrl: 'https://www.olx.com.br/',
+    });
+    expect(extractKeywords(monitor)).toBe('Corolla');
+  });
+
+  it('returns empty when all sources including name are empty', () => {
+    const monitor = makeMonitor({
+      name: '',
+      filtersJson: {},
+      searchUrl: '',
+    });
+    expect(extractKeywords(monitor)).toBe('');
   });
 });
 
