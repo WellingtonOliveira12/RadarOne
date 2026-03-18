@@ -217,9 +217,22 @@ export class MonitorRunner {
 
       // Executa scraping com circuit breaker
       // Para sites que requerem auth, usa chave por userId+site para não afetar outros usuários
+      log.info('SCRAPER_START', {
+        monitorId: monitor.id,
+        site: monitor.site,
+        searchUrl: monitor.searchUrl ? monitor.searchUrl.substring(0, 120) : 'N/A',
+        mode: (monitor as any).mode || 'URL_ONLY',
+      });
+
       const ads = siteRequiresAuth
         ? await circuitBreaker.executeForUser(monitor.site, monitor.userId, () => this.scrape(monitor))
         : await circuitBreaker.execute(monitor.site, () => this.scrape(monitor));
+
+      log.info('SCRAPER_RESULT', {
+        monitorId: monitor.id,
+        site: monitor.site,
+        adsExtracted: ads.length,
+      });
 
       // Log de filtros aplicados e diagnóstico
       const diagData = (monitor as any).__lastDiagnosis;
@@ -244,10 +257,38 @@ export class MonitorRunner {
       // Processa anúncios
       const newAds = await this.processAds(monitor.id, ads);
 
+      log.info('ADS_PROCESSED', {
+        monitorId: monitor.id,
+        site: monitor.site,
+        totalAds: ads.length,
+        newAds: newAds.length,
+        duplicates: ads.length - newAds.length,
+      });
+
       // Envia alertas para anúncios novos
       let alertsSent = 0;
       if (newAds.length > 0 && monitor.alertsEnabled) {
+        log.info('NOTIFICATION_TRIGGERED', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          newAdsCount: newAds.length,
+          alertsEnabled: monitor.alertsEnabled,
+        });
         alertsSent = await this.sendAlerts(monitor, newAds);
+      } else if (newAds.length === 0) {
+        log.info('NOTIFICATION_SKIPPED_REASON', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          reason: 'no_new_ads',
+          totalAds: ads.length,
+        });
+      } else if (!monitor.alertsEnabled) {
+        log.info('NOTIFICATION_SKIPPED_REASON', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          reason: 'alerts_disabled',
+          newAds: newAds.length,
+        });
       }
 
       // Incrementa contador de consultas

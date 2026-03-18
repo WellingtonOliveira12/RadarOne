@@ -51,8 +51,10 @@ const DEFAULT_CHECK_INTERVAL_MINUTES = 60;
 
 class Worker {
   private isRunning = false;
+  private isExecuting = false; // Guard against overlapping cycles
   private checkInterval: NodeJS.Timeout | null = null;
   private worker: any = null;
+  private cycleCount = 0;
 
   async start() {
     console.log('='.repeat(60));
@@ -120,9 +122,22 @@ class Worker {
   async runMonitors() {
     if (!this.isRunning) return;
 
+    // Prevent overlapping cycles — this is the #1 cause of notification bursts.
+    // If a cycle takes longer than the tick interval (e.g. 9 monitors × 15-30s = 135-270s),
+    // the next setInterval tick would start a new cycle while the old one is still running,
+    // causing the same monitors to be executed in parallel → duplicate ads → burst notifications.
+    if (this.isExecuting) {
+      console.log(`⚠️  [${new Date().toISOString()}] CYCLE_SKIPPED: previous cycle still running — no overlap allowed`);
+      return;
+    }
+
+    this.isExecuting = true;
+    this.cycleCount++;
+    const cycleId = this.cycleCount;
+
     const now = new Date();
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`📊 [${now.toISOString()}] Iniciando ciclo de verificação...`);
+    console.log(`📊 [${now.toISOString()}] CYCLE_START #${cycleId}`);
     const startTime = Date.now();
 
     try {
@@ -164,10 +179,21 @@ class Worker {
         const plan = subscription?.plan;
         const checkIntervalMin = plan?.checkInterval || DEFAULT_CHECK_INTERVAL_MINUTES;
 
+        // Skip monitors without active subscription
+        if (!subscription) {
+          return false;
+        }
+
         // Se nunca rodou, é elegível
         if (!monitor.lastCheckedAt) {
-          console.log(`   ✅ ${monitor.name} - NUNCA RODOU (plano: ${plan?.name || 'Free'}, interval: ${checkIntervalMin}min)`);
+          console.log(`   ✅ ${monitor.name} [${monitor.site}] - NUNCA RODOU (plano: ${plan?.name || 'Free'}, interval: ${checkIntervalMin}min)`);
           return true;
+        }
+
+        // Clock drift protection: if lastCheckedAt is in the future, skip
+        if (monitor.lastCheckedAt.getTime() > now.getTime() + 60000) {
+          console.warn(`   ⚠️  ${monitor.name} [${monitor.site}] - CLOCK_DRIFT: lastCheckedAt in future, skipping`);
+          return false;
         }
 
         // Calcula se está "due" (lastCheckedAt + interval <= agora)
@@ -176,10 +202,10 @@ class Worker {
 
         if (isDue) {
           const minSinceLastRun = Math.round((now.getTime() - monitor.lastCheckedAt.getTime()) / 60000);
-          console.log(`   ✅ ${monitor.name} - DUE (plano: ${plan?.name || 'Free'}, interval: ${checkIntervalMin}min, last: ${minSinceLastRun}min atrás)`);
+          console.log(`   ✅ ${monitor.name} [${monitor.site}] - DUE (plano: ${plan?.name || 'Free'}, interval: ${checkIntervalMin}min, last: ${minSinceLastRun}min atrás)`);
         } else {
           const minUntilNext = Math.round((nextRunAt.getTime() - now.getTime()) / 60000);
-          console.log(`   ⏳ ${monitor.name} - SKIP (plano: ${plan?.name || 'Free'}, interval: ${checkIntervalMin}min, próximo em: ${minUntilNext}min)`);
+          console.log(`   ⏳ ${monitor.name} [${monitor.site}] - SKIP (plano: ${plan?.name || 'Free'}, interval: ${checkIntervalMin}min, próximo em: ${minUntilNext}min)`);
         }
 
         return isDue;
@@ -201,25 +227,33 @@ class Worker {
         const stats = await getQueueStats();
         console.log(`📊 Fila: ${stats.total} total (${stats.active} processando, ${stats.waiting} aguardando)`);
       } else {
-        // Modo LOOP: Processa sequencialmente
+        // Modo LOOP: Processa sequencialmente with stagger to prevent bursts
         let processed = 0;
         for (const monitor of eligibleMonitors) {
+          const monitorStart = Date.now();
           try {
+            console.log(`MONITOR_EXECUTION_START: name=${monitor.name} site=${monitor.site} monitorId=${monitor.id}`);
             await MonitorRunner.run(monitor);
             processed++;
+            const monitorDuration = Date.now() - monitorStart;
+            console.log(`MONITOR_EXECUTION_END: name=${monitor.name} site=${monitor.site} duration=${monitorDuration}ms status=SUCCESS`);
           } catch (error: any) {
-            console.error(`❌ Erro ao executar monitor ${monitor.name}:`, error.message);
+            const monitorDuration = Date.now() - monitorStart;
+            console.error(`MONITOR_EXECUTION_END: name=${monitor.name} site=${monitor.site} duration=${monitorDuration}ms status=ERROR error=${error.message}`);
           }
-          await this.delay(2000); // 2 segundos entre monitores
+          // Stagger: 3s between monitors to spread out execution and reduce memory pressure
+          await this.delay(3000);
         }
         console.log(`📊 Processados: ${processed}/${eligibleMonitors.length}`);
       }
 
       const duration = Date.now() - startTime;
-      console.log(`✅ Ciclo concluído em ${(duration / 1000).toFixed(2)}s`);
+      console.log(`✅ CYCLE_END #${cycleId} duration=${(duration / 1000).toFixed(2)}s monitors=${eligibleMonitors.length}`);
     } catch (error: any) {
       console.error('❌ Erro ao executar monitores:', error);
       captureException(error, { context: 'monitor_execution_cycle' });
+    } finally {
+      this.isExecuting = false;
     }
   }
 

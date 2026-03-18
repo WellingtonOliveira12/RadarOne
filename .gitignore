@@ -180,3 +180,11 @@ docs/*_REPORT*.md
 docs/*_AUDIT*.md
 docs/*_BUGFIX*.md
 docs/RadarOne_Auditoria_*.md
+
+# Dependencies (AIOX)
+node_modules
+
+# AIOX Local (AIOX)
+.aiox-core/local/
+.claude/settings.local.json
+.aiox/install-log.txt

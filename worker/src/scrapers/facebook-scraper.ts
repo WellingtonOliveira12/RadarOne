@@ -25,9 +25,16 @@ export async function scrapeFacebook(monitor: MonitorWithFilters): Promise<Scrap
 
   let result = await engine.scrape(monitor);
 
-  // Log final URL after all redirects
+  // Log final URL after all redirects + detailed diagnosis for debugging
   console.log(
     `FB_NAV_FINAL_URL: monitorId=${monitor.id} finalUrl=${result.diagnosis.finalUrl}`
+  );
+  console.log(
+    `FB_DIAGNOSIS_DETAIL: monitorId=${monitor.id} pageType=${result.diagnosis.pageType} ` +
+    `adsRaw=${result.metrics.adsRaw} adsValid=${result.metrics.adsValid} ` +
+    `auth=${result.metrics.authenticated}(${result.metrics.authSource}) ` +
+    `bodyLength=${result.diagnosis.bodyLength} ` +
+    `skipped=${JSON.stringify(result.metrics.skippedReasons)}`
   );
 
   // ── Location assertion (STRUCTURED_FILTERS only) ──────────────

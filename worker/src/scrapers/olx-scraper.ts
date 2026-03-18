@@ -20,13 +20,27 @@ export async function scrapeOLX(monitor: MonitorWithFilters): Promise<ScrapedAd[
     olxConfig.antiDetection.stealthLevel
   );
 
-  // Log engine metrics
+  // Log engine metrics with detailed diagnosis
   const m = result.metrics;
   console.log(
     `OLX_ENGINE: ads=${result.ads.length} raw=${m.adsRaw} ` +
       `selector=${m.selectorUsed || 'NONE'} scrolls=${m.scrollsDone} duration=${m.durationMs}ms ` +
       `pageType=${result.diagnosis.pageType}`
   );
+  console.log(
+    `OLX_DIAGNOSIS_DETAIL: monitorId=${monitor.id} pageType=${result.diagnosis.pageType} ` +
+    `adsRaw=${m.adsRaw} adsValid=${m.adsValid} ` +
+    `bodyLength=${result.diagnosis.bodyLength} finalUrl=${result.diagnosis.finalUrl} ` +
+    `skipped=${JSON.stringify(m.skippedReasons)}`
+  );
+
+  // Warn if we got raw ads but all were filtered out (likely externalId extraction issue)
+  if (m.adsRaw > 0 && result.ads.length === 0) {
+    console.warn(
+      `OLX_ALL_ADS_FILTERED: monitorId=${monitor.id} raw=${m.adsRaw} valid=0 ` +
+      `skippedReasons=${JSON.stringify(m.skippedReasons)} — check externalIdExtractor or selectors`
+    );
+  }
 
   return result.ads;
 }

@@ -25,41 +25,53 @@ export const olxConfig: SiteConfig = {
     containers: [
       '[data-ds-component="DS-AdCard"]',
       'li[data-ds-component="DS-AdCard"]',
-      '.olx-ad-card',
-      '[class*="AdCard"]',
       'a[data-lurker-detail]',
+      'li.sc-1fcmfeb-2',          // OLX 2025+ listing item class pattern
+      'section[data-ds-component="DS-AdCard"]',
+      '[class*="AdCard"]',
+      '.olx-ad-card',
+      'ul[class*="list"] > li a[href*="/d/"]', // List items with ad links
     ],
     title: [
       'h2',
       '[data-ds-component="DS-Text"]',
       '.olx-ad-card__title',
+      'h2[class*="title"]',
+      'span[class*="title"]',
     ],
     price: [
+      'span[class*="price"]',
       '[data-ds-component="DS-Text"]',
       '.olx-ad-card__price',
-      'span[class*="price"]',
+      'p[class*="price"]',
+      'span[aria-label*="preço"]',
     ],
     link: [
-      'a',
+      'a[href*="/d/"]',
+      'a[data-lurker-detail]',
       'a[href*="olx.com.br"]',
+      'a',
     ],
     location: [
       '[data-testid="ad-location"]',
-      '.olx-ad-card__location',
       'span[class*="location"]',
+      '.olx-ad-card__location',
+      'p[class*="detail"]',
     ],
     image: [
+      'img[src*="img.olx"]',
+      'img[data-src*="img.olx"]',
       'img',
     ],
   },
   rateLimit: { tokensPerMin: 15 },
-  timeouts: [5000, 10000, 15000],
-  navigationTimeout: 30000,
-  renderDelay: 1000,
+  timeouts: [8000, 15000, 25000],
+  navigationTimeout: 45000,
+  renderDelay: 2000,
   scroll: {
     strategy: 'fixed',
-    fixedSteps: 2,
-    delayBetweenScrollsMs: 1000,
+    fixedSteps: 3,
+    delayBetweenScrollsMs: 1200,
   },
   antiDetection: {
     stealthLevel: 'minimal',
@@ -71,12 +83,24 @@ export const olxConfig: SiteConfig = {
     randomizeViewport: false,
   },
   externalIdExtractor: (url: string) => {
-    const match = url.match(/\/(\d+)$/);
-    return match ? `OLX-${match[1]}` : '';
+    // Strip query string and fragment before extracting ID
+    const cleanUrl = url.split(/[?#]/)[0];
+    // OLX ad URLs end with a numeric ID: .../some-title-1234567890
+    // Try trailing numeric segment first (most common)
+    const trailingMatch = cleanUrl.match(/[/-](\d{7,})$/);
+    if (trailingMatch) return `OLX-${trailingMatch[1]}`;
+    // Fallback: any long numeric segment in the path
+    const pathMatch = cleanUrl.match(/\/(\d{7,})/);
+    if (pathMatch) return `OLX-${pathMatch[1]}`;
+    return '';
   },
   priceParser: parseBrazilianPrice,
-  urlNormalizer: (url: string) =>
-    url.startsWith('http') ? url : `https://www.olx.com.br${url}`,
+  urlNormalizer: (url: string) => {
+    if (url.startsWith('http')) return url;
+    // OLX uses regional subdomains (sp.olx.com.br, rj.olx.com.br, etc.)
+    // Default to www if no subdomain is present
+    return `https://www.olx.com.br${url}`;
+  },
   noResultsPatterns: [
     'nenhum resultado',
     'não encontramos',
