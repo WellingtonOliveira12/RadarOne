@@ -171,16 +171,21 @@ const OLX_STATE_SUBDOMAINS: Record<string, string> = {
  * Without state: https://www.olx.com.br/?q={keyword}
  *
  * OLX does NOT support advanced filters via URL (condition, sort, etc.).
+ *
+ * Returns null if no keywords can be extracted — caller falls back to searchUrl.
  */
-function buildOlxUrl(monitor: MonitorWithFilters): UrlBuildResult {
+function buildOlxUrl(monitor: MonitorWithFilters): UrlBuildResult | null {
   const state = monitor.stateRegion?.trim().toUpperCase() || '';
   const keywords = extractKeywords(monitor);
 
   if (!keywords) {
-    throw new Error(
-      `OLX_URL_BUILD_FAILED: Cannot build OLX URL without keywords. ` +
-      `Provide keywords in STRUCTURED_FILTERS.`
+    console.log(
+      `OLX_URL_BUILD_NO_KEYWORDS: monitorId=${monitor.id} name=${monitor.name} ` +
+      `filtersJson=${JSON.stringify(monitor.filtersJson)} ` +
+      `keywords=${JSON.stringify(monitor.keywords)} ` +
+      `searchUrl=${monitor.searchUrl?.substring(0, 80)} — falling back to searchUrl`
     );
+    return null;
   }
 
   // Use state subdomain if available (go.olx.com.br for Goiás)
@@ -245,22 +250,42 @@ export function buildSearchUrl(monitor: MonitorWithFilters): UrlBuildResult | nu
 }
 
 /**
- * Extracts keywords from monitor.filtersJson.
- * Handles multiple possible shapes of filtersJson.
+ * Extracts keywords from monitor using a multi-source fallback chain:
+ *   1. filtersJson.keywords (primary — frontend sends this)
+ *   2. filtersJson.keyword  (legacy singular form)
+ *   3. monitor.keywords[]   (top-level Prisma array field)
+ *   4. searchUrl ?q= param  (URL_ONLY → STRUCTURED_FILTERS migration)
  */
 function extractKeywords(monitor: MonitorWithFilters): string {
-  if (!monitor.filtersJson) return '';
+  // 1. filtersJson.keywords (primary)
+  if (monitor.filtersJson && typeof monitor.filtersJson === 'object') {
+    const filters = monitor.filtersJson as Record<string, unknown>;
 
-  const filters = monitor.filtersJson as Record<string, unknown>;
+    if (typeof filters.keywords === 'string' && filters.keywords.trim()) {
+      return filters.keywords.trim();
+    }
 
-  // Primary: filtersJson.keywords (frontend sends this)
-  if (typeof filters.keywords === 'string' && filters.keywords.trim()) {
-    return filters.keywords.trim();
+    // 2. filtersJson.keyword (singular)
+    if (typeof filters.keyword === 'string' && filters.keyword.trim()) {
+      return filters.keyword.trim();
+    }
   }
 
-  // Fallback: filtersJson.keyword (singular form)
-  if (typeof filters.keyword === 'string' && filters.keyword.trim()) {
-    return filters.keyword.trim();
+  // 3. monitor.keywords[] (top-level array from Prisma schema)
+  if (Array.isArray(monitor.keywords) && monitor.keywords.length > 0) {
+    const joined = monitor.keywords.filter(Boolean).join(' ').trim();
+    if (joined) return joined;
+  }
+
+  // 4. Extract ?q= from searchUrl (handles URL_ONLY monitors migrated to STRUCTURED_FILTERS)
+  if (monitor.searchUrl) {
+    try {
+      const url = new URL(monitor.searchUrl);
+      const q = url.searchParams.get('q') || url.searchParams.get('query');
+      if (q && q.trim()) return q.trim();
+    } catch {
+      // Invalid URL — ignore
+    }
   }
 
   return '';

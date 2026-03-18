@@ -24,6 +24,7 @@ export interface MonitorWithFilters {
   active: boolean;
   mode?: string;        // 'URL_ONLY' | 'STRUCTURED_FILTERS' — optional for backward compat
   filtersJson?: unknown; // For future use with STRUCTURED_FILTERS URL builder
+  keywords?: string[];   // Top-level keywords array from Prisma schema
   country?: string | null;  // ISO-3166-1 alpha-2 (ex: BR, US) ou null = sem filtro
   stateRegion?: string | null;
   city?: string | null;

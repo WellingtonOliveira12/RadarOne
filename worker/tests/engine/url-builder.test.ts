@@ -59,6 +59,38 @@ describe('Other marketplaces are not affected', () => {
     expect(result!.location).toBe('BR-GO-Itaberaí');
   });
 
+  it('returns null for OLX without keywords (graceful fallback)', () => {
+    const monitor = makeMonitor({
+      site: 'OLX',
+      filtersJson: {},
+      searchUrl: 'https://www.olx.com.br/',
+    });
+    const result = buildSearchUrl(monitor);
+    expect(result).toBeNull();
+  });
+
+  it('OLX extracts keywords from searchUrl ?q= param', () => {
+    const monitor = makeMonitor({
+      site: 'OLX',
+      filtersJson: {},
+      searchUrl: 'https://go.olx.com.br/autos-e-pecas?q=Corolla',
+    });
+    const result = buildSearchUrl(monitor);
+    expect(result).not.toBeNull();
+    expect(result!.url).toBe('https://go.olx.com.br/?q=Corolla');
+  });
+
+  it('OLX extracts keywords from monitor.keywords array', () => {
+    const monitor = makeMonitor({
+      site: 'OLX',
+      filtersJson: {},
+      keywords: ['Corolla'],
+    });
+    const result = buildSearchUrl(monitor);
+    expect(result).not.toBeNull();
+    expect(result!.url).toBe('https://go.olx.com.br/?q=Corolla');
+  });
+
   it('returns null for MERCADO_LIVRE with STRUCTURED_FILTERS', () => {
     const monitor = makeMonitor({ site: 'MERCADO_LIVRE' });
     const result = buildSearchUrl(monitor);
@@ -341,13 +373,46 @@ describe('extractKeywords', () => {
   });
 
   it('returns empty for missing filtersJson', () => {
-    const monitor = makeMonitor({ filtersJson: undefined });
+    const monitor = makeMonitor({ filtersJson: undefined, searchUrl: '' });
     expect(extractKeywords(monitor)).toBe('');
   });
 
   it('trims whitespace', () => {
     const monitor = makeMonitor({ filtersJson: { keywords: '  carro  ' } });
     expect(extractKeywords(monitor)).toBe('carro');
+  });
+
+  it('falls back to monitor.keywords array', () => {
+    const monitor = makeMonitor({
+      filtersJson: {},
+      keywords: ['Corolla'],
+    });
+    expect(extractKeywords(monitor)).toBe('Corolla');
+  });
+
+  it('falls back to searchUrl ?q= param', () => {
+    const monitor = makeMonitor({
+      filtersJson: {},
+      searchUrl: 'https://go.olx.com.br/autos-e-pecas?q=Civic',
+    });
+    expect(extractKeywords(monitor)).toBe('Civic');
+  });
+
+  it('falls back to searchUrl ?query= param', () => {
+    const monitor = makeMonitor({
+      filtersJson: {},
+      searchUrl: 'https://www.facebook.com/marketplace/search/?query=moto',
+    });
+    expect(extractKeywords(monitor)).toBe('moto');
+  });
+
+  it('prefers filtersJson.keywords over other sources', () => {
+    const monitor = makeMonitor({
+      filtersJson: { keywords: 'primary' },
+      keywords: ['fallback'],
+      searchUrl: 'https://olx.com.br/?q=url-fallback',
+    });
+    expect(extractKeywords(monitor)).toBe('primary');
   });
 });
 

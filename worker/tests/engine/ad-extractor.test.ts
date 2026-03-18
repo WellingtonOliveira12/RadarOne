@@ -376,6 +376,134 @@ describe('extractAds', () => {
     expect(result.skippedReasons).not.toHaveProperty('location_country_mismatch');
   });
 
+  // ──── Facebook soft state filter tests ────
+
+  it('should reject FB STRUCTURED_FILTERS ads from wrong state', async () => {
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/700/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Corolla 2020' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 70.000' },
+        },
+        // Reverse-scan heuristic will pick last valid span as location
+        spans: [
+          { textContent: 'R$ 70.000' },
+          { textContent: 'Corolla 2020' },
+          { textContent: 'Uberlândia, MG' },  // wrong state
+        ],
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    const fbMonitor: MonitorWithFilters = {
+      ...testMonitor,
+      mode: 'STRUCTURED_FILTERS',
+      country: 'BR',
+      stateRegion: 'GO',
+    };
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', testConfig, fbMonitor);
+
+    expect(result.adsRaw).toBe(1);
+    expect(result.ads).toHaveLength(0);
+    expect(result.skippedReasons).toHaveProperty('fb_state_mismatch', 1);
+  });
+
+  it('should accept FB STRUCTURED_FILTERS ads from correct state', async () => {
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/701/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Corolla 2021' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 80.000' },
+        },
+        spans: [
+          { textContent: 'R$ 80.000' },
+          { textContent: 'Corolla 2021' },
+          { textContent: 'Anápolis, GO' },  // correct state
+        ],
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    const fbMonitor: MonitorWithFilters = {
+      ...testMonitor,
+      mode: 'STRUCTURED_FILTERS',
+      country: 'BR',
+      stateRegion: 'GO',
+    };
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', testConfig, fbMonitor);
+
+    expect(result.ads).toHaveLength(1);
+    expect(result.ads[0].title).toBe('Corolla 2021');
+  });
+
+  it('should accept FB STRUCTURED_FILTERS ads with unparseable location', async () => {
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/702/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Civic 2019' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 60.000' },
+        },
+        spans: [
+          { textContent: 'R$ 60.000' },
+          { textContent: 'Civic 2019' },
+          // No valid location span — should still pass
+        ],
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    const fbMonitor: MonitorWithFilters = {
+      ...testMonitor,
+      mode: 'STRUCTURED_FILTERS',
+      country: 'BR',
+      stateRegion: 'GO',
+    };
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', testConfig, fbMonitor);
+
+    expect(result.ads).toHaveLength(1);
+  });
+
+  it('should not apply FB soft filter for non-STRUCTURED_FILTERS mode', async () => {
+    const locationConfig: SiteConfig = {
+      ...testConfig,
+      selectors: {
+        ...testConfig.selectors,
+        location: ['span.location'],
+      },
+    };
+
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/703/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Item MG' },
+          'span[class*="x193iq5w"]': { textContent: 'R$ 100' },
+          'span.location': { textContent: 'São Paulo, SP' },
+        },
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    // URL_ONLY mode → uses full matchLocation, NOT soft state filter
+    const urlOnlyMonitor: MonitorWithFilters = {
+      ...testMonitor,
+      mode: 'URL_ONLY',
+      country: 'BR',
+      stateRegion: 'GO',
+    };
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', locationConfig, urlOnlyMonitor);
+
+    // Full location filter rejects because São Paulo, SP ≠ GO
+    expect(result.ads).toHaveLength(0);
+  });
+
   it('should fallback to el.querySelector("a") for div containers with no linkSel match', async () => {
     // Simulate a div container where the link selector doesn't match,
     // but there's a generic <a> tag available

@@ -139,13 +139,22 @@ export async function extractAds(
     skippedReasons[reason] = (skippedReasons[reason] || 0) + 1;
   };
 
-  // Log FB location filter decision for observability
+  // Determine filter strategy for Facebook STRUCTURED_FILTERS
   const isFbStructured =
     config.site === 'FACEBOOK_MARKETPLACE' && monitor.mode === 'STRUCTURED_FILTERS';
+
+  // For FB STRUCTURED_FILTERS: use soft state-level filter instead of full location match.
+  // Reason: FB uses span[dir="auto"] for ALL text, so the generic location selector returns
+  // the title (not the location). However, the reverse-scan heuristic does extract "Cidade, UF"
+  // in many cases — we can use the UF (state code) for a soft filter.
+  // Policy: accept if (a) no location extracted, (b) state matches, (c) state not determinable.
+  //         reject only if state is clearly different from monitor's stateRegion.
+  const fbTargetState = isFbStructured ? (monitor.stateRegion?.trim().toUpperCase() || '') : '';
   if (isFbStructured && rawAds.length > 0) {
     console.log(
-      `FB_LOCATION_FILTER_SKIPPED: site=${config.site} mode=${monitor.mode} ` +
-      `rawAds=${rawAds.length} reason=URL_is_authoritative_filter`
+      `FB_LOCATION_SOFT_FILTER: site=${config.site} mode=${monitor.mode} ` +
+      `rawAds=${rawAds.length} targetState=${fbTargetState || 'NONE'} ` +
+      `policy=accept_same_state_or_unknown`
     );
   }
 
@@ -183,12 +192,23 @@ export async function extractAds(
       continue;
     }
 
-    // Location filter (best-effort: depends on site exposing ad.location)
-    // For FACEBOOK_MARKETPLACE with STRUCTURED_FILTERS: skip post-process location filter.
-    // Reason: FB uses span[dir="auto"] for ALL text (title, price, location), so querySelector
-    // returns the title text, not the actual location. The URL (/marketplace/{city-slug}/) is
-    // the authoritative location filter for Facebook — the post-filter is redundant and broken.
-    if (monitor.country && !isFbStructured) {
+    // Location filter — strategy depends on site + mode
+    if (isFbStructured) {
+      // Facebook STRUCTURED_FILTERS: soft state-level filter.
+      // Only reject ads where the extracted location clearly shows a different state.
+      // Location format from FB heuristic: "Cidade, UF" (e.g., "Uberlândia, MG")
+      if (fbTargetState && raw.location) {
+        const extractedState = extractBrazilianStateCode(raw.location);
+        if (extractedState && extractedState !== fbTargetState) {
+          skip('fb_state_mismatch');
+          continue;
+        }
+        // extractedState === null means we couldn't parse → accept (don't block)
+        // extractedState === fbTargetState → accept
+      }
+      // No location or no target state → accept
+    } else if (monitor.country) {
+      // Non-Facebook sites: full location match (city/state/country)
       const locResult = matchLocation(raw.location, {
         country: monitor.country,
         stateRegion: monitor.stateRegion,
@@ -215,4 +235,43 @@ export async function extractAds(
     adsRaw: rawAds.length,
     skippedReasons,
   };
+}
+
+// Brazilian state codes (UF) — used for soft state-level filtering on Facebook
+const BRAZILIAN_STATES = new Set([
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS',
+  'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC',
+  'SP', 'SE', 'TO',
+]);
+
+/**
+ * Extracts a Brazilian state code (UF) from a location string.
+ *
+ * Handles common formats from Facebook Marketplace:
+ *   - "Uberlândia, MG"     → "MG"
+ *   - "Goiânia, GO"        → "GO"
+ *   - "Taguatinga, DF"     → "DF"
+ *   - "São Paulo - SP"     → "SP"
+ *   - "Rio de Janeiro"     → null (no state code)
+ *   - ""                   → null
+ *
+ * Returns null if no valid state code can be extracted.
+ */
+function extractBrazilianStateCode(location: string): string | null {
+  if (!location) return null;
+
+  const trimmed = location.trim();
+
+  // Pattern 1: "Cidade, UF" or "Cidade - UF" (most common from Facebook)
+  const match = trimmed.match(/[,\-–]\s*([A-Z]{2})\s*$/);
+  if (match && BRAZILIAN_STATES.has(match[1])) {
+    return match[1];
+  }
+
+  // Pattern 2: Standalone "UF" (rare but possible)
+  if (trimmed.length === 2 && BRAZILIAN_STATES.has(trimmed.toUpperCase())) {
+    return trimmed.toUpperCase();
+  }
+
+  return null;
 }
