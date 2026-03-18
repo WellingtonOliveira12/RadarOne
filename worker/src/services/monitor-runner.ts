@@ -327,14 +327,21 @@ export class MonitorRunner {
         success: true,
       });
 
-      // Atualiza lastCheckedAt
-      await prisma.monitor.update({
-        where: { id: monitor.id },
-        data: {
-          lastCheckedAt: new Date(),
-          lastAlertAt: alertsSent > 0 ? new Date() : undefined,
-        },
-      });
+      // Update lastCheckedAt (skipped if scheduler already set it at start)
+      // Also update lastAlertAt if alerts were sent
+      const updateData: any = {};
+      if (!(monitor as any).__lastCheckedAtSetByScheduler) {
+        updateData.lastCheckedAt = new Date();
+      }
+      if (alertsSent > 0) {
+        updateData.lastAlertAt = new Date();
+      }
+      if (Object.keys(updateData).length > 0) {
+        await prisma.monitor.update({
+          where: { id: monitor.id },
+          data: updateData,
+        });
+      }
 
       const duration = Date.now() - startTime;
       log.monitorSuccess(monitor.id, ads.length, newAds.length, alertsSent, duration);
