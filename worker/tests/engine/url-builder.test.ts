@@ -51,10 +51,12 @@ describe('URL_ONLY monitors are not affected', () => {
 // ============================================================
 
 describe('Other marketplaces are not affected', () => {
-  it('returns null for OLX with STRUCTURED_FILTERS', () => {
+  it('builds OLX URL with state subdomain and keyword', () => {
     const monitor = makeMonitor({ site: 'OLX' });
     const result = buildSearchUrl(monitor);
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.url).toBe('https://go.olx.com.br/?q=carro');
+    expect(result!.location).toBe('BR-GO-Itaberaí');
   });
 
   it('returns null for MERCADO_LIVRE with STRUCTURED_FILTERS', () => {
@@ -367,8 +369,15 @@ describe('buildSearchUrl entry point', () => {
     expect(buildSearchUrl(monitor)).toBeNull();
   });
 
-  it('returns null for unsupported site', () => {
+  it('builds OLX URL for OLX STRUCTURED_FILTERS', () => {
     const monitor = makeMonitor({ site: 'OLX' });
+    const result = buildSearchUrl(monitor);
+    expect(result).not.toBeNull();
+    expect(result!.url).toContain('olx.com.br/?q=carro');
+  });
+
+  it('returns null for unsupported site (WEBMOTORS)', () => {
+    const monitor = makeMonitor({ site: 'WEBMOTORS' });
     expect(buildSearchUrl(monitor)).toBeNull();
   });
 });

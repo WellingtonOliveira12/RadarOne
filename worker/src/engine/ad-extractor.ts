@@ -139,6 +139,16 @@ export async function extractAds(
     skippedReasons[reason] = (skippedReasons[reason] || 0) + 1;
   };
 
+  // Log FB location filter decision for observability
+  const isFbStructured =
+    config.site === 'FACEBOOK_MARKETPLACE' && monitor.mode === 'STRUCTURED_FILTERS';
+  if (isFbStructured && rawAds.length > 0) {
+    console.log(
+      `FB_LOCATION_FILTER_SKIPPED: site=${config.site} mode=${monitor.mode} ` +
+      `rawAds=${rawAds.length} reason=URL_is_authoritative_filter`
+    );
+  }
+
   for (const raw of rawAds) {
     // Normalize URL
     const url = config.urlNormalizer(raw.url);
@@ -178,10 +188,7 @@ export async function extractAds(
     // Reason: FB uses span[dir="auto"] for ALL text (title, price, location), so querySelector
     // returns the title text, not the actual location. The URL (/marketplace/{city-slug}/) is
     // the authoritative location filter for Facebook — the post-filter is redundant and broken.
-    const skipLocationFilter =
-      config.site === 'FACEBOOK_MARKETPLACE' && monitor.mode === 'STRUCTURED_FILTERS';
-
-    if (monitor.country && !skipLocationFilter) {
+    if (monitor.country && !isFbStructured) {
       const locResult = matchLocation(raw.location, {
         country: monitor.country,
         stateRegion: monitor.stateRegion,

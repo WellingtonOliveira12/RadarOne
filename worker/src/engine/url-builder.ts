@@ -154,6 +154,54 @@ export function buildFacebookMarketplaceUrl(monitor: MonitorWithFilters): UrlBui
 }
 
 /**
+ * OLX state-to-subdomain mapping.
+ * OLX uses regional subdomains: go.olx.com.br, sp.olx.com.br, etc.
+ */
+const OLX_STATE_SUBDOMAINS: Record<string, string> = {
+  AC: 'ac', AL: 'al', AP: 'ap', AM: 'am', BA: 'ba', CE: 'ce', DF: 'df',
+  ES: 'es', GO: 'go', MA: 'ma', MT: 'mt', MS: 'ms', MG: 'mg', PA: 'pa',
+  PB: 'pb', PR: 'pr', PE: 'pe', PI: 'pi', RJ: 'rj', RN: 'rn', RS: 'rs',
+  RO: 'ro', RR: 'rr', SC: 'sc', SP: 'sp', SE: 'se', TO: 'to',
+};
+
+/**
+ * Builds an OLX search URL from structured filters.
+ *
+ * URL pattern: https://{state}.olx.com.br/?q={keyword}
+ * Without state: https://www.olx.com.br/?q={keyword}
+ *
+ * OLX does NOT support advanced filters via URL (condition, sort, etc.).
+ */
+function buildOlxUrl(monitor: MonitorWithFilters): UrlBuildResult {
+  const state = monitor.stateRegion?.trim().toUpperCase() || '';
+  const keywords = extractKeywords(monitor);
+
+  if (!keywords) {
+    throw new Error(
+      `OLX_URL_BUILD_FAILED: Cannot build OLX URL without keywords. ` +
+      `Provide keywords in STRUCTURED_FILTERS.`
+    );
+  }
+
+  // Use state subdomain if available (go.olx.com.br for Goiás)
+  const subdomain = OLX_STATE_SUBDOMAINS[state] || 'www';
+  const url = `https://${subdomain}.olx.com.br/?q=${encodeURIComponent(keywords)}`;
+
+  const locationParts = [monitor.country, state, monitor.city].filter(Boolean);
+  const location = locationParts.join('-') || 'BR';
+
+  return {
+    url,
+    location,
+    filtersApplied: {
+      appliedUrl: [`q=${keywords}`, ...(subdomain !== 'www' ? [`state=${state}`] : [])],
+      appliedPostProcess: [],
+      ignored: [],
+    },
+  };
+}
+
+/**
  * Entry point: builds search URL for any site that supports STRUCTURED_FILTERS.
  *
  * Returns null if:
@@ -170,6 +218,8 @@ export function buildSearchUrl(monitor: MonitorWithFilters): UrlBuildResult | nu
   switch (monitor.site) {
     case 'FACEBOOK_MARKETPLACE':
       return buildFacebookMarketplaceUrl(monitor);
+    case 'OLX':
+      return buildOlxUrl(monitor);
     default: {
       // Log ignored filters for non-Facebook sites
       const filters = parseAdvancedFilters(monitor);
