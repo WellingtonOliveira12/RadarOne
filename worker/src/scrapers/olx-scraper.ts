@@ -20,8 +20,13 @@ export async function scrapeOLX(monitor: MonitorWithFilters): Promise<ScrapedAd[
     olxConfig.antiDetection.stealthLevel
   );
 
-  // Log engine metrics with detailed diagnosis
+  // Log auth context + engine metrics with detailed diagnosis
   const m = result.metrics;
+  console.log(
+    `OLX_AUTH_MODE: monitorId=${monitor.id} authMode=OPTIONAL_AUTH ` +
+    `contextMode=${m.authenticated ? 'AUTHENTICATED' : 'ANONYMOUS'} ` +
+    `authSource=${m.authSource}`
+  );
   console.log(
     `OLX_ENGINE: ads=${result.ads.length} raw=${m.adsRaw} ` +
       `selector=${m.selectorUsed || 'NONE'} scrolls=${m.scrollsDone} duration=${m.durationMs}ms ` +

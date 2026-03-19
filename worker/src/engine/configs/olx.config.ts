@@ -20,7 +20,7 @@ function parseBrazilianPrice(text: string): number {
 export const olxConfig: SiteConfig = {
   site: 'OLX',
   domain: 'olx.com.br',
-  authMode: 'anonymous',
+  authMode: 'cookies_optional',
   selectors: {
     containers: [
       // OLX Design System (2024-2026)

@@ -11,6 +11,9 @@ import { getRandomViewport } from './anti-detection';
  * 1. customAuthProvider (if defined in SiteConfig — e.g. ML)
  * 2. Database cookies (UserSession via userSessionService)
  * 3. Anonymous context (fallback)
+ *
+ * Observability: logs SESSION_POLICY_SELECTED, AUTHENTICATED_CONTEXT_USED,
+ * ANONYMOUS_CONTEXT_USED, AUTH_FALLBACK_USED at each decision point.
  */
 export async function getAuthContext(
   userId: string,
@@ -21,10 +24,20 @@ export async function getAuthContext(
   customAuthProvider?: CustomAuthProvider,
   browser?: Browser
 ): Promise<AuthContextResult> {
+  console.log(
+    `SESSION_POLICY_SELECTED: site=${site} userId=${userId} authMode=${authMode} ` +
+    `hasCustomProvider=${!!customAuthProvider}`
+  );
+
   // 1. Custom auth provider (ML uses this for its 5-priority cascade)
   if (customAuthProvider) {
     try {
-      return await customAuthProvider(userId);
+      const result = await customAuthProvider(userId);
+      console.log(
+        `AUTHENTICATED_CONTEXT_USED: site=${site} source=${result.source} ` +
+        `authenticated=${result.authenticated} via=customAuthProvider`
+      );
+      return result;
     } catch (error: any) {
       console.error(`ENGINE_AUTH: customAuthProvider failed for ${site}: ${error.message}`);
       // If cookies_required, we must propagate the error
@@ -40,8 +53,13 @@ export async function getAuthContext(
     try {
       const dbResult = await tryDatabaseAuth(userId, site, domain, antiDetection);
       if (dbResult) {
+        console.log(
+          `AUTHENTICATED_CONTEXT_USED: site=${site} source=database ` +
+          `authenticated=true sessionId=${dbResult.sessionId} via=databaseAuth`
+        );
         return dbResult;
       }
+      console.log(`SESSION_NOT_FOUND_FOR_SITE: site=${site} userId=${userId} — no valid DB session`);
     } catch (error: any) {
       console.error(`ENGINE_AUTH: Database auth failed for ${site}: ${error.message}`);
       if (authMode === 'cookies_required') {
@@ -61,6 +79,15 @@ export async function getAuthContext(
   }
 
   // 4. Anonymous context (use provided browser if available)
+  const isAuthFallback = authMode === 'cookies_optional';
+  if (isAuthFallback) {
+    console.log(
+      `AUTH_FALLBACK_USED: site=${site} userId=${userId} ` +
+      `reason=no_session_available falling_back_to=anonymous`
+    );
+  } else {
+    console.log(`ANONYMOUS_CONTEXT_USED: site=${site} userId=${userId} authMode=${authMode}`);
+  }
   return createAnonymousContext(antiDetection, browser);
 }
 
