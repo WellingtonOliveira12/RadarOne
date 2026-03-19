@@ -155,13 +155,15 @@ export function buildFacebookMarketplaceUrl(monitor: MonitorWithFilters): UrlBui
 
 /**
  * OLX state-to-subdomain mapping.
- * OLX uses regional subdomains: go.olx.com.br, sp.olx.com.br, etc.
+ *
+ * DISABLED: OLX state subdomains (go.olx.com.br, sp.olx.com.br) redirect to
+ * www.olx.com.br/ and LOSE the ?q= query string, breaking search entirely.
+ * Production logs confirmed: requested=go.olx.com.br/?q=... final=www.olx.com.br/
+ * Always use www.olx.com.br to preserve search query.
  */
 const OLX_STATE_SUBDOMAINS: Record<string, string> = {
-  AC: 'ac', AL: 'al', AP: 'ap', AM: 'am', BA: 'ba', CE: 'ce', DF: 'df',
-  ES: 'es', GO: 'go', MA: 'ma', MT: 'mt', MS: 'ms', MG: 'mg', PA: 'pa',
-  PB: 'pb', PR: 'pr', PE: 'pe', PI: 'pi', RJ: 'rj', RN: 'rn', RS: 'rs',
-  RO: 'ro', RR: 'rr', SC: 'sc', SP: 'sp', SE: 'se', TO: 'to',
+  // All states intentionally map to 'www' to avoid redirect query loss.
+  // State filtering is handled by OLX's internal location system via cookies.
 };
 
 /**
@@ -195,7 +197,7 @@ function buildOlxUrl(monitor: MonitorWithFilters): UrlBuildResult | null {
     return null;
   }
 
-  // Use state subdomain if available (go.olx.com.br for Goiás)
+  // Always use www to avoid redirect query loss (state subdomains disabled)
   const subdomain = OLX_STATE_SUBDOMAINS[state] || 'www';
   const url = `https://${subdomain}.olx.com.br/?q=${encodeURIComponent(keywords)}`;
 

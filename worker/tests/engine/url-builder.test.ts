@@ -55,7 +55,7 @@ describe('Other marketplaces are not affected', () => {
     const monitor = makeMonitor({ site: 'OLX' });
     const result = buildSearchUrl(monitor);
     expect(result).not.toBeNull();
-    expect(result!.url).toBe('https://go.olx.com.br/?q=carro');
+    expect(result!.url).toBe('https://www.olx.com.br/?q=carro');
     expect(result!.location).toBe('BR-GO-Itaberaí');
   });
 
@@ -80,18 +80,18 @@ describe('Other marketplaces are not affected', () => {
     });
     const result = buildSearchUrl(monitor);
     expect(result).not.toBeNull();
-    expect(result!.url).toBe('https://go.olx.com.br/?q=Corolla');
+    expect(result!.url).toBe('https://www.olx.com.br/?q=Corolla');
   });
 
   it('OLX extracts keywords from searchUrl ?q= param', () => {
     const monitor = makeMonitor({
       site: 'OLX',
       filtersJson: {},
-      searchUrl: 'https://go.olx.com.br/autos-e-pecas?q=Corolla',
+      searchUrl: 'https://www.olx.com.br/autos-e-pecas?q=Corolla',
     });
     const result = buildSearchUrl(monitor);
     expect(result).not.toBeNull();
-    expect(result!.url).toBe('https://go.olx.com.br/?q=Corolla');
+    expect(result!.url).toBe('https://www.olx.com.br/?q=Corolla');
   });
 
   it('OLX extracts keywords from monitor.keywords array', () => {
@@ -102,7 +102,7 @@ describe('Other marketplaces are not affected', () => {
     });
     const result = buildSearchUrl(monitor);
     expect(result).not.toBeNull();
-    expect(result!.url).toBe('https://go.olx.com.br/?q=Corolla');
+    expect(result!.url).toBe('https://www.olx.com.br/?q=Corolla');
   });
 
   it('returns null for MERCADO_LIVRE with STRUCTURED_FILTERS', () => {
@@ -411,7 +411,7 @@ describe('extractKeywords', () => {
   it('falls back to searchUrl ?q= param', () => {
     const monitor = makeMonitor({
       filtersJson: {},
-      searchUrl: 'https://go.olx.com.br/autos-e-pecas?q=Civic',
+      searchUrl: 'https://www.olx.com.br/autos-e-pecas?q=Civic',
     });
     expect(extractKeywords(monitor)).toBe('Civic');
   });

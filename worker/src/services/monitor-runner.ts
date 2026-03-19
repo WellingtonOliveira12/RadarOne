@@ -76,16 +76,19 @@ export class MonitorRunner {
           const buildResult = buildSearchUrl(monitor as any);
           if (buildResult) {
             (monitor as any).searchUrl = buildResult.url;
-            log.info('FB_MONITOR_URL', {
+            log.info('MONITOR_SEARCH_URL', {
               monitorId: monitor.id,
+              site: monitor.site,
               url: buildResult.url,
             });
-            log.info('FB_MONITOR_LOCATION', {
+            log.info('MONITOR_SEARCH_LOCATION', {
               monitorId: monitor.id,
+              site: monitor.site,
               location: buildResult.location,
             });
-            log.info('FB_MONITOR_MODE', {
+            log.info('MONITOR_SEARCH_MODE', {
               monitorId: monitor.id,
+              site: monitor.site,
               mode: 'STRUCTURED_FILTERS',
             });
 
