@@ -175,15 +175,22 @@ const OLX_STATE_SUBDOMAINS: Record<string, string> = {
  * Returns null if no keywords can be extracted — caller falls back to searchUrl.
  */
 function buildOlxUrl(monitor: MonitorWithFilters): UrlBuildResult | null {
+  // ── TRACE: Full input diagnostic ──
+  console.log(
+    `OLX_URL_BUILDER_ENTRY: monitorId=${monitor.id} name=${monitor.name} ` +
+    `filtersJson=${JSON.stringify(monitor.filtersJson)} ` +
+    `keywords=${JSON.stringify(monitor.keywords)} ` +
+    `searchUrl=${monitor.searchUrl?.substring(0, 80)} ` +
+    `state=${monitor.stateRegion || 'NONE'}`
+  );
+
   const state = monitor.stateRegion?.trim().toUpperCase() || '';
   const keywords = extractKeywords(monitor);
 
   if (!keywords) {
     console.log(
-      `OLX_URL_BUILD_NO_KEYWORDS: monitorId=${monitor.id} name=${monitor.name} ` +
-      `filtersJson=${JSON.stringify(monitor.filtersJson)} ` +
-      `keywords=${JSON.stringify(monitor.keywords)} ` +
-      `searchUrl=${monitor.searchUrl?.substring(0, 80)} — falling back to searchUrl`
+      `OLX_URL_BUILD_FAILED_NO_KEYWORDS: monitorId=${monitor.id} — ` +
+      `all 5 sources exhausted, no keyword found. Monitor config is invalid.`
     );
     return null;
   }
@@ -191,6 +198,11 @@ function buildOlxUrl(monitor: MonitorWithFilters): UrlBuildResult | null {
   // Use state subdomain if available (go.olx.com.br for Goiás)
   const subdomain = OLX_STATE_SUBDOMAINS[state] || 'www';
   const url = `https://${subdomain}.olx.com.br/?q=${encodeURIComponent(keywords)}`;
+
+  console.log(
+    `OLX_URL_BUILDER_SUCCESS: monitorId=${monitor.id} keyword=${keywords} ` +
+    `url=${url}`
+  );
 
   const locationParts = [monitor.country, state, monitor.city].filter(Boolean);
   const location = locationParts.join('-') || 'BR';
@@ -263,11 +275,13 @@ function extractKeywords(monitor: MonitorWithFilters): string {
     const filters = monitor.filtersJson as Record<string, unknown>;
 
     if (typeof filters.keywords === 'string' && filters.keywords.trim()) {
+      console.log(`KEYWORDS_RESOLVED: monitorId=${monitor.id} source=filtersJson.keywords value=${filters.keywords.trim()}`);
       return filters.keywords.trim();
     }
 
     // 2. filtersJson.keyword (singular)
     if (typeof filters.keyword === 'string' && filters.keyword.trim()) {
+      console.log(`KEYWORDS_RESOLVED: monitorId=${monitor.id} source=filtersJson.keyword value=${filters.keyword.trim()}`);
       return filters.keyword.trim();
     }
   }
@@ -275,7 +289,10 @@ function extractKeywords(monitor: MonitorWithFilters): string {
   // 3. monitor.keywords[] (top-level array from Prisma schema)
   if (Array.isArray(monitor.keywords) && monitor.keywords.length > 0) {
     const joined = monitor.keywords.filter(Boolean).join(' ').trim();
-    if (joined) return joined;
+    if (joined) {
+      console.log(`KEYWORDS_RESOLVED: monitorId=${monitor.id} source=monitor.keywords[] value=${joined}`);
+      return joined;
+    }
   }
 
   // 4. Extract ?q= from searchUrl (handles URL_ONLY monitors migrated to STRUCTURED_FILTERS)
@@ -283,7 +300,10 @@ function extractKeywords(monitor: MonitorWithFilters): string {
     try {
       const url = new URL(monitor.searchUrl);
       const q = url.searchParams.get('q') || url.searchParams.get('query');
-      if (q && q.trim()) return q.trim();
+      if (q && q.trim()) {
+        console.log(`KEYWORDS_RESOLVED: monitorId=${monitor.id} source=searchUrl.q value=${q.trim()}`);
+        return q.trim();
+      }
     } catch {
       // Invalid URL — ignore
     }
@@ -292,13 +312,11 @@ function extractKeywords(monitor: MonitorWithFilters): string {
   // 5. monitor.name as last resort (e.g., monitor named "Corolla" with empty keywords)
   // Only for STRUCTURED_FILTERS where the name likely IS the search term.
   if (monitor.name && monitor.name.trim()) {
-    console.log(
-      `KEYWORDS_FROM_NAME: monitorId=${monitor.id} name=${monitor.name} — ` +
-      `using monitor name as keyword (no other source available)`
-    );
+    console.log(`KEYWORDS_RESOLVED: monitorId=${monitor.id} source=monitor.name value=${monitor.name.trim()}`);
     return monitor.name.trim();
   }
 
+  console.log(`KEYWORDS_RESOLVED: monitorId=${monitor.id} source=NONE value=EMPTY — all 5 sources exhausted`);
   return '';
 }
 

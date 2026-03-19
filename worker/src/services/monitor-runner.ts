@@ -64,6 +64,14 @@ export class MonitorRunner {
       // STRUCTURED_FILTERS: build dynamic URL from location + keyword data
       const monitorMode = (monitor as any).mode as string | undefined;
       if (monitorMode === 'STRUCTURED_FILTERS') {
+        log.info('STRUCTURED_FILTERS_ENTRY', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          name: monitor.name,
+          searchUrlBefore: monitor.searchUrl?.substring(0, 80) || 'NONE',
+          hasFiltersJson: !!((monitor as any).filtersJson),
+          filtersJsonKeys: (monitor as any).filtersJson ? Object.keys((monitor as any).filtersJson) : [],
+        });
         try {
           const buildResult = buildSearchUrl(monitor as any);
           if (buildResult) {
