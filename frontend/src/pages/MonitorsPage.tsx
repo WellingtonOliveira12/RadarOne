@@ -677,7 +677,7 @@ export function MonitorsPage() {
                     onChange={setCity}
                     options={availableCities}
                     placeholder={t('monitors.location.searchCity')}
-                    disabled={!stateRegion || country === ''}
+                    disabled={false}
                     loading={loadingCities}
                     loadingText={t('monitors.location.loadingCities')}
                     noOptionsText={t('monitors.location.noCitiesFound')}
