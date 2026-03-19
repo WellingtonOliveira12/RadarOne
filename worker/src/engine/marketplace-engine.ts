@@ -1,3 +1,4 @@
+import { Page } from 'playwright';
 import {
   SiteConfig,
   ExtractionResult,
@@ -184,6 +185,11 @@ export class MarketplaceEngine {
         `visibleElements=${diagnosis.signals.visibleElements}`
       );
 
+      // OLX deep diagnostic — probe real DOM state before container wait
+      if (this.config.site === 'OLX') {
+        await this.olxDeepDiagnostic(authResult.page, monitor.id);
+      }
+
       // Handle non-content page types
       switch (diagnosis.pageType) {
         case 'LOGIN_REQUIRED':
@@ -338,6 +344,127 @@ export class MarketplaceEngine {
           `connected=${m.connected} activeContexts=${m.activeContexts} ` +
           `durationMs=${Date.now() - startTime}`
       );
+    }
+  }
+
+  /**
+   * OLX-specific deep diagnostic: probes the real DOM to understand
+   * what the page looks like before container wait + extraction.
+   * Logs element counts for ALL selectors, HTML snippet, anti-bot indicators.
+   */
+  private async olxDeepDiagnostic(page: Page, monitorId: string): Promise<void> {
+    try {
+      const diagnostic = await page.evaluate(() => {
+        const body = document.body;
+        const bodyText = body?.innerText || '';
+        const bodyHTML = body?.innerHTML || '';
+
+        // Anti-bot indicators
+        const antiBotSignals = {
+          hasAccessDenied: /access denied|acesso negado/i.test(bodyText),
+          hasCaptcha: /captcha|verify you are human|verifique/i.test(bodyText),
+          hasRetryMessage: /tente novamente|try again/i.test(bodyText),
+          hasBlankPage: bodyText.trim().length < 100,
+          htmlLength: bodyHTML.length,
+          textLength: bodyText.length,
+          title: document.title,
+        };
+
+        // Count elements for each known OLX selector
+        const selectorCounts: Record<string, number> = {};
+        const selectors = [
+          '[data-ds-component="DS-AdCard"]',
+          'li[data-ds-component="DS-AdCard"]',
+          'section[data-ds-component="DS-AdCard"]',
+          'a[data-lurker-detail]',
+          'li[class*="sc-"] a[href*="/d/"]',
+          '[class*="AdCard"]',
+          '.olx-ad-card',
+          '#ad-list li',
+          'ul[class*="list"] > li',
+          'section[class*="list"] a[href*="/d/"]',
+          // Extra discovery selectors
+          'a[href*="/d/"]',
+          '#ad-list',
+          '[id*="ad"]',
+          '[class*="ad-list"]',
+          '[class*="listing"]',
+          'article',
+          '[role="listitem"]',
+          '[data-testid]',
+        ];
+
+        for (const sel of selectors) {
+          try {
+            selectorCounts[sel] = document.querySelectorAll(sel).length;
+          } catch {
+            selectorCounts[sel] = -1; // invalid selector
+          }
+        }
+
+        // Capture HTML snippet around ad content (first 3000 chars of main content area)
+        let htmlSnippet = '';
+        const mainContent = document.querySelector('#ad-list, [class*="list"], main, [role="main"]');
+        if (mainContent) {
+          htmlSnippet = mainContent.innerHTML.substring(0, 3000);
+        } else {
+          // Fallback: body HTML after <header>
+          const headerEnd = bodyHTML.indexOf('</header>');
+          const start = headerEnd > 0 ? headerEnd + 9 : 0;
+          htmlSnippet = bodyHTML.substring(start, start + 3000);
+        }
+
+        // Check for all <a> tags linking to /d/ (OLX ad detail pattern)
+        const adLinks = document.querySelectorAll('a[href*="/d/"]');
+        const adLinkSamples: string[] = [];
+        for (let i = 0; i < Math.min(3, adLinks.length); i++) {
+          const el = adLinks[i] as HTMLAnchorElement;
+          adLinkSamples.push(`href=${el.href} text=${el.textContent?.trim().substring(0, 50)}`);
+        }
+
+        return { antiBotSignals, selectorCounts, htmlSnippet, adLinkCount: adLinks.length, adLinkSamples };
+      });
+
+      // Log anti-bot signals
+      console.log(
+        `OLX_DEEP_DIAGNOSTIC: monitorId=${monitorId} ` +
+        `title="${diagnostic.antiBotSignals.title}" ` +
+        `htmlLength=${diagnostic.antiBotSignals.htmlLength} ` +
+        `textLength=${diagnostic.antiBotSignals.textLength} ` +
+        `accessDenied=${diagnostic.antiBotSignals.hasAccessDenied} ` +
+        `captcha=${diagnostic.antiBotSignals.hasCaptcha} ` +
+        `retryMsg=${diagnostic.antiBotSignals.hasRetryMessage} ` +
+        `blankPage=${diagnostic.antiBotSignals.hasBlankPage}`
+      );
+
+      // Log selector counts
+      const selectorEntries = Object.entries(diagnostic.selectorCounts)
+        .map(([sel, count]) => `${sel}=${count}`)
+        .join(' | ');
+      console.log(`OLX_SELECTOR_COUNTS: monitorId=${monitorId} ${selectorEntries}`);
+
+      // Log ad links found
+      console.log(
+        `OLX_AD_LINKS: monitorId=${monitorId} count=${diagnostic.adLinkCount} ` +
+        `samples=[${diagnostic.adLinkSamples.join(' ; ')}]`
+      );
+
+      // Log HTML snippet (truncated for log safety)
+      const safeSnippet = diagnostic.htmlSnippet
+        .replace(/\n/g, ' ')
+        .replace(/\s+/g, ' ')
+        .substring(0, 1500);
+      console.log(`OLX_HTML_SNIPPET: monitorId=${monitorId} ${safeSnippet}`);
+
+      // Anti-bot alert
+      if (diagnostic.antiBotSignals.hasAccessDenied || diagnostic.antiBotSignals.hasCaptcha) {
+        console.warn(
+          `OLX_ANTI_BOT_DETECTED: monitorId=${monitorId} ` +
+          `reason=${diagnostic.antiBotSignals.hasAccessDenied ? 'ACCESS_DENIED' : 'CAPTCHA'}`
+        );
+      }
+    } catch (error: any) {
+      console.error(`OLX_DEEP_DIAGNOSTIC_ERROR: monitorId=${monitorId} error=${error.message}`);
     }
   }
 

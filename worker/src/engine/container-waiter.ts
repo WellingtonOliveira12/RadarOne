@@ -24,12 +24,15 @@ export async function waitForContainer(
         await page.waitForSelector(selector, { timeout, state: 'attached' });
         const count = await page.locator(selector).count();
         if (count > 0) {
+          console.log(`CONTAINER_FOUND: selector="${selector}" count=${count} timeout=${timeout}ms attempt=${i + 1}`);
           return { success: true, selector, timeout, attempts: i + 1 };
         }
       } catch {
         // Continue to next selector
       }
     }
+
+    console.log(`CONTAINER_WAIT_LEVEL_EXHAUSTED: level=${i + 1}/${timeouts.length} timeout=${timeout}ms selectors_tried=${selectors.length}`);
 
     // Wait a bit before next timeout level (unless last)
     if (i < timeouts.length - 1) {

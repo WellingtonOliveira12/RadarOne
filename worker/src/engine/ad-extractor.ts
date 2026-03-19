@@ -131,6 +131,26 @@ export async function extractAds(
     }
   );
 
+  // Log raw extraction results for OLX diagnostic
+  if (config.site === 'OLX') {
+    console.log(
+      `OLX_RAW_EXTRACTION: containerSelector="${containerSelector}" ` +
+      `rawCount=${rawAds.length} ` +
+      `titleSelector=${titleResult.selector || 'NONE'} ` +
+      `priceSelector=${priceResult.selector || 'NONE'} ` +
+      `linkSelector=${linkResult.selector || 'NONE'}`
+    );
+    // Log first 3 raw ads for inspection
+    for (let i = 0; i < Math.min(3, rawAds.length); i++) {
+      const ad = rawAds[i];
+      console.log(
+        `OLX_RAW_AD[${i}]: title="${ad.title?.substring(0, 60)}" ` +
+        `price="${ad.priceText}" url="${ad.url?.substring(0, 80)}" ` +
+        `location="${ad.location}"`
+      );
+    }
+  }
+
   // Process, validate and filter
   const ads: ScrapedAd[] = [];
   const skippedReasons: Record<string, number> = {};

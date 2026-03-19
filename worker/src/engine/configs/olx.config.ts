@@ -23,28 +23,36 @@ export const olxConfig: SiteConfig = {
   authMode: 'anonymous',
   selectors: {
     containers: [
+      // OLX Design System (2024-2026)
       '[data-ds-component="DS-AdCard"]',
       'li[data-ds-component="DS-AdCard"]',
-      'a[data-lurker-detail]',
-      'li.sc-1fcmfeb-2',          // OLX 2025+ listing item class pattern
       'section[data-ds-component="DS-AdCard"]',
+      // Legacy lurker
+      'a[data-lurker-detail]',
+      // Modern hashed class patterns
+      'li[class*="sc-"] a[href*="/d/"]',
       '[class*="AdCard"]',
       '.olx-ad-card',
-      'ul[class*="list"] > li a[href*="/d/"]', // List items with ad links
+      // Broad fallback: any <a> linking to /d/ inside a list
+      '#ad-list li',
+      'ul[class*="list"] > li',
+      'section[class*="list"] a[href*="/d/"]',
     ],
     title: [
       'h2',
+      'h2[class*="title"]',
       '[data-ds-component="DS-Text"]',
       '.olx-ad-card__title',
-      'h2[class*="title"]',
       'span[class*="title"]',
+      'h3',
     ],
     price: [
       'span[class*="price"]',
+      'p[class*="price"]',
       '[data-ds-component="DS-Text"]',
       '.olx-ad-card__price',
-      'p[class*="price"]',
       'span[aria-label*="preço"]',
+      'span[aria-label*="preco"]',
     ],
     link: [
       'a[href*="/d/"]',
@@ -57,30 +65,33 @@ export const olxConfig: SiteConfig = {
       'span[class*="location"]',
       '.olx-ad-card__location',
       'p[class*="detail"]',
+      'span[class*="detail"]',
     ],
     image: [
       'img[src*="img.olx"]',
       'img[data-src*="img.olx"]',
+      'img[loading="lazy"]',
       'img',
     ],
   },
   rateLimit: { tokensPerMin: 15 },
-  timeouts: [8000, 15000, 25000],
-  navigationTimeout: 45000,
-  renderDelay: 2000,
+  timeouts: [10000, 20000, 30000],
+  navigationTimeout: 60000,
+  renderDelay: 3500,
+  renderWaitSelector: '[data-ds-component="DS-AdCard"], a[data-lurker-detail], a[href*="/d/"]',
   scroll: {
     strategy: 'fixed',
-    fixedSteps: 3,
-    delayBetweenScrollsMs: 1200,
+    fixedSteps: 4,
+    delayBetweenScrollsMs: 1500,
   },
   antiDetection: {
-    stealthLevel: 'minimal',
-    blockImages: true,
+    stealthLevel: 'standard',
+    blockImages: false,
     blockFonts: true,
     blockCSS: false,
-    blockMedia: false,
-    injectStealthScripts: false,
-    randomizeViewport: false,
+    blockMedia: true,
+    injectStealthScripts: true,
+    randomizeViewport: true,
   },
   externalIdExtractor: (url: string) => {
     // Strip query string and fragment before extracting ID
