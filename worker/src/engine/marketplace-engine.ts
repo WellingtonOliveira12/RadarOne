@@ -158,15 +158,25 @@ export class MarketplaceEngine {
           `WARMUP_START: ${this.config.site} monitorId=${monitor.id} url=${this.config.warmupUrl}`
         );
         try {
+          // Use 'load' + networkidle to ensure ALL anti-bot scripts execute and set cookies
           await page.goto(this.config.warmupUrl, {
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'load',
             timeout: this.config.navigationTimeout,
           });
-          // Wait for anti-bot scripts to set cookies (realistic dwell time)
-          const warmupDelay = applyJitter(3000);
+          // Wait for networkidle — ensures all async scripts (reCAPTCHA, anti-bot) finish
+          try {
+            await page.waitForLoadState('networkidle', { timeout: 10000 });
+          } catch { /* non-fatal if networkidle times out */ }
+          // Realistic dwell time on homepage (human would browse for a few seconds)
+          const warmupDelay = applyJitter(4000);
           await page.waitForTimeout(warmupDelay);
+
+          // Log cookies established during warm-up
+          const cookies = await context.cookies();
+          const cookieDomains = [...new Set(cookies.map(c => c.domain))];
           console.log(
             `WARMUP_DONE: ${this.config.site} monitorId=${monitor.id} dwellMs=${warmupDelay} ` +
+            `cookies=${cookies.length} domains=[${cookieDomains.join(',')}] ` +
             `finalUrl=${page.url()}`
           );
         } catch (error: any) {
@@ -178,10 +188,20 @@ export class MarketplaceEngine {
       }
 
       // 3. Navigate to real search URL
+      // For sites with warm-up (SPA like OLX), use 'load' to wait for full page render.
+      // For other sites, use 'domcontentloaded' for speed.
+      const navWaitUntil = this.config.warmupUrl ? 'load' as const : 'domcontentloaded' as const;
       await page.goto(monitor.searchUrl!, {
-        waitUntil: 'domcontentloaded',
+        waitUntil: navWaitUntil,
         timeout: this.config.navigationTimeout,
       });
+
+      // For SPA sites: wait for network to settle (search API responses)
+      if (this.config.warmupUrl) {
+        try {
+          await page.waitForLoadState('networkidle', { timeout: 15000 });
+        } catch { /* non-fatal */ }
+      }
 
       // 3.1 Log final URL after redirects (observability for all sites)
       const finalUrl = page.url();
