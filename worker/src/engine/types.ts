@@ -172,6 +172,11 @@ export interface SiteConfig {
   noResultsPatterns: string[];
   loginPatterns: string[];
   checkpointPatterns?: string[];
+  /** Pre-navigation URL for anti-bot warm-up. If set, engine navigates here first
+   *  to establish cookies/session before the real search URL. */
+  warmupUrl?: string;
+  /** Extra HTTP headers to add to all requests (e.g. Referer for realistic navigation). */
+  extraHeaders?: Record<string, string>;
 }
 
 // Re-export scraper types for convenience

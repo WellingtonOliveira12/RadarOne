@@ -75,6 +75,14 @@ export class MarketplaceEngine {
               if (isAuthenticationError(error)) {
                 throw error;
               }
+              // Don't retry CAPTCHA for sites without a solver — same IP = same result.
+              // Retrying wastes 15+ seconds per attempt with no benefit.
+              if (error.message?.includes('CAPTCHA') && !captchaSolver.isEnabled()) {
+                console.warn(
+                  `ENGINE_CAPTCHA_NO_RETRY: ${this.config.site} captcha detected, no solver configured — aborting retries`
+                );
+                throw error;
+              }
               console.warn(
                 `ENGINE_RETRY: ${this.config.site} attempt ${attemptNum}: ${error.message}`
               );
@@ -138,7 +146,38 @@ export class MarketplaceEngine {
       // 2. Setup anti-detection
       await setupAntiDetection(context, this.config.antiDetection);
 
-      // 3. Navigate
+      // 2.5 Set extra headers if configured (e.g. Referer for OLX)
+      if (this.config.extraHeaders) {
+        await page.setExtraHTTPHeaders(this.config.extraHeaders);
+      }
+
+      // 2.6 Warm-up navigation: visit a seed URL first to establish cookies/tokens
+      //     before the real search URL. Mimics human browsing pattern.
+      if (this.config.warmupUrl) {
+        console.log(
+          `WARMUP_START: ${this.config.site} monitorId=${monitor.id} url=${this.config.warmupUrl}`
+        );
+        try {
+          await page.goto(this.config.warmupUrl, {
+            waitUntil: 'domcontentloaded',
+            timeout: this.config.navigationTimeout,
+          });
+          // Wait for anti-bot scripts to set cookies (realistic dwell time)
+          const warmupDelay = applyJitter(3000);
+          await page.waitForTimeout(warmupDelay);
+          console.log(
+            `WARMUP_DONE: ${this.config.site} monitorId=${monitor.id} dwellMs=${warmupDelay} ` +
+            `finalUrl=${page.url()}`
+          );
+        } catch (error: any) {
+          // Warm-up failure is non-fatal — continue to real URL
+          console.warn(
+            `WARMUP_FAILED: ${this.config.site} monitorId=${monitor.id} error=${error.message}`
+          );
+        }
+      }
+
+      // 3. Navigate to real search URL
       await page.goto(monitor.searchUrl!, {
         waitUntil: 'domcontentloaded',
         timeout: this.config.navigationTimeout,

@@ -87,9 +87,9 @@ export const olxConfig: SiteConfig = {
   antiDetection: {
     stealthLevel: 'standard',
     blockImages: false,
-    blockFonts: true,
+    blockFonts: false,
     blockCSS: false,
-    blockMedia: true,
+    blockMedia: false,
     injectStealthScripts: true,
     randomizeViewport: true,
   },
@@ -123,4 +123,18 @@ export const olxConfig: SiteConfig = {
     'faca login',
     'entrar na conta',
   ],
+  // Warm-up: visit homepage first to establish cookies/anti-bot tokens before searching.
+  // OLX serves captcha/empty results to direct-hit bot traffic but allows "browsing" visitors.
+  warmupUrl: 'https://www.olx.com.br/',
+  // Realistic navigation headers — make search look like user clicked from homepage.
+  extraHeaders: {
+    'Referer': 'https://www.olx.com.br/',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+  },
 };
