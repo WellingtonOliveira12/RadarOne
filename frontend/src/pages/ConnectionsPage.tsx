@@ -103,6 +103,13 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     loginUrl: 'facebook.com',
     playwrightCommand: 'npx playwright codegen facebook.com --save-storage=sessao.json',
   },
+  OLX: {
+    providerKey: 'OLX',
+    displayName: 'OLX',
+    requiredDomains: ['olx.com.br'],
+    loginUrl: 'olx.com.br',
+    playwrightCommand: 'npx playwright codegen olx.com.br --save-storage=sessao.json',
+  },
 };
 
 /** Helper: retorna config do provider ou fallback para ML (compatibilidade) */
@@ -909,6 +916,11 @@ const FALLBACK_SUPPORTED_SITES: SupportedSite[] = [
     name: 'Facebook Marketplace',
     domains: ['facebook.com'],
   },
+  {
+    id: 'OLX',
+    name: 'OLX',
+    domains: ['olx.com.br'],
+  },
 ];
 
 export default function ConnectionsPage() {
@@ -1082,7 +1094,7 @@ export default function ConnectionsPage() {
         {/* Site Cards */}
         <VStack spacing={4} align="stretch">
           {effectiveSites
-            .filter((site) => ['MERCADO_LIVRE', 'FACEBOOK_MARKETPLACE'].includes(site.id))
+            .filter((site) => ['MERCADO_LIVRE', 'FACEBOOK_MARKETPLACE', 'OLX'].includes(site.id))
             .map((site) => (
               <SiteCard
                 key={site.id}

@@ -67,7 +67,7 @@ interface MonitorsResponse {
 
 const SITE_OPTIONS: { value: MonitorSite; label: string; requiresLogin: boolean }[] = [
   { value: 'MERCADO_LIVRE', label: 'Mercado Livre', requiresLogin: true },
-  { value: 'OLX', label: 'OLX', requiresLogin: false },
+  { value: 'OLX', label: 'OLX', requiresLogin: true },
   { value: 'FACEBOOK_MARKETPLACE', label: 'Facebook Marketplace', requiresLogin: true },
   { value: 'WEBMOTORS', label: 'Webmotors', requiresLogin: false },
   { value: 'ICARROS', label: 'iCarros', requiresLogin: false },

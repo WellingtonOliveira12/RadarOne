@@ -320,6 +320,36 @@ export class MarketplaceEngine {
           });
       }
 
+      // 5.5 OLX shell page detection: if page loaded with content but zero ad links,
+      //     the anti-bot delivered the homepage shell without search results.
+      //     Fail fast instead of waiting 60+ seconds for container selectors that will never match.
+      if (this.config.site === 'OLX' && diagnosis.pageType === 'CONTENT') {
+        const adLinkCount = await page.locator('a[href*="/d/"]').count();
+        if (adLinkCount === 0) {
+          const isAuthenticated = authResult.authenticated;
+          console.warn(
+            `OLX_SHELL_PAGE_DETECTED: monitorId=${monitor.id} ` +
+            `bodyLength=${diagnosis.bodyLength} adLinks=0 authenticated=${isAuthenticated} ` +
+            `reason=anti_bot_delivered_shell_without_results`
+          );
+          diagnosis.pageType = 'BLOCKED';
+          return this.buildResult([], diagnosis, {
+            durationMs: Date.now() - startTime,
+            authenticated: authResult.authenticated,
+            authSource: authResult.source,
+            selectorUsed: null,
+            adsRaw: 0,
+            adsValid: 0,
+            skippedReasons: { shell_page: 1 },
+            scrollsDone: 0,
+            retryAttempts: 0,
+          });
+        }
+        console.log(
+          `OLX_RESULTS_PRESENT: monitorId=${monitor.id} adLinks=${adLinkCount} — proceeding to extraction`
+        );
+      }
+
       // 6. Wait for container
       const containerResult = await waitForContainer(
         page,

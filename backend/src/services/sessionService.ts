@@ -68,6 +68,10 @@ export const SUPPORTED_SITES: Record<string, { domains: string[]; displayName: s
     domains: ['facebook.com', 'www.facebook.com'],
     displayName: 'Facebook Marketplace',
   },
+  OLX: {
+    domains: ['olx.com.br', 'www.olx.com.br'],
+    displayName: 'OLX',
+  },
   SUPERBID: {
     domains: ['superbid.net', 'www.superbid.net'],
     displayName: 'Superbid',
