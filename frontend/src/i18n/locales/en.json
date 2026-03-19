@@ -291,8 +291,12 @@
       "worldwide": "No filter (Worldwide)",
       "stateRegion": "State / Region",
       "stateRegionPlaceholder": "SP, NY, etc.",
+      "selectState": "Select a state",
       "city": "City",
       "cityPlaceholder": "São Paulo, New York...",
+      "searchCity": "Type to search for a city...",
+      "loadingCities": "Loading cities...",
+      "noCitiesFound": "No city found. Type to enter manually.",
       "helpText": "Best-effort post-filter. Depends on the site exposing location in listings."
     },
     "customFilters": {

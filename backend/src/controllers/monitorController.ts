@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as monitorService from '../services/monitorService';
 import { MonitorSite } from '@prisma/client';
+import { normalizeStateToCode, normalizeCityName } from '../utils/location-normalizer';
 
 /**
  * Controller de Monitores - RadarOne
@@ -163,14 +164,22 @@ export async function createMonitor(
         return;
       }
     }
-    const stateRegion = !country ? null
-      : (rawState && typeof rawState === 'string' && rawState.trim().length >= 2 && rawState.trim().length <= 40)
-        ? rawState.trim().toUpperCase()
-        : null;
+
+    // Normalize state: accept both UF codes and full names (backward compat)
+    let stateRegion: string | null = null;
+    if (country && rawState && typeof rawState === 'string' && rawState.trim().length >= 2) {
+      if (country === 'BR') {
+        // Try to normalize to UF code (handles "São Paulo" → "SP", "sp" → "SP", etc.)
+        const normalized = normalizeStateToCode(rawState);
+        stateRegion = normalized ?? rawState.trim().toUpperCase().slice(0, 40);
+      } else {
+        stateRegion = rawState.trim().toUpperCase().slice(0, 40);
+      }
+    }
+
+    // Normalize city: preserve accents, trim whitespace
     const city = !country ? null
-      : (rawCity && typeof rawCity === 'string' && rawCity.trim().length >= 2 && rawCity.trim().length <= 80)
-        ? rawCity.trim()
-        : null;
+      : normalizeCityName(rawCity);
 
     // Cria o monitor (validações de plano são feitas no service)
     const monitor = await monitorService.createMonitor(userId, {
@@ -303,18 +312,31 @@ export async function updateMonitor(
       }
     }
     const effectiveCountry = country !== undefined ? country : rawCountry;
-    const stateRegion = effectiveCountry === null ? null
-      : (rawState !== undefined)
-        ? (typeof rawState === 'string' && rawState.trim().length >= 2 && rawState.trim().length <= 40
-            ? rawState.trim().toUpperCase()
-            : null)
-        : undefined;
-    const city = effectiveCountry === null ? null
-      : (rawCity !== undefined)
-        ? (typeof rawCity === 'string' && rawCity.trim().length >= 2 && rawCity.trim().length <= 80
-            ? rawCity.trim()
-            : null)
-        : undefined;
+
+    // Normalize state: accept both UF codes and full names (backward compat)
+    let stateRegion: string | null | undefined = undefined;
+    if (effectiveCountry === null) {
+      stateRegion = null;
+    } else if (rawState !== undefined) {
+      if (typeof rawState === 'string' && rawState.trim().length >= 2) {
+        if (effectiveCountry === 'BR') {
+          const normalized = normalizeStateToCode(rawState);
+          stateRegion = normalized ?? rawState.trim().toUpperCase().slice(0, 40);
+        } else {
+          stateRegion = rawState.trim().toUpperCase().slice(0, 40);
+        }
+      } else {
+        stateRegion = null;
+      }
+    }
+
+    // Normalize city: preserve accents, trim whitespace
+    let city: string | null | undefined = undefined;
+    if (effectiveCountry === null) {
+      city = null;
+    } else if (rawCity !== undefined) {
+      city = normalizeCityName(rawCity);
+    }
 
     // Atualiza o monitor
     const monitor = await monitorService.updateMonitor(userId, id, {

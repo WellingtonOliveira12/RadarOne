@@ -291,8 +291,12 @@
       "worldwide": "Sem filtro (Worldwide)",
       "stateRegion": "Estado / Região",
       "stateRegionPlaceholder": "SP, NY, etc.",
+      "selectState": "Selecione o estado",
       "city": "Cidade",
       "cityPlaceholder": "São Paulo, New York...",
+      "searchCity": "Digite para buscar a cidade...",
+      "loadingCities": "Carregando cidades...",
+      "noCitiesFound": "Nenhuma cidade encontrada. Digite para inserir manualmente.",
       "helpText": "Pós-filtro best-effort. Depende do site expor localização nos anúncios."
     },
     "customFilters": {

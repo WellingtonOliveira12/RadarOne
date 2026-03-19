@@ -8,8 +8,10 @@ import { useAuth } from '../context/AuthContext';
 import { trackMonitorCreated } from '../lib/analytics';
 import { TrialBanner } from '../components/TrialBanner';
 import { AppLayout } from '../components/AppLayout';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { getCountryList } from '../utils/countries';
 import { getSiteDefaultUrl, isDefaultUrl } from '../constants/siteDefaults';
+import { useLocationData, resolveStateCode } from '../hooks/useLocationData';
 import * as responsive from '../styles/responsive';
 
 type MonitorSite =
@@ -203,10 +205,13 @@ export function MonitorsPage() {
   const [idSelecionado, setIdSelecionado] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Localização (global)
+  // Localização (global) — stateRegion stores UF code (e.g., 'GO')
   const [country, setCountry] = useState('BR');
   const [stateRegion, setStateRegion] = useState('');
   const [city, setCity] = useState('');
+
+  // Cascading location data (states/cities based on country/state)
+  const { states: availableStates, cities: availableCities, loadingCities } = useLocationData(country, stateRegion);
 
   // Filtros estruturados (sem city/state — ficam só em Localização)
   const [filters, setFilters] = useState<StructuredFilters>({ ...DEFAULT_FILTERS });
@@ -314,14 +319,18 @@ export function MonitorsPage() {
         }
       }
 
+      // Normalize location before sending
+      const normalizedState = stateRegion.trim().toUpperCase() || null;
+      const normalizedCity = city.trim() || null;
+
       const body: Record<string, unknown> = {
         name,
         site,
         mode,
         active,
         country: country || null, // '' -> null (sem filtro)
-        stateRegion: stateRegion.trim() || null,
-        city: city.trim() || null,
+        stateRegion: normalizedState,
+        city: normalizedCity,
       };
 
       if (mode === 'URL_ONLY') {
@@ -381,8 +390,13 @@ export function MonitorsPage() {
     setSearchUrl(monitor.searchUrl || '');
     setActive(monitor.active);
     setIdSelecionado(monitor.id);
-    setCountry(monitor.country || '');
-    setStateRegion(monitor.stateRegion || '');
+
+    // Backward compat: normalize legacy free-text state to UF code
+    const editCountry = monitor.country || '';
+    setCountry(editCountry);
+    const resolvedState = resolveStateCode(monitor.stateRegion);
+    setStateRegion(resolvedState);
+    // City will be resolved against available options once cities load
     setCity(monitor.city || '');
 
     if (monitor.mode === 'STRUCTURED_FILTERS' && monitor.filtersJson) {
@@ -592,13 +606,15 @@ export function MonitorsPage() {
           <div style={styles.locationBox}>
             <h3 style={styles.locationTitle}>{t('monitors.location.title')}</h3>
             <div style={styles.locationGrid}>
+              {/* País — dropdown */}
               <div style={styles.field}>
                 <label style={styles.labelSmall}>{t('monitors.location.country')}</label>
                 <select
                   value={country}
                   onChange={(e) => {
-                    setCountry(e.target.value);
-                    if (e.target.value === '') {
+                    const newCountry = e.target.value;
+                    setCountry(newCountry);
+                    if (newCountry === '' || newCountry !== country) {
                       setStateRegion('');
                       setCity('');
                     }
@@ -615,27 +631,69 @@ export function MonitorsPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Estado — dropdown dependente do país */}
               <div style={styles.field}>
                 <label style={styles.labelSmall}>{t('monitors.location.stateRegion')}</label>
-                <input
-                  type="text"
-                  value={stateRegion}
-                  onChange={(e) => setStateRegion(e.target.value)}
-                  disabled={country === ''}
-                  style={styles.input}
-                  placeholder={t('monitors.location.stateRegionPlaceholder')}
-                />
+                {availableStates.length > 0 ? (
+                  <select
+                    value={stateRegion}
+                    onChange={(e) => {
+                      setStateRegion(e.target.value);
+                      setCity(''); // Reset city when state changes
+                    }}
+                    disabled={country === ''}
+                    style={styles.input}
+                  >
+                    <option value="">{t('monitors.location.selectState')}</option>
+                    {availableStates.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.code} - {s.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  /* Fallback to text input for non-BR countries */
+                  <input
+                    type="text"
+                    value={stateRegion}
+                    onChange={(e) => {
+                      setStateRegion(e.target.value);
+                      setCity('');
+                    }}
+                    disabled={country === ''}
+                    style={styles.input}
+                    placeholder={t('monitors.location.stateRegionPlaceholder')}
+                  />
+                )}
               </div>
+
+              {/* Cidade — dropdown pesquisável dependente do estado */}
               <div style={styles.field}>
                 <label style={styles.labelSmall}>{t('monitors.location.city')}</label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  disabled={country === ''}
-                  style={styles.input}
-                  placeholder={t('monitors.location.cityPlaceholder')}
-                />
+                {country === 'BR' && stateRegion ? (
+                  <SearchableSelect
+                    value={city}
+                    onChange={setCity}
+                    options={availableCities}
+                    placeholder={t('monitors.location.searchCity')}
+                    disabled={!stateRegion || country === ''}
+                    loading={loadingCities}
+                    loadingText={t('monitors.location.loadingCities')}
+                    noOptionsText={t('monitors.location.noCitiesFound')}
+                    allowFreeText={true}
+                  />
+                ) : (
+                  /* Fallback to text input for non-BR countries */
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    disabled={country === ''}
+                    style={styles.input}
+                    placeholder={t('monitors.location.cityPlaceholder')}
+                  />
+                )}
               </div>
             </div>
             <p style={styles.helpText}>{t('monitors.location.helpText')}</p>
