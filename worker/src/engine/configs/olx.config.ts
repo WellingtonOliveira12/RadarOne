@@ -43,11 +43,14 @@ export const olxConfig: SiteConfig = {
       'h3',
     ],
     price: [
+      // OLX 2025-2026: price inside data-testid containers (confirmed in production)
+      '[data-testid="adcard-price-info"] h3',
+      '[data-testid="adcard-price-info"] p',
+      '[data-testid="adcard-price-info"] span',
+      'h3[class*="price"]',
       'span[class*="price"]',
       'p[class*="price"]',
-      '[data-ds-component="DS-Text"]',
       'span[aria-label*="preço"]',
-      'span[aria-label*="preco"]',
     ],
     link: [
       'a[href*="olx.com.br"]',
@@ -59,9 +62,10 @@ export const olxConfig: SiteConfig = {
     ],
     location: [
       'span[class*="location"]',
+      '[data-testid="ad-location"]',
+      '[class*="location"]',
       'p[class*="detail"]',
       'span[class*="detail"]',
-      '[data-testid="ad-location"]',
     ],
     image: [
       'img[src*="img.olx"]',
