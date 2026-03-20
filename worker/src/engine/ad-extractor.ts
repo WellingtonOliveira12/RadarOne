@@ -159,20 +159,30 @@ export async function extractAds(
     skippedReasons[reason] = (skippedReasons[reason] || 0) + 1;
   };
 
-  // Determine filter strategy:
-  // - Facebook STRUCTURED_FILTERS: soft state-level filter (FB location extraction is heuristic)
-  // - OLX STRUCTURED_FILTERS: soft state-level filter (OLX search via UI is always national,
-  //   cannot be restricted by location in the URL — hard filter would reject ALL results)
-  // - Other sites: full location match (city/state/country)
-  const useSoftStateFilter =
-    (config.site === 'FACEBOOK_MARKETPLACE' || config.site === 'OLX') &&
-    monitor.mode === 'STRUCTURED_FILTERS';
+  // Location filter strategies per site:
+  // - Facebook STRUCTURED_FILTERS: SOFT state filter (FB location is heuristic/unreliable)
+  // - OLX: STRICT filter (location is reliably extracted as "Cidade - UF")
+  // - Other sites: full location match via location-matcher
+  const isFbStructured =
+    config.site === 'FACEBOOK_MARKETPLACE' && monitor.mode === 'STRUCTURED_FILTERS';
+  const isOlxSite = config.site === 'OLX';
 
-  const softTargetState = useSoftStateFilter ? (monitor.stateRegion?.trim().toUpperCase() || '') : '';
-  if (useSoftStateFilter && rawAds.length > 0) {
+  const fbTargetState = isFbStructured ? (monitor.stateRegion?.trim().toUpperCase() || '') : '';
+  const olxTargetState = isOlxSite ? (monitor.stateRegion?.trim().toUpperCase() || '') : '';
+  const olxTargetCity = isOlxSite && monitor.city ? normalizeForComparison(monitor.city) : '';
+  const olxRequiresLocation = isOlxSite && (!!olxTargetState || !!olxTargetCity);
+
+  if (isOlxSite && rawAds.length > 0) {
     console.log(
-      `LOCATION_SOFT_FILTER: site=${config.site} mode=${monitor.mode} ` +
-      `rawAds=${rawAds.length} targetState=${softTargetState || 'NONE'} ` +
+      `OLX_LOCATION_RULE: mode=STRICT scope=${olxTargetCity ? 'city' : olxTargetState ? 'state' : 'country'} ` +
+      `targetState=${olxTargetState || 'NONE'} targetCity=${olxTargetCity || 'NONE'} ` +
+      `requiresLocation=${olxRequiresLocation}`
+    );
+  }
+  if (isFbStructured && rawAds.length > 0) {
+    console.log(
+      `FB_LOCATION_SOFT_FILTER: site=${config.site} mode=${monitor.mode} ` +
+      `rawAds=${rawAds.length} targetState=${fbTargetState || 'NONE'} ` +
       `policy=accept_same_state_or_unknown`
     );
   }
@@ -211,22 +221,47 @@ export async function extractAds(
       continue;
     }
 
-    // Location filter — strategy depends on site + mode
-    if (useSoftStateFilter) {
-      // FB/OLX STRUCTURED_FILTERS: soft state-level filter.
-      // Only reject ads where the extracted location clearly shows a different state.
-      // OLX search via UI is national — can't restrict by location in URL.
-      // Policy: accept if (a) no location, (b) state matches, (c) state not determinable.
-      if (softTargetState && raw.location) {
-        const extractedState = extractBrazilianStateCode(raw.location);
-        if (extractedState && extractedState !== softTargetState) {
-          skip('soft_state_mismatch');
+    // Location filter — strategy depends on site
+    if (isOlxSite) {
+      // OLX STRICT location filter.
+      // OLX search via UI is national, so post-extraction filtering is the only way
+      // to enforce location. If user configured state/city, ads MUST match.
+      if (olxRequiresLocation) {
+        const parsed = parseOlxLocation(raw.location);
+        if (!parsed.state) {
+          // Location unknown/absent — reject when state/city is required
+          skip('olx_location_unknown');
+          continue;
+        }
+        if (olxTargetState && parsed.state !== olxTargetState) {
+          skip('olx_state_mismatch');
+          continue;
+        }
+        if (olxTargetCity && parsed.city) {
+          const normalizedParsedCity = normalizeForComparison(parsed.city);
+          if (normalizedParsedCity !== olxTargetCity) {
+            skip('olx_city_mismatch');
+            continue;
+          }
+        } else if (olxTargetCity && !parsed.city) {
+          // City required but not extractable — reject
+          skip('olx_city_unknown');
           continue;
         }
       }
-      // No location or no target state → accept
+      // No state/city configured → accept all (Brasil inteiro)
+    } else if (isFbStructured) {
+      // Facebook STRUCTURED_FILTERS: SOFT state-level filter.
+      // FB location extraction is heuristic — accept if unknown/matching.
+      if (fbTargetState && raw.location) {
+        const extractedState = extractBrazilianStateCode(raw.location);
+        if (extractedState && extractedState !== fbTargetState) {
+          skip('fb_state_mismatch');
+          continue;
+        }
+      }
     } else if (monitor.country) {
-      // Non-Facebook sites: full location match (city/state/country)
+      // Other sites: full location match (city/state/country)
       const locResult = matchLocation(raw.location, {
         country: monitor.country,
         stateRegion: monitor.stateRegion,
@@ -292,4 +327,55 @@ function extractBrazilianStateCode(location: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Parses OLX location string into city and state components.
+ *
+ * OLX format (from production logs):
+ *   "São Paulo -  SP"                    → { city: "São Paulo", state: "SP" }
+ *   "São José dos Pinhais -  PRHoje, 12:12" → { city: "São José dos Pinhais", state: "PR" }
+ *   "Curitiba -  PRHoje, 12:10"          → { city: "Curitiba", state: "PR" }
+ *   "Rio de Janeiro -  RJOntem, 19:09"   → { city: "Rio de Janeiro", state: "RJ" }
+ *   ""                                   → { city: null, state: null }
+ */
+function parseOlxLocation(location: string): { city: string | null; state: string | null } {
+  if (!location || !location.trim()) return { city: null, state: null };
+
+  const text = location.trim();
+
+  // OLX pattern: "Cidade -  UF" or "Cidade - UFDate..."
+  // The UF is always 2 uppercase letters after " - " or " -  "
+  const match = text.match(/^(.+?)\s*-\s+([A-Z]{2})/);
+  if (match && BRAZILIAN_STATES.has(match[2])) {
+    return {
+      city: match[1].trim(),
+      state: match[2],
+    };
+  }
+
+  // Fallback: try to find UF anywhere followed by non-letter
+  const ufMatch = text.match(/[,\-–]\s*([A-Z]{2})(?:[^A-Za-z]|$)/);
+  if (ufMatch && BRAZILIAN_STATES.has(ufMatch[1])) {
+    const cityPart = text.substring(0, text.indexOf(ufMatch[0])).trim();
+    return {
+      city: cityPart || null,
+      state: ufMatch[1],
+    };
+  }
+
+  return { city: null, state: null };
+}
+
+/**
+ * Normalizes a city name for comparison (case-insensitive, accent-insensitive).
+ *   "Goiânia" → "goiania"
+ *   "São Paulo" → "sao paulo"
+ */
+function normalizeForComparison(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 }

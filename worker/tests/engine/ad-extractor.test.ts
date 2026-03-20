@@ -407,7 +407,7 @@ describe('extractAds', () => {
 
     expect(result.adsRaw).toBe(1);
     expect(result.ads).toHaveLength(0);
-    expect(result.skippedReasons).toHaveProperty('soft_state_mismatch', 1);
+    expect(result.skippedReasons).toHaveProperty('fb_state_mismatch', 1);
   });
 
   it('should accept FB STRUCTURED_FILTERS ads from correct state', async () => {
@@ -525,5 +525,117 @@ describe('extractAds', () => {
     expect(result.adsRaw).toBe(1);
     expect(result.ads).toHaveLength(1);
     expect(result.ads[0].url).toBe('https://www.facebook.com/marketplace/item/555666777/');
+  });
+});
+
+// ============================================================
+// OLX STRICT LOCATION FILTER
+// ============================================================
+
+describe('OLX strict location filter', () => {
+  const olxConfig: SiteConfig = {
+    ...testConfig,
+    site: 'OLX',
+    domain: 'olx.com.br',
+    selectors: {
+      ...testConfig.selectors,
+      title: ['h2'],
+      price: ['span.price'],
+      link: ['a'],
+      location: ['span.location'],
+    },
+    externalIdExtractor: (url: string) => {
+      const m = url.match(/(\d{7,})/);
+      return m ? `OLX-${m[1]}` : '';
+    },
+    urlNormalizer: (url: string) => url.startsWith('http') ? url : `https://www.olx.com.br${url}`,
+  };
+
+  function makeOlxElement(title: string, price: string, url: string, location: string) {
+    return createElement({
+      tagName: 'SECTION',
+      childSelectors: {
+        h2: { textContent: title },
+        'span.price': { textContent: price },
+        a: { href: url, textContent: title },
+        'span.location': { textContent: location },
+      },
+    });
+  }
+
+  it('accepts any location when monitor has no state/city (Brasil inteiro)', async () => {
+    const elements = [makeOlxElement('Corolla', 'R$ 70.000', 'https://sp.olx.com.br/autos/corolla-1234567890', 'São Paulo -  SP')];
+    const page = createMockPage(elements);
+    const monitor: MonitorWithFilters = { ...testMonitor, site: 'OLX', mode: 'STRUCTURED_FILTERS', country: 'BR', stateRegion: undefined, city: undefined };
+    const result = await extractAds(page, '.olx-adcard', olxConfig, monitor);
+    expect(result.ads).toHaveLength(1);
+  });
+
+  it('accepts ad from correct state when monitor has state only', async () => {
+    const elements = [makeOlxElement('Corolla', 'R$ 70.000', 'https://go.olx.com.br/autos/corolla-1234567890', 'Goiânia -  GO')];
+    const page = createMockPage(elements);
+    const monitor: MonitorWithFilters = { ...testMonitor, site: 'OLX', mode: 'STRUCTURED_FILTERS', country: 'BR', stateRegion: 'GO', city: undefined };
+    const result = await extractAds(page, '.olx-adcard', olxConfig, monitor);
+    expect(result.ads).toHaveLength(1);
+  });
+
+  it('rejects ad from wrong state when monitor has state', async () => {
+    const elements = [makeOlxElement('Corolla', 'R$ 70.000', 'https://sp.olx.com.br/autos/corolla-1234567890', 'São Paulo -  SP')];
+    const page = createMockPage(elements);
+    const monitor: MonitorWithFilters = { ...testMonitor, site: 'OLX', mode: 'STRUCTURED_FILTERS', country: 'BR', stateRegion: 'GO', city: undefined };
+    const result = await extractAds(page, '.olx-adcard', olxConfig, monitor);
+    expect(result.ads).toHaveLength(0);
+    expect(result.skippedReasons).toHaveProperty('olx_state_mismatch', 1);
+  });
+
+  it('accepts ad from correct city+state', async () => {
+    const elements = [makeOlxElement('Corolla', 'R$ 70.000', 'https://go.olx.com.br/autos/corolla-1234567890', 'Goiânia -  GO')];
+    const page = createMockPage(elements);
+    const monitor: MonitorWithFilters = { ...testMonitor, site: 'OLX', mode: 'STRUCTURED_FILTERS', country: 'BR', stateRegion: 'GO', city: 'Goiânia' };
+    const result = await extractAds(page, '.olx-adcard', olxConfig, monitor);
+    expect(result.ads).toHaveLength(1);
+  });
+
+  it('rejects ad from wrong city same state', async () => {
+    const elements = [makeOlxElement('Corolla', 'R$ 70.000', 'https://go.olx.com.br/autos/corolla-1234567890', 'Aparecida de Goiânia -  GO')];
+    const page = createMockPage(elements);
+    const monitor: MonitorWithFilters = { ...testMonitor, site: 'OLX', mode: 'STRUCTURED_FILTERS', country: 'BR', stateRegion: 'GO', city: 'Goiânia' };
+    const result = await extractAds(page, '.olx-adcard', olxConfig, monitor);
+    expect(result.ads).toHaveLength(0);
+    expect(result.skippedReasons).toHaveProperty('olx_city_mismatch', 1);
+  });
+
+  it('rejects ad with absent location when state required', async () => {
+    const elements = [makeOlxElement('Corolla', 'R$ 70.000', 'https://go.olx.com.br/autos/corolla-1234567890', '')];
+    const page = createMockPage(elements);
+    const monitor: MonitorWithFilters = { ...testMonitor, site: 'OLX', mode: 'STRUCTURED_FILTERS', country: 'BR', stateRegion: 'GO', city: undefined };
+    const result = await extractAds(page, '.olx-adcard', olxConfig, monitor);
+    expect(result.ads).toHaveLength(0);
+    expect(result.skippedReasons).toHaveProperty('olx_location_unknown', 1);
+  });
+
+  it('rejects ad with absent location when city required', async () => {
+    const elements = [makeOlxElement('Corolla', 'R$ 70.000', 'https://go.olx.com.br/autos/corolla-1234567890', '')];
+    const page = createMockPage(elements);
+    const monitor: MonitorWithFilters = { ...testMonitor, site: 'OLX', mode: 'STRUCTURED_FILTERS', country: 'BR', stateRegion: 'GO', city: 'Goiânia' };
+    const result = await extractAds(page, '.olx-adcard', olxConfig, monitor);
+    expect(result.ads).toHaveLength(0);
+    expect(result.skippedReasons).toHaveProperty('olx_location_unknown', 1);
+  });
+
+  it('accepts ad with absent location when no state/city configured', async () => {
+    const elements = [makeOlxElement('Corolla', 'R$ 70.000', 'https://go.olx.com.br/autos/corolla-1234567890', '')];
+    const page = createMockPage(elements);
+    const monitor: MonitorWithFilters = { ...testMonitor, site: 'OLX', mode: 'STRUCTURED_FILTERS', country: 'BR', stateRegion: undefined, city: undefined };
+    const result = await extractAds(page, '.olx-adcard', olxConfig, monitor);
+    expect(result.ads).toHaveLength(1);
+  });
+
+  it('parses OLX location with datetime suffix correctly', async () => {
+    const elements = [makeOlxElement('Bike', 'R$ 1.000', 'https://pr.olx.com.br/ciclismo/bike-1234567890', 'São José dos Pinhais -  PRHoje, 12:12')];
+    const page = createMockPage(elements);
+    const monitor: MonitorWithFilters = { ...testMonitor, site: 'OLX', mode: 'STRUCTURED_FILTERS', country: 'BR', stateRegion: 'PR', city: undefined };
+    const result = await extractAds(page, '.olx-adcard', olxConfig, monitor);
+    expect(result.ads).toHaveLength(1);
   });
 });
