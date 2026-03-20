@@ -369,31 +369,79 @@ export class MarketplaceEngine {
           `OLX_RESULTS_PRESENT: monitorId=${monitor.id} adCards=${adCardCount} adLinks=${adLinkCount} — proceeding to extraction`
         );
 
-        // Capture real DOM structure of first few cards for selector discovery
+        // Capture raw outerHTML of first few cards to discover real structure
         try {
-          const cardSamples = await page.evaluate(() => {
+          const cardAudit = await page.evaluate(() => {
             const cards = document.querySelectorAll('[class*="AdCard"]');
-            const samples: string[] = [];
-            for (let i = 0; i < Math.min(3, cards.length); i++) {
-              const card = cards[i];
-              // Find all <a> links inside the card
-              const links = card.querySelectorAll('a');
-              const linkInfo = Array.from(links).map(a => a.getAttribute('href')).filter(Boolean);
-              // Find title text
-              const h2 = card.querySelector('h2');
-              const title = h2?.textContent?.trim()?.substring(0, 60) || '';
-              // Find price
-              const priceEl = card.querySelector('span[class*="price"], p[class*="price"]');
-              const price = priceEl?.textContent?.trim() || '';
-              samples.push(`title="${title}" price="${price}" links=[${linkInfo.map(l => (l as string).substring(0, 80)).join(',')}]`);
+            const results: Array<{
+              index: number;
+              tagName: string;
+              className: string;
+              outerHtmlSnippet: string;
+              innerText: string;
+              childTags: string[];
+              allLinks: string[];
+              allDataAttrs: string[];
+              isAnchor: boolean;
+              ownHref: string;
+            }> = [];
+
+            for (let i = 0; i < Math.min(5, cards.length); i++) {
+              const card = cards[i] as HTMLElement;
+              // Get all child element tags
+              const children = Array.from(card.querySelectorAll('*'));
+              const childTags = [...new Set(children.map(c => c.tagName.toLowerCase()))];
+              // Get all links
+              const links = Array.from(card.querySelectorAll('a'));
+              const allLinks = links.map(a => a.getAttribute('href') || '').filter(Boolean);
+              // If card IS an <a>, get its href
+              const isAnchor = card.tagName === 'A';
+              const ownHref = isAnchor ? (card.getAttribute('href') || '') : '';
+              // Get all data-* attributes on the card and immediate children
+              const dataAttrs: string[] = [];
+              for (const attr of Array.from(card.attributes)) {
+                if (attr.name.startsWith('data-')) dataAttrs.push(`${attr.name}=${attr.value.substring(0, 50)}`);
+              }
+              children.slice(0, 20).forEach(child => {
+                for (const attr of Array.from(child.attributes)) {
+                  if (attr.name.startsWith('data-')) dataAttrs.push(`${child.tagName.toLowerCase()}.${attr.name}=${attr.value.substring(0, 50)}`);
+                }
+              });
+
+              results.push({
+                index: i,
+                tagName: card.tagName,
+                className: card.className.substring(0, 200),
+                outerHtmlSnippet: card.outerHTML.substring(0, 500),
+                innerText: card.innerText?.substring(0, 200) || '',
+                childTags: childTags.slice(0, 20),
+                allLinks,
+                allDataAttrs: [...new Set(dataAttrs)].slice(0, 20),
+                isAnchor,
+                ownHref,
+              });
             }
-            return samples;
+            return results;
           });
-          for (let i = 0; i < cardSamples.length; i++) {
-            console.log(`OLX_DOM_CARD_SAMPLE[${i}]: monitorId=${monitor.id} ${cardSamples[i]}`);
+
+          for (const card of cardAudit) {
+            console.log(
+              `OLX_CARD_AUDIT[${card.index}]: monitorId=${monitor.id} ` +
+              `tag=${card.tagName} isAnchor=${card.isAnchor} ownHref="${card.ownHref}" ` +
+              `class="${card.className.substring(0, 100)}" ` +
+              `innerText="${card.innerText.replace(/\n/g, ' ').substring(0, 150)}" ` +
+              `childTags=[${card.childTags.join(',')}] ` +
+              `links=[${card.allLinks.map(l => l.substring(0, 80)).join(' | ')}] ` +
+              `dataAttrs=[${card.allDataAttrs.join(', ')}]`
+            );
+            // Also log raw HTML snippet for selector discovery
+            const safeHtml = card.outerHtmlSnippet.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+            console.log(
+              `OLX_CARD_HTML[${card.index}]: monitorId=${monitor.id} ${safeHtml}`
+            );
           }
         } catch (e: any) {
-          console.warn(`OLX_DOM_CARD_SAMPLE_ERROR: ${e.message}`);
+          console.warn(`OLX_CARD_AUDIT_ERROR: ${e.message}`);
         }
       }
 
