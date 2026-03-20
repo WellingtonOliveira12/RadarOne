@@ -124,11 +124,24 @@ export const olxConfig: SiteConfig = {
     'entrar na conta',
   ],
   // Warm-up: visit homepage first to establish cookies/anti-bot tokens before searching.
-  // OLX serves captcha/empty results to direct-hit bot traffic but allows "browsing" visitors.
   warmupUrl: 'https://www.olx.com.br/',
-  // Realistic navigation headers — make search look like user clicked from homepage.
+  // Search via UI: type keyword into search input and submit instead of direct URL navigation.
+  // OLX SPA blocks direct ?q= hits for headless browsers but allows UI-driven search.
+  searchViaInput: true,
+  searchInputSelectors: [
+    'input[data-testid="search-input"]',
+    'input[name="q"]',
+    'input[type="search"]',
+    'input[placeholder*="Buscar"]',
+    'input[placeholder*="buscar"]',
+    'input[placeholder*="O que"]',
+    '#searchtext',
+    'input.olx-input',
+    'header input[type="text"]',
+    'nav input[type="text"]',
+  ],
+  // Realistic navigation headers.
   extraHeaders: {
-    'Referer': 'https://www.olx.com.br/',
     'Sec-Fetch-Dest': 'document',
     'Sec-Fetch-Mode': 'navigate',
     'Sec-Fetch-Site': 'same-origin',

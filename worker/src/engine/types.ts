@@ -177,6 +177,12 @@ export interface SiteConfig {
   warmupUrl?: string;
   /** Extra HTTP headers to add to all requests (e.g. Referer for realistic navigation). */
   extraHeaders?: Record<string, string>;
+  /** If true, perform search by typing into the UI search input instead of direct URL navigation.
+   *  Requires warmupUrl to load the homepage first. The keyword is extracted from searchUrl ?q= param.
+   *  This bypasses SPA anti-bot that blocks direct URL search but allows UI-driven search. */
+  searchViaInput?: boolean;
+  /** CSS selectors to find the search input field (tried in order). */
+  searchInputSelectors?: string[];
 }
 
 // Re-export scraper types for convenience

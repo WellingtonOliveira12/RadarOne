@@ -187,26 +187,43 @@ export class MarketplaceEngine {
         }
       }
 
-      // 3. Navigate to real search URL
-      // For sites with warm-up (SPA like OLX), use 'load' to wait for full page render.
-      // For other sites, use 'domcontentloaded' for speed.
-      const navWaitUntil = this.config.warmupUrl ? 'load' as const : 'domcontentloaded' as const;
-      await page.goto(monitor.searchUrl!, {
-        waitUntil: navWaitUntil,
-        timeout: this.config.navigationTimeout,
-      });
+      // 3. Navigate to search — either via direct URL or UI input submission
+      let searchPerformed = false;
 
-      // For SPA sites: wait for network to settle (search API responses)
-      if (this.config.warmupUrl) {
-        try {
-          await page.waitForLoadState('networkidle', { timeout: 15000 });
-        } catch { /* non-fatal */ }
+      if (this.config.searchViaInput && this.config.warmupUrl && this.config.searchInputSelectors) {
+        // Extract keyword from searchUrl ?q= parameter
+        const keyword = this.extractSearchKeyword(monitor.searchUrl!);
+        if (keyword) {
+          searchPerformed = await this.performSearchViaInput(
+            page, keyword, this.config.searchInputSelectors, monitor.id
+          );
+        }
+        if (!searchPerformed) {
+          console.warn(
+            `OLX_UI_SEARCH_FAILED: monitorId=${monitor.id} — falling back to direct URL navigation`
+          );
+        }
+      }
+
+      if (!searchPerformed) {
+        // Direct URL navigation (default path for all other sites)
+        const navWaitUntil = this.config.warmupUrl ? 'load' as const : 'domcontentloaded' as const;
+        await page.goto(monitor.searchUrl!, {
+          waitUntil: navWaitUntil,
+          timeout: this.config.navigationTimeout,
+        });
+        if (this.config.warmupUrl) {
+          try {
+            await page.waitForLoadState('networkidle', { timeout: 15000 });
+          } catch { /* non-fatal */ }
+        }
       }
 
       // 3.1 Log final URL after redirects (observability for all sites)
       const finalUrl = page.url();
       console.log(
-        `NAV_FINAL_URL: ${this.config.site} requested=${monitor.searchUrl} final=${finalUrl}`
+        `NAV_FINAL_URL: ${this.config.site} requested=${monitor.searchUrl} final=${finalUrl} ` +
+        `searchMode=${searchPerformed ? 'ui_submit' : 'direct_url'}`
       );
 
       // 3.2 Early login redirect detection — abort immediately to save memory
@@ -441,6 +458,96 @@ export class MarketplaceEngine {
    * what the page looks like before container wait + extraction.
    * Logs element counts for ALL selectors, HTML snippet, anti-bot indicators.
    */
+  /**
+   * Performs search by typing into the site's search input and pressing Enter.
+   * Used for SPAs that block direct URL search but allow UI-driven search.
+   * Returns true if search was performed successfully, false if fallback needed.
+   */
+  private async performSearchViaInput(
+    page: Page,
+    keyword: string,
+    selectors: string[],
+    monitorId: string
+  ): Promise<boolean> {
+    try {
+      // Find the search input
+      let inputFound = false;
+      for (const selector of selectors) {
+        const count = await page.locator(selector).count();
+        if (count > 0) {
+          console.log(
+            `OLX_SEARCH_UI_FOUND: monitorId=${monitorId} selector="${selector}" count=${count}`
+          );
+
+          // Click the input to focus it
+          await page.locator(selector).first().click();
+          await page.waitForTimeout(applyJitter(500));
+
+          // Clear existing text and type keyword with realistic delay
+          await page.locator(selector).first().fill('');
+          await page.locator(selector).first().type(keyword, { delay: applyJitter(80) });
+
+          console.log(
+            `OLX_SEARCH_UI_FILLED: monitorId=${monitorId} keyword="${keyword}"`
+          );
+
+          inputFound = true;
+          break;
+        }
+      }
+
+      if (!inputFound) {
+        console.warn(
+          `OLX_SEARCH_UI_NOT_FOUND: monitorId=${monitorId} tried=${selectors.length} selectors`
+        );
+        return false;
+      }
+
+      // Submit search by pressing Enter
+      await page.keyboard.press('Enter');
+      console.log(`OLX_SEARCH_UI_SUBMITTED: monitorId=${monitorId}`);
+
+      // Wait for navigation to search results page
+      try {
+        await page.waitForLoadState('load', { timeout: this.config.navigationTimeout });
+      } catch {
+        // Non-fatal: page may not trigger a full navigation
+      }
+
+      // Wait for network to settle (search API responses)
+      try {
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+      } catch { /* non-fatal */ }
+
+      // Extra render delay for SPA hydration
+      await page.waitForTimeout(applyJitter(3000));
+
+      console.log(
+        `OLX_SEARCH_COMPLETE: monitorId=${monitorId} finalUrl=${page.url()} ` +
+        `searchMode=ui_submit`
+      );
+
+      return true;
+    } catch (error: any) {
+      console.error(
+        `OLX_SEARCH_UI_ERROR: monitorId=${monitorId} error=${error.message}`
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Extracts the search keyword from a URL's ?q= or ?query= parameter.
+   */
+  private extractSearchKeyword(searchUrl: string): string {
+    try {
+      const url = new URL(searchUrl);
+      return url.searchParams.get('q') || url.searchParams.get('query') || '';
+    } catch {
+      return '';
+    }
+  }
+
   private async olxDeepDiagnostic(page: Page, monitorId: string): Promise<void> {
     try {
       const diagnostic = await page.evaluate(() => {
