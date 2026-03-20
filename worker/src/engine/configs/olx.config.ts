@@ -23,17 +23,17 @@ export const olxConfig: SiteConfig = {
   authMode: 'cookies_optional',
   selectors: {
     containers: [
-      // PRIMARY: AdCard class pattern (confirmed 129 matches in production 2026-03-20)
-      '[class*="AdCard"]',
-      // OLX Design System
+      // PRIMARY: BEM block class for OLX ad card wrapper (2025-2026)
+      // The <a> or <div> wrapper has class "olx-adcard" (exact BEM block).
+      // DO NOT use [class*="AdCard"] — it matches inner elements (AdCard_media, AdCard_content)
+      // which contain only images or only text, not the full card.
+      '.olx-adcard',
+      // Fallback: Design System component
       '[data-ds-component="DS-AdCard"]',
-      'li[data-ds-component="DS-AdCard"]',
-      'section[data-ds-component="DS-AdCard"]',
-      // Legacy patterns
+      // Fallback: legacy patterns
       'a[data-lurker-detail]',
-      '.olx-ad-card',
-      '#ad-list li',
-      'ul[class*="list"] > li',
+      // Broader fallback: any element with AdCard in class that IS an anchor
+      'a[class*="AdCard"]',
     ],
     title: [
       'h2',
@@ -50,7 +50,6 @@ export const olxConfig: SiteConfig = {
       'span[aria-label*="preco"]',
     ],
     link: [
-      // OLX 2025-2026: ad links may use /autos-e-pecas/, /item/, or other paths
       'a[href*="olx.com.br"]',
       'a[href*="/d/"]',
       'a[data-lurker-detail]',
@@ -59,10 +58,10 @@ export const olxConfig: SiteConfig = {
       'a',
     ],
     location: [
-      '[data-testid="ad-location"]',
       'span[class*="location"]',
       'p[class*="detail"]',
       'span[class*="detail"]',
+      '[data-testid="ad-location"]',
     ],
     image: [
       'img[src*="img.olx"]',
@@ -75,7 +74,7 @@ export const olxConfig: SiteConfig = {
   timeouts: [10000, 20000, 30000],
   navigationTimeout: 60000,
   renderDelay: 3500,
-  renderWaitSelector: '[class*="AdCard"], [data-ds-component="DS-AdCard"], a[data-lurker-detail]',
+  renderWaitSelector: '.olx-adcard, [data-ds-component="DS-AdCard"], a[data-lurker-detail]',
   scroll: {
     strategy: 'fixed',
     fixedSteps: 4,
@@ -100,6 +99,22 @@ export const olxConfig: SiteConfig = {
     // Fallback: any long numeric segment in the path
     const pathMatch = cleanUrl.match(/\/(\d{7,})/);
     if (pathMatch) return `OLX-${pathMatch[1]}`;
+    // Fallback: shorter numeric ID (5+ digits) — OLX may use shorter IDs
+    const shortMatch = cleanUrl.match(/[/-](\d{5,})$/);
+    if (shortMatch) return `OLX-${shortMatch[1]}`;
+    // Fallback: deterministic hash from URL pathname (stable across cycles)
+    // This handles new OLX URL formats without numeric IDs
+    try {
+      const pathname = new URL(url).pathname;
+      if (pathname && pathname.length > 5 && pathname !== '/') {
+        // Simple deterministic hash
+        let hash = 0;
+        for (let i = 0; i < pathname.length; i++) {
+          hash = ((hash << 5) - hash + pathname.charCodeAt(i)) | 0;
+        }
+        return `OLX-P${Math.abs(hash).toString(36)}`;
+      }
+    } catch { /* invalid URL */ }
     return '';
   },
   priceParser: parseBrazilianPrice,

@@ -341,7 +341,8 @@ export class MarketplaceEngine {
       //     OLX uses [class*="AdCard"] elements (not a[href*="/d/"] — URL format changed).
       //     If zero cards found, it's a shell/homepage page → fail fast.
       if (this.config.site === 'OLX' && diagnosis.pageType === 'CONTENT') {
-        const adCardCount = await page.locator('[class*="AdCard"]').count();
+        const olxCardCount = await page.locator('.olx-adcard').count();
+        const adCardCount = olxCardCount > 0 ? olxCardCount : await page.locator('[class*="AdCard"]').count();
         const adLinkCount = await page.locator('a[href*="/d/"]').count();
 
         if (adCardCount === 0 && adLinkCount === 0) {
@@ -372,7 +373,10 @@ export class MarketplaceEngine {
         // Capture raw outerHTML of first few cards to discover real structure
         try {
           const cardAudit = await page.evaluate(() => {
-            const cards = document.querySelectorAll('[class*="AdCard"]');
+            // Try .olx-adcard first (BEM block = full card wrapper)
+            let cards = document.querySelectorAll('.olx-adcard');
+            const selectorUsed = cards.length > 0 ? '.olx-adcard' : '[class*="AdCard"]';
+            if (cards.length === 0) cards = document.querySelectorAll('[class*="AdCard"]');
             const results: Array<{
               index: number;
               tagName: string;
