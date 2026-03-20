@@ -43,14 +43,16 @@ export const olxConfig: SiteConfig = {
       'h3',
     ],
     price: [
-      // OLX 2025-2026: price inside data-testid containers (confirmed in production)
-      '[data-testid="adcard-price-info"] h3',
-      '[data-testid="adcard-price-info"] p',
-      '[data-testid="adcard-price-info"] span',
+      // OLX 2025-2026: price is in h3 inside the card (confirmed in production).
+      // h3[class*="price"] works for vertical cards (carros).
+      // For horizontal cards, h3 inside adcard-price-info has the main price.
+      // IMPORTANT: Do NOT use [data-testid="adcard-price-info"] span — it captures
+      // the installment text ("em até 3x de R$ 266,67") instead of the main price.
       'h3[class*="price"]',
-      'span[class*="price"]',
+      '[data-testid="adcard-price-info"] h3',
+      'h3',
       'p[class*="price"]',
-      'span[aria-label*="preço"]',
+      'span[class*="price"]',
     ],
     link: [
       'a[href*="olx.com.br"]',
