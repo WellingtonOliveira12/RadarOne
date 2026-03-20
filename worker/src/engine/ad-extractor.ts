@@ -159,21 +159,20 @@ export async function extractAds(
     skippedReasons[reason] = (skippedReasons[reason] || 0) + 1;
   };
 
-  // Determine filter strategy for Facebook STRUCTURED_FILTERS
-  const isFbStructured =
-    config.site === 'FACEBOOK_MARKETPLACE' && monitor.mode === 'STRUCTURED_FILTERS';
+  // Determine filter strategy:
+  // - Facebook STRUCTURED_FILTERS: soft state-level filter (FB location extraction is heuristic)
+  // - OLX STRUCTURED_FILTERS: soft state-level filter (OLX search via UI is always national,
+  //   cannot be restricted by location in the URL — hard filter would reject ALL results)
+  // - Other sites: full location match (city/state/country)
+  const useSoftStateFilter =
+    (config.site === 'FACEBOOK_MARKETPLACE' || config.site === 'OLX') &&
+    monitor.mode === 'STRUCTURED_FILTERS';
 
-  // For FB STRUCTURED_FILTERS: use soft state-level filter instead of full location match.
-  // Reason: FB uses span[dir="auto"] for ALL text, so the generic location selector returns
-  // the title (not the location). However, the reverse-scan heuristic does extract "Cidade, UF"
-  // in many cases — we can use the UF (state code) for a soft filter.
-  // Policy: accept if (a) no location extracted, (b) state matches, (c) state not determinable.
-  //         reject only if state is clearly different from monitor's stateRegion.
-  const fbTargetState = isFbStructured ? (monitor.stateRegion?.trim().toUpperCase() || '') : '';
-  if (isFbStructured && rawAds.length > 0) {
+  const softTargetState = useSoftStateFilter ? (monitor.stateRegion?.trim().toUpperCase() || '') : '';
+  if (useSoftStateFilter && rawAds.length > 0) {
     console.log(
-      `FB_LOCATION_SOFT_FILTER: site=${config.site} mode=${monitor.mode} ` +
-      `rawAds=${rawAds.length} targetState=${fbTargetState || 'NONE'} ` +
+      `LOCATION_SOFT_FILTER: site=${config.site} mode=${monitor.mode} ` +
+      `rawAds=${rawAds.length} targetState=${softTargetState || 'NONE'} ` +
       `policy=accept_same_state_or_unknown`
     );
   }
@@ -213,18 +212,17 @@ export async function extractAds(
     }
 
     // Location filter — strategy depends on site + mode
-    if (isFbStructured) {
-      // Facebook STRUCTURED_FILTERS: soft state-level filter.
+    if (useSoftStateFilter) {
+      // FB/OLX STRUCTURED_FILTERS: soft state-level filter.
       // Only reject ads where the extracted location clearly shows a different state.
-      // Location format from FB heuristic: "Cidade, UF" (e.g., "Uberlândia, MG")
-      if (fbTargetState && raw.location) {
+      // OLX search via UI is national — can't restrict by location in URL.
+      // Policy: accept if (a) no location, (b) state matches, (c) state not determinable.
+      if (softTargetState && raw.location) {
         const extractedState = extractBrazilianStateCode(raw.location);
-        if (extractedState && extractedState !== fbTargetState) {
-          skip('fb_state_mismatch');
+        if (extractedState && extractedState !== softTargetState) {
+          skip('soft_state_mismatch');
           continue;
         }
-        // extractedState === null means we couldn't parse → accept (don't block)
-        // extractedState === fbTargetState → accept
       }
       // No location or no target state → accept
     } else if (monitor.country) {

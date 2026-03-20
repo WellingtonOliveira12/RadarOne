@@ -407,7 +407,7 @@ describe('extractAds', () => {
 
     expect(result.adsRaw).toBe(1);
     expect(result.ads).toHaveLength(0);
-    expect(result.skippedReasons).toHaveProperty('fb_state_mismatch', 1);
+    expect(result.skippedReasons).toHaveProperty('soft_state_mismatch', 1);
   });
 
   it('should accept FB STRUCTURED_FILTERS ads from correct state', async () => {
