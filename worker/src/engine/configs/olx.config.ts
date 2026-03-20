@@ -23,26 +23,22 @@ export const olxConfig: SiteConfig = {
   authMode: 'cookies_optional',
   selectors: {
     containers: [
-      // OLX Design System (2024-2026)
+      // PRIMARY: AdCard class pattern (confirmed 129 matches in production 2026-03-20)
+      '[class*="AdCard"]',
+      // OLX Design System
       '[data-ds-component="DS-AdCard"]',
       'li[data-ds-component="DS-AdCard"]',
       'section[data-ds-component="DS-AdCard"]',
-      // Legacy lurker
+      // Legacy patterns
       'a[data-lurker-detail]',
-      // Modern hashed class patterns
-      'li[class*="sc-"] a[href*="/d/"]',
-      '[class*="AdCard"]',
       '.olx-ad-card',
-      // Broad fallback: any <a> linking to /d/ inside a list
       '#ad-list li',
       'ul[class*="list"] > li',
-      'section[class*="list"] a[href*="/d/"]',
     ],
     title: [
       'h2',
       'h2[class*="title"]',
       '[data-ds-component="DS-Text"]',
-      '.olx-ad-card__title',
       'span[class*="title"]',
       'h3',
     ],
@@ -50,20 +46,21 @@ export const olxConfig: SiteConfig = {
       'span[class*="price"]',
       'p[class*="price"]',
       '[data-ds-component="DS-Text"]',
-      '.olx-ad-card__price',
       'span[aria-label*="preço"]',
       'span[aria-label*="preco"]',
     ],
     link: [
+      // OLX 2025-2026: ad links may use /autos-e-pecas/, /item/, or other paths
+      'a[href*="olx.com.br"]',
       'a[href*="/d/"]',
       'a[data-lurker-detail]',
-      'a[href*="olx.com.br"]',
+      'a[href*="/autos"]',
+      'a[href*="/item"]',
       'a',
     ],
     location: [
       '[data-testid="ad-location"]',
       'span[class*="location"]',
-      '.olx-ad-card__location',
       'p[class*="detail"]',
       'span[class*="detail"]',
     ],
@@ -78,7 +75,7 @@ export const olxConfig: SiteConfig = {
   timeouts: [10000, 20000, 30000],
   navigationTimeout: 60000,
   renderDelay: 3500,
-  renderWaitSelector: '[data-ds-component="DS-AdCard"], a[data-lurker-detail], a[href*="/d/"]',
+  renderWaitSelector: '[class*="AdCard"], [data-ds-component="DS-AdCard"], a[data-lurker-detail]',
   scroll: {
     strategy: 'fixed',
     fixedSteps: 4,

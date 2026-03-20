@@ -337,17 +337,18 @@ export class MarketplaceEngine {
           });
       }
 
-      // 5.5 OLX shell page detection: if page loaded with content but zero ad links,
-      //     the anti-bot delivered the homepage shell without search results.
-      //     Fail fast instead of waiting 60+ seconds for container selectors that will never match.
+      // 5.5 OLX results detection: check if the page has real ad cards.
+      //     OLX uses [class*="AdCard"] elements (not a[href*="/d/"] — URL format changed).
+      //     If zero cards found, it's a shell/homepage page → fail fast.
       if (this.config.site === 'OLX' && diagnosis.pageType === 'CONTENT') {
+        const adCardCount = await page.locator('[class*="AdCard"]').count();
         const adLinkCount = await page.locator('a[href*="/d/"]').count();
-        if (adLinkCount === 0) {
-          const isAuthenticated = authResult.authenticated;
+
+        if (adCardCount === 0 && adLinkCount === 0) {
           console.warn(
             `OLX_SHELL_PAGE_DETECTED: monitorId=${monitor.id} ` +
-            `bodyLength=${diagnosis.bodyLength} adLinks=0 authenticated=${isAuthenticated} ` +
-            `reason=anti_bot_delivered_shell_without_results`
+            `bodyLength=${diagnosis.bodyLength} adCards=0 adLinks=0 ` +
+            `authenticated=${authResult.authenticated} reason=no_ad_elements_found`
           );
           diagnosis.pageType = 'BLOCKED';
           return this.buildResult([], diagnosis, {
@@ -362,9 +363,38 @@ export class MarketplaceEngine {
             retryAttempts: 0,
           });
         }
+
+        // Cards found! Log card structure for selector tuning
         console.log(
-          `OLX_RESULTS_PRESENT: monitorId=${monitor.id} adLinks=${adLinkCount} — proceeding to extraction`
+          `OLX_RESULTS_PRESENT: monitorId=${monitor.id} adCards=${adCardCount} adLinks=${adLinkCount} — proceeding to extraction`
         );
+
+        // Capture real DOM structure of first few cards for selector discovery
+        try {
+          const cardSamples = await page.evaluate(() => {
+            const cards = document.querySelectorAll('[class*="AdCard"]');
+            const samples: string[] = [];
+            for (let i = 0; i < Math.min(3, cards.length); i++) {
+              const card = cards[i];
+              // Find all <a> links inside the card
+              const links = card.querySelectorAll('a');
+              const linkInfo = Array.from(links).map(a => a.getAttribute('href')).filter(Boolean);
+              // Find title text
+              const h2 = card.querySelector('h2');
+              const title = h2?.textContent?.trim()?.substring(0, 60) || '';
+              // Find price
+              const priceEl = card.querySelector('span[class*="price"], p[class*="price"]');
+              const price = priceEl?.textContent?.trim() || '';
+              samples.push(`title="${title}" price="${price}" links=[${linkInfo.map(l => (l as string).substring(0, 80)).join(',')}]`);
+            }
+            return samples;
+          });
+          for (let i = 0; i < cardSamples.length; i++) {
+            console.log(`OLX_DOM_CARD_SAMPLE[${i}]: monitorId=${monitor.id} ${cardSamples[i]}`);
+          }
+        } catch (e: any) {
+          console.warn(`OLX_DOM_CARD_SAMPLE_ERROR: ${e.message}`);
+        }
       }
 
       // 6. Wait for container
