@@ -1,9 +1,27 @@
 import { SiteConfig } from '../types';
 
+/** Patterns that indicate installment/invalid text, NOT a main price. */
+const INSTALLMENT_PATTERNS = /até|x de|parcela|sem juros|parcelamento/i;
+
 /**
- * Parse Brazilian price format for OLX
+ * Parse Brazilian price format for OLX.
+ *
+ * Validates that the text is a real price (not installment/promo text).
+ * Returns 0 for invalid/installment strings — the ad will still be accepted
+ * with price=0 (unknown), which is correct for "price not available" ads.
  */
 function parseBrazilianPrice(text: string): number {
+  if (!text || !text.trim()) return 0;
+
+  // Reject installment/promo text — these are NOT the main price
+  if (INSTALLMENT_PATTERNS.test(text)) {
+    console.log(`OLX_PRICE_REJECTED: raw="${text.substring(0, 80)}" reason=installment_detected`);
+    return 0;
+  }
+
+  // Must contain either "R$" or at least one digit to be a price
+  if (!/R\$|\d/.test(text)) return 0;
+
   try {
     const cleaned = text
       .replace(/R\$/g, '')
