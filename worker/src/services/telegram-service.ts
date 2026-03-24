@@ -1,4 +1,8 @@
 import TelegramBot from 'node-telegram-bot-api';
+import type { FipeEnrichment } from '../engine/enrichment/fipe-types';
+import { formatFipeTelegram } from '../engine/enrichment/fipe';
+import type { OpportunityResult } from '../engine/enrichment/score-types';
+import { formatScoreTelegram } from '../engine/enrichment/score-formatters';
 
 /**
  * Serviço de integração com Telegram
@@ -22,6 +26,8 @@ interface AdAlert {
     url: string;
     imageUrl?: string;
     location?: string;
+    fipe?: FipeEnrichment;
+    opportunity?: OpportunityResult;
   };
 }
 
@@ -57,6 +63,18 @@ export class TelegramService {
 
       if (data.ad.price) {
         message += `💰 ${this.formatPrice(data.ad.price)}\n`;
+      }
+
+      // FIPE enrichment (if available)
+      if (data.ad.fipe) {
+        message += formatFipeTelegram(data.ad.fipe);
+        message += '\n';
+      }
+
+      // Opportunity Score (if available)
+      if (data.ad.opportunity) {
+        message += formatScoreTelegram(data.ad.opportunity);
+        message += '\n';
       }
 
       if (data.ad.location) {

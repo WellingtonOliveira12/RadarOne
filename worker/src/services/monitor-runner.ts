@@ -18,6 +18,10 @@ import { isAuthError } from './session-provider';
 import { StatsRecorder, mapPageType } from './stats-recorder';
 import { getDefaultUrl } from '../engine/default-urls';
 import { buildSearchUrl } from '../engine/url-builder';
+import { enrichAdWithFipe } from '../engine/enrichment/fipe';
+import type { FipeEnrichment } from '../engine/enrichment/fipe-types';
+import { computeOpportunityScoreV2 } from '../engine/enrichment/score-orchestrator';
+import type { OpportunityResult } from '../engine/enrichment/score-types';
 
 /**
  * MonitorRunner
@@ -33,6 +37,8 @@ interface Ad {
   imageUrl?: string;
   location?: string;
   publishedAt?: Date;
+  fipe?: FipeEnrichment;
+  opportunity?: OpportunityResult;
 }
 
 export class MonitorRunner {
@@ -290,6 +296,49 @@ export class MonitorRunner {
         newAds: newAds.length,
         duplicates: ads.length - newAds.length,
       });
+
+      // Enriquece anúncios com FIPE (best-effort, never blocks)
+      if (newAds.length > 0) {
+        for (const ad of newAds) {
+          try {
+            const fipeData = await enrichAdWithFipe({ title: ad.title, price: ad.price });
+            if (fipeData) {
+              ad.fipe = fipeData;
+              log.info('FIPE_ENRICHED', {
+                monitorId: monitor.id,
+                adId: ad.externalId,
+                fipePrice: fipeData.price,
+                confidence: fipeData.confidence,
+                classification: fipeData.classification,
+              });
+            }
+          } catch {
+            // FAILSAFE: FIPE enrichment never blocks the pipeline
+          }
+        }
+      }
+
+      // Computa Opportunity Score V2 (best-effort, never blocks)
+      if (newAds.length > 0) {
+        for (const ad of newAds) {
+          try {
+            const scoreResult = await computeOpportunityScoreV2({
+              title: ad.title,
+              price: ad.price,
+              location: ad.location,
+              site: monitor.site,
+              monitorId: monitor.id,
+              fipe: ad.fipe,
+              publishedAt: ad.publishedAt,
+            });
+            if (scoreResult) {
+              ad.opportunity = scoreResult;
+            }
+          } catch {
+            // FAILSAFE: Score never blocks the pipeline
+          }
+        }
+      }
 
       // Envia alertas para anúncios novos
       let alertsSent = 0;

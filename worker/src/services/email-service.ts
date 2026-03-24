@@ -1,4 +1,8 @@
 import { logger } from '../utils/logger';
+import type { FipeEnrichment } from '../engine/enrichment/fipe-types';
+import { formatFipeEmail, formatFipeText } from '../engine/enrichment/fipe';
+import type { OpportunityResult } from '../engine/enrichment/score-types';
+import { formatScoreEmail, formatScoreText } from '../engine/enrichment/score-formatters';
 
 /**
  * Email Service - Envio de alertas por email
@@ -20,6 +24,8 @@ export interface EmailAlert {
     imageUrl?: string;
     location?: string;
     description?: string;
+    fipe?: FipeEnrichment;
+    opportunity?: OpportunityResult;
   };
 }
 
@@ -331,6 +337,12 @@ class EmailService {
                 </p>
               </div>
 
+              <!-- FIPE Enrichment -->
+              ${ad.fipe ? formatFipeEmail(ad.fipe) : ''}
+
+              <!-- Opportunity Score -->
+              ${ad.opportunity ? formatScoreEmail(ad.opportunity) : ''}
+
               <!-- Location -->
               ${ad.location ? `
               <p style="color: #666666; margin: 0 0 15px 0; font-size: 14px;">
@@ -392,6 +404,14 @@ class EmailService {
     text += `────────────────────────────────\n\n`;
     text += `${ad.title}\n\n`;
     text += `💰 Preço: ${priceFormatted}\n`;
+
+    if (ad.fipe) {
+      text += `${formatFipeText(ad.fipe)}\n`;
+    }
+
+    if (ad.opportunity) {
+      text += `${formatScoreText(ad.opportunity)}\n`;
+    }
 
     if (ad.location) {
       text += `📍 Local: ${ad.location}\n`;
