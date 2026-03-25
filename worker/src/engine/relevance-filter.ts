@@ -7,7 +7,7 @@
  * Rules:
  *   1. Main keyword MUST exist in ad title (at least one word with 4+ chars)
  *   2. Category-specific blacklist rejects known false positives
- *   3. Minimum relevance score threshold
+ *   3. Relevance score computed for observability (not a gate)
  *
  * FAILSAFE: If filter errors, ad is ACCEPTED (never block on filter failure).
  */
@@ -44,7 +44,8 @@ function extractSignificantWords(keywords: string): string[] {
   return keywords
     .toLowerCase()
     .replace(/[^\w\sÀ-ú]/g, '')
-    .split(/\s+/)
+    .replace(/([a-zÀ-ú])(\d)/g, '$1 $2') // "ipad10" → "ipad 10"
+    .split(/[\s_]+/)
     .filter(w => w.length >= 4);
 }
 
@@ -112,7 +113,11 @@ export function checkRelevance(
       };
     }
 
-    // Rule 3: Compute relevance score
+    // Rule 3: Compute relevance score (informational — not a gate)
+    // Rule 1 already ensures at least one keyword is in the title.
+    // The score is computed for observability but does NOT reject ads.
+    // Previous 30% threshold was too aggressive: monitors with 4+ keywords
+    // and ads matching only 1 keyword (e.g. 1/4=25%) were silently rejected.
     const titleLower = adTitle.toLowerCase();
     const significantWords = extractSignificantWords(keywords);
     const matchedWords = significantWords.filter(w => titleLower.includes(w));
@@ -122,22 +127,13 @@ export function checkRelevance(
 
     const relevanceScore = Math.round(matchRatio * 100);
 
-    // Threshold: at least 30% relevance
-    if (relevanceScore < 30) {
-      return {
-        relevant: false,
-        reason: 'below_relevance_threshold',
-        score: relevanceScore,
-      };
-    }
-
     return {
       relevant: true,
       score: relevanceScore,
     };
   } catch (error: any) {
     // FAILSAFE: accept on error
-    logger.warn({ error: error.message, adTitle: adTitle.substring(0, 60) }, 'RELEVANCE_FILTER_ERROR');
+    logger.warn({ error: error.message, adTitle: String(adTitle ?? '').substring(0, 60) }, 'RELEVANCE_FILTER_ERROR');
     return { relevant: true, score: 100 };
   }
 }

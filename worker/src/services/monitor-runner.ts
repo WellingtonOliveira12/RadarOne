@@ -294,10 +294,12 @@ export class MonitorRunner {
       const allNewAds = await this.processAds(monitor.id, ads);
 
       // V3: Relevance filter — remove noise ads before enrichment
-      const monitorKeywords = (monitor as any).filtersJson?.keywords
+      const monitorKeywordsRaw = (monitor as any).filtersJson?.keywords
         || (monitor as any).filtersJson?.keyword
         || (monitor.keywords && monitor.keywords.length > 0 ? monitor.keywords.join(' ') : '')
-        || monitor.name;
+        || null;
+      const monitorKeywords = monitorKeywordsRaw || monitor.name;
+      const keywordsSource = monitorKeywordsRaw ? 'explicit' : 'monitor_name_fallback';
 
       const newAds: Ad[] = [];
       let relevanceFiltered = 0;
@@ -324,7 +326,21 @@ export class MonitorRunner {
         newAds: newAds.length,
         duplicates: ads.length - allNewAds.length,
         relevanceFiltered,
+        keywordsSource,
+        monitorKeywords: monitorKeywords.substring(0, 100),
       });
+
+      // V3: Warn when all new ads were filtered by relevance (diagnostic)
+      if (relevanceFiltered > 0 && newAds.length === 0 && allNewAds.length > 0) {
+        log.warn('ALL_NEW_ADS_FILTERED_BY_RELEVANCE', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          allNewAdsCount: allNewAds.length,
+          relevanceFiltered,
+          keywordsSource,
+          monitorKeywords: monitorKeywords.substring(0, 100),
+        });
+      }
 
       // Enriquece anúncios com FIPE (best-effort, never blocks)
       if (newAds.length > 0) {
@@ -431,8 +447,14 @@ export class MonitorRunner {
         log.info('NOTIFICATION_SKIPPED_REASON', {
           monitorId: monitor.id,
           site: monitor.site,
-          reason: 'no_new_ads',
+          reason: ads.length === 0
+            ? 'no_ads_scraped'
+            : allNewAds.length === 0
+              ? 'all_duplicates'
+              : 'all_filtered_by_relevance',
           totalAds: ads.length,
+          duplicates: ads.length - allNewAds.length,
+          relevanceFiltered,
         });
       } else if (!monitor.alertsEnabled) {
         log.info('NOTIFICATION_SKIPPED_REASON', {
