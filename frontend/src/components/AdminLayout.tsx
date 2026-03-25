@@ -76,6 +76,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { to: '/admin/coupons', label: 'Cupons', icon: '🎟️' },
     { to: '/admin/alerts', label: 'Alertas', icon: '🔔' },
     { to: '/admin/site-health', label: 'Saúde dos Sites', icon: '🏥' },
+    { to: '/admin/apple-references', label: 'Ref. Preços Apple', icon: '🍏' },
     { to: '/admin/security', label: 'Segurança (2FA)', icon: '🔐' },
   ];
 

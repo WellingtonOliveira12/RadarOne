@@ -42,6 +42,7 @@ const AdminWebhooksPage = lazy(() => import('./pages/AdminWebhooksPage').then(m 
 const AdminCouponsPage = lazy(() => import('./pages/AdminCouponsPage').then(m => ({ default: m.AdminCouponsPage })));
 const AdminAlertsPage = lazy(() => import('./pages/AdminAlertsPage').then(m => ({ default: m.AdminAlertsPage })));
 const AdminSiteHealthPage = lazy(() => import('./pages/AdminSiteHealthPage').then(m => ({ default: m.AdminSiteHealthPage })));
+const AdminAppleReferencePage = lazy(() => import('./pages/AdminAppleReferencePage'));
 const Security2FAPage = lazy(() => import('./pages/Security2FAPage').then(m => ({ default: m.Security2FAPage })));
 
 // Páginas de teste/debug
@@ -275,6 +276,16 @@ export function AppRouter() {
               <AdminProtectedRoute>
                 <Suspense fallback={<PageLoader />}>
                   <AdminSiteHealthPage />
+                </Suspense>
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/apple-references"
+            element={
+              <AdminProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <AdminAppleReferencePage />
                 </Suspense>
               </AdminProtectedRoute>
             }

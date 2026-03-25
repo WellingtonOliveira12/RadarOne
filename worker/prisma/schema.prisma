@@ -938,3 +938,20 @@ model SiteExecutionStats {
   @@index([userId])
   @@map("site_execution_stats")
 }
+
+// ============================================
+// REFERÊNCIA DE PREÇOS APPLE (V3)
+// ============================================
+
+model ApplePriceReference {
+  id             String   @id @default(cuid())
+  model          String   // e.g. "iPhone 13 Pro"
+  storage        String   // e.g. "128 GB"
+  referencePrice Float    @map("reference_price") // e.g. 1900.00
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([model, storage])
+  @@index([model])
+  @@map("apple_price_references")
+}

@@ -20,8 +20,11 @@ import { getDefaultUrl } from '../engine/default-urls';
 import { buildSearchUrl } from '../engine/url-builder';
 import { enrichAdWithFipe } from '../engine/enrichment/fipe';
 import type { FipeEnrichment } from '../engine/enrichment/fipe-types';
+import { matchAppleReference } from '../engine/enrichment/apple-reference';
+import type { AppleReferenceMatch } from '../engine/enrichment/score-types';
 import { computeOpportunityScoreV2 } from '../engine/enrichment/score-orchestrator';
 import type { OpportunityResult } from '../engine/enrichment/score-types';
+import { checkRelevance } from '../engine/relevance-filter';
 
 /**
  * MonitorRunner
@@ -38,6 +41,7 @@ interface Ad {
   location?: string;
   publishedAt?: Date;
   fipe?: FipeEnrichment;
+  appleRef?: AppleReferenceMatch;
   opportunity?: OpportunityResult;
 }
 
@@ -287,14 +291,39 @@ export class MonitorRunner {
       }
 
       // Processa anúncios
-      const newAds = await this.processAds(monitor.id, ads);
+      const allNewAds = await this.processAds(monitor.id, ads);
+
+      // V3: Relevance filter — remove noise ads before enrichment
+      const monitorKeywords = (monitor as any).filtersJson?.keywords
+        || (monitor as any).filtersJson?.keyword
+        || (monitor.keywords && monitor.keywords.length > 0 ? monitor.keywords.join(' ') : '')
+        || monitor.name;
+
+      const newAds: Ad[] = [];
+      let relevanceFiltered = 0;
+      for (const ad of allNewAds) {
+        const relevance = checkRelevance(ad.title, monitor.name, monitorKeywords);
+        if (relevance.relevant) {
+          newAds.push(ad);
+        } else {
+          relevanceFiltered++;
+          log.info('AD_RELEVANCE_REJECTED', {
+            monitorId: monitor.id,
+            adId: ad.externalId,
+            title: ad.title.substring(0, 60),
+            reason: relevance.reason,
+            relevanceScore: relevance.score,
+          });
+        }
+      }
 
       log.info('ADS_PROCESSED', {
         monitorId: monitor.id,
         site: monitor.site,
         totalAds: ads.length,
         newAds: newAds.length,
-        duplicates: ads.length - newAds.length,
+        duplicates: ads.length - allNewAds.length,
+        relevanceFiltered,
       });
 
       // Enriquece anúncios com FIPE (best-effort, never blocks)
@@ -318,7 +347,31 @@ export class MonitorRunner {
         }
       }
 
-      // Computa Opportunity Score V2 (best-effort, never blocks)
+      // Enriquece anúncios com Apple Reference (best-effort, never blocks)
+      if (newAds.length > 0) {
+        for (const ad of newAds) {
+          try {
+            // Only attempt Apple match if no FIPE (avoids double-reference)
+            if (!ad.fipe) {
+              const appleMatch = await matchAppleReference(ad.title);
+              if (appleMatch) {
+                ad.appleRef = appleMatch;
+                log.info('APPLE_REF_ENRICHED', {
+                  monitorId: monitor.id,
+                  adId: ad.externalId,
+                  model: appleMatch.model,
+                  storage: appleMatch.storage,
+                  refPrice: appleMatch.referencePrice,
+                });
+              }
+            }
+          } catch {
+            // FAILSAFE: Apple enrichment never blocks the pipeline
+          }
+        }
+      }
+
+      // Computa Opportunity Score V3 (best-effort, never blocks)
       if (newAds.length > 0) {
         for (const ad of newAds) {
           try {
@@ -330,6 +383,7 @@ export class MonitorRunner {
               monitorId: monitor.id,
               fipe: ad.fipe,
               publishedAt: ad.publishedAt,
+              appleRef: ad.appleRef,
             });
             if (scoreResult) {
               ad.opportunity = scoreResult;
@@ -337,6 +391,29 @@ export class MonitorRunner {
           } catch {
             // FAILSAFE: Score never blocks the pipeline
           }
+        }
+      }
+
+      // V3 Enrichment Summary Log (per ad)
+      if (newAds.length > 0) {
+        for (const ad of newAds) {
+          log.info('V3_AD_ENRICHMENT_SUMMARY', {
+            monitorId: monitor.id,
+            source: monitor.site,
+            adId: ad.externalId,
+            title: ad.title.substring(0, 60),
+            price: ad.price || null,
+            fipeFound: !!ad.fipe,
+            fipePrice: ad.fipe?.price || null,
+            fipeConfidence: ad.fipe?.confidence || null,
+            appleMatch: !!ad.appleRef,
+            appleModel: ad.appleRef?.model || null,
+            appleRefPrice: ad.appleRef?.referencePrice || null,
+            scoreMode: ad.opportunity?.scoreMode || null,
+            scoreFinal: ad.opportunity?.score || null,
+            scoreLabel: ad.opportunity?.label || null,
+            confidence: ad.opportunity?.confidenceLevel || null,
+          });
         }
       }
 

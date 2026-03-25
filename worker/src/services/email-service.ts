@@ -23,6 +23,7 @@ export interface EmailAlert {
     url: string;
     imageUrl?: string;
     location?: string;
+    publishedAt?: Date;
     description?: string;
     fipe?: FipeEnrichment;
     opportunity?: OpportunityResult;
@@ -346,7 +347,7 @@ class EmailService {
               <!-- Location -->
               ${ad.location ? `
               <p style="color: #666666; margin: 0 0 15px 0; font-size: 14px;">
-                📍 <strong>Localização:</strong> ${this.escapeHtml(ad.location)}
+                📍 <strong>Localização:</strong> ${this.escapeHtml(ad.location)}${ad.publishedAt ? ` / ${this.formatRelativeDate(ad.publishedAt)}` : ''}
               </p>
               ` : ''}
 
@@ -414,7 +415,9 @@ class EmailService {
     }
 
     if (ad.location) {
-      text += `📍 Local: ${ad.location}\n`;
+      let locText = `📍 Local: ${ad.location}`;
+      if (ad.publishedAt) locText += ` / ${this.formatRelativeDate(ad.publishedAt)}`;
+      text += `${locText}\n`;
     }
 
     if (ad.description) {
@@ -442,6 +445,20 @@ class EmailService {
     };
 
     return text.replace(/[&<>"']/g, (m) => map[m]);
+  }
+
+  private formatRelativeDate(date: Date): string {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+    if (date.toDateString() === now.toDateString()) return `Hoje, ${time}`;
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) return `Ontem, ${time}`;
+
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}, ${time}`;
   }
 
   /**

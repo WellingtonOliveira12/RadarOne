@@ -242,8 +242,10 @@ export async function computeOpportunityScore(
       score,
       label,
       confidenceLevel,
+      scoreMode: hasFipe ? 'full' : 'simplified', // V3: will be overridden by orchestrator
       meta: {
         hasFipe,
+        hasAppleRef: false, // V3: set by orchestrator if Apple match found
         scoreFipe,
         scoreMarket,
         scoreQuality,

@@ -273,13 +273,27 @@ export async function extractAds(
       }
     }
 
+    // Clean OLX location: strip concatenated date text and reconstruct clean "Cidade - UF"
+    let cleanLocation = raw.location || undefined;
+    let publishedAtHint: Date | undefined;
+    if (isOlxSite && raw.location) {
+      const parsed = parseOlxLocation(raw.location);
+      if (parsed.city && parsed.state) {
+        cleanLocation = `${parsed.city} - ${parsed.state}`;
+        if (parsed.dateText) {
+          publishedAtHint = parseOlxDateText(parsed.dateText);
+        }
+      }
+    }
+
     ads.push({
       externalId,
       title: raw.title,
       price,
       url,
       imageUrl: raw.imageUrl || undefined,
-      location: raw.location || undefined,
+      location: cleanLocation,
+      publishedAt: publishedAtHint,
     });
   }
 
@@ -330,27 +344,31 @@ function extractBrazilianStateCode(location: string): string | null {
 }
 
 /**
- * Parses OLX location string into city and state components.
+ * Parses OLX location string into city, state, and optional date components.
  *
  * OLX format (from production logs):
- *   "São Paulo -  SP"                    → { city: "São Paulo", state: "SP" }
- *   "São José dos Pinhais -  PRHoje, 12:12" → { city: "São José dos Pinhais", state: "PR" }
- *   "Curitiba -  PRHoje, 12:10"          → { city: "Curitiba", state: "PR" }
- *   "Rio de Janeiro -  RJOntem, 19:09"   → { city: "Rio de Janeiro", state: "RJ" }
- *   ""                                   → { city: null, state: null }
+ *   "São Paulo -  SP"                          → { city: "São Paulo", state: "SP", dateText: null }
+ *   "São José dos Pinhais -  PRHoje, 12:12"    → { city: "São José dos Pinhais", state: "PR", dateText: "Hoje, 12:12" }
+ *   "Curitiba -  PRHoje, 12:10"                → { city: "Curitiba", state: "PR", dateText: "Hoje, 12:10" }
+ *   "Rio de Janeiro -  RJOntem, 19:09"         → { city: "Rio de Janeiro", state: "RJ", dateText: "Ontem, 19:09" }
+ *   "Macapá -  AP23 de mar, 22:32"             → { city: "Macapá", state: "AP", dateText: "23 de mar, 22:32" }
+ *   ""                                         → { city: null, state: null, dateText: null }
  */
-function parseOlxLocation(location: string): { city: string | null; state: string | null } {
-  if (!location || !location.trim()) return { city: null, state: null };
+function parseOlxLocation(location: string): { city: string | null; state: string | null; dateText: string | null } {
+  if (!location || !location.trim()) return { city: null, state: null, dateText: null };
 
   const text = location.trim();
 
-  // OLX pattern: "Cidade -  UF" or "Cidade - UFDate..."
+  // OLX pattern: "Cidade -  UF" or "Cidade - UFDateText..."
   // The UF is always 2 uppercase letters after " - " or " -  "
-  const match = text.match(/^(.+?)\s*-\s+([A-Z]{2})/);
+  // Date text (if any) is concatenated immediately after the UF code
+  const match = text.match(/^(.+?)\s*-\s+([A-Z]{2})(.*)?$/);
   if (match && BRAZILIAN_STATES.has(match[2])) {
+    const dateText = match[3]?.trim() || null;
     return {
       city: match[1].trim(),
       state: match[2],
+      dateText,
     };
   }
 
@@ -361,10 +379,11 @@ function parseOlxLocation(location: string): { city: string | null; state: strin
     return {
       city: cityPart || null,
       state: ufMatch[1],
+      dateText: null,
     };
   }
 
-  return { city: null, state: null };
+  return { city: null, state: null, dateText: null };
 }
 
 /**
@@ -378,4 +397,59 @@ function normalizeForComparison(text: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+}
+
+/**
+ * Parses OLX date text (extracted from location) into a Date.
+ *
+ * Handles:
+ *   "Hoje, 19:26"          → today at 19:26
+ *   "Ontem, 08:51"         → yesterday at 08:51
+ *   "23 de mar, 22:32"     → March 23 at 22:32
+ *   "5 de jan, 10:00"      → January 5 at 10:00
+ *
+ * Returns undefined if parsing fails.
+ */
+const OLX_MONTHS: Record<string, number> = {
+  jan: 0, fev: 1, mar: 2, abr: 3, mai: 4, jun: 5,
+  jul: 6, ago: 7, set: 8, out: 9, nov: 10, dez: 11,
+};
+
+function parseOlxDateText(dateText: string): Date | undefined {
+  if (!dateText) return undefined;
+
+  const text = dateText.trim();
+  const now = new Date();
+
+  // "Hoje, HH:MM"
+  const hojeMatch = text.match(/^Hoje,?\s*(\d{1,2}):(\d{2})$/i);
+  if (hojeMatch) {
+    const d = new Date(now);
+    d.setHours(parseInt(hojeMatch[1], 10), parseInt(hojeMatch[2], 10), 0, 0);
+    return d;
+  }
+
+  // "Ontem, HH:MM"
+  const ontemMatch = text.match(/^Ontem,?\s*(\d{1,2}):(\d{2})$/i);
+  if (ontemMatch) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 1);
+    d.setHours(parseInt(ontemMatch[1], 10), parseInt(ontemMatch[2], 10), 0, 0);
+    return d;
+  }
+
+  // "DD de MMM, HH:MM"
+  const dateMatch = text.match(/^(\d{1,2})\s+de\s+(\w{3}),?\s*(\d{1,2}):(\d{2})$/i);
+  if (dateMatch) {
+    const month = OLX_MONTHS[dateMatch[2].toLowerCase()];
+    if (month !== undefined) {
+      const d = new Date(now.getFullYear(), month, parseInt(dateMatch[1], 10),
+        parseInt(dateMatch[3], 10), parseInt(dateMatch[4], 10), 0, 0);
+      // If date is in the future, it's from last year
+      if (d > now) d.setFullYear(d.getFullYear() - 1);
+      return d;
+    }
+  }
+
+  return undefined;
 }

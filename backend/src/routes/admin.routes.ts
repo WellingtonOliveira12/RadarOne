@@ -5,6 +5,7 @@ import { AdminSubscriptionsController } from '../controllers/admin-subscriptions
 import { AdminMonitorsController } from '../controllers/admin-monitors.controller';
 import { AdminSystemController } from '../controllers/admin-system.controller';
 import { AdminCouponsController } from '../controllers/admin-coupons.controller';
+import { AdminAppleReferenceController } from '../controllers/admin-apple-reference.controller';
 import { requireAdmin, requireAdminRole } from '../middlewares/admin.middleware';
 import { UserRole } from '@prisma/client';
 
@@ -19,6 +20,25 @@ const upload = multer({
       cb(null, true);
     } else {
       cb(new Error('Apenas arquivos CSV são permitidos'));
+    }
+  },
+});
+
+// Multer config for Excel upload (Apple references)
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max
+  },
+  fileFilter: (req, file, cb) => {
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    if (validTypes.includes(file.mimetype) || file.originalname.endsWith('.xlsx') || file.originalname.endsWith('.xls')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas arquivos Excel (.xlsx, .xls) são permitidos'));
     }
   },
 });
@@ -79,5 +99,12 @@ router.post('/coupons', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_F
 router.put('/coupons/:id', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), AdminCouponsController.updateCoupon); // ADMIN_SUPER ou ADMIN_FINANCE
 router.patch('/coupons/:id/toggle', requireAdminRole([UserRole.ADMIN_SUPER, UserRole.ADMIN_FINANCE]), AdminCouponsController.toggleCouponStatus); // ADMIN_SUPER ou ADMIN_FINANCE
 router.delete('/coupons/:id', requireAdminRole([UserRole.ADMIN_SUPER]), AdminCouponsController.deleteCoupon); // Apenas ADMIN_SUPER
+
+// Apple Price References (V3)
+router.get('/apple-references', requireAdmin, AdminAppleReferenceController.list);
+router.post('/apple-references/upload', requireAdminRole([UserRole.ADMIN_SUPER]), uploadExcel.single('file'), AdminAppleReferenceController.upload);
+router.post('/apple-references', requireAdminRole([UserRole.ADMIN_SUPER]), AdminAppleReferenceController.create);
+router.put('/apple-references/:id', requireAdminRole([UserRole.ADMIN_SUPER]), AdminAppleReferenceController.update);
+router.delete('/apple-references/:id', requireAdminRole([UserRole.ADMIN_SUPER]), AdminAppleReferenceController.delete);
 
 export default router;

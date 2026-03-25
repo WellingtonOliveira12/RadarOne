@@ -248,10 +248,13 @@ describe('V2.1 Label Gate', () => {
       seller: { sellerName: 'X', hasPhone: true },
     });
 
-    // Score might be high due to quality+time+seller, but label gate blocks OPORTUNIDADE
-    if (result && result.score >= 85) {
+    // V3: Without FIPE, score uses simplified mode — no price labels
+    if (result) {
+      expect(result.scoreMode).toBe('simplified');
       expect(result.label).not.toContain('OPORTUNIDADE');
-      expect(result.label).toContain('BOM');
+      expect(result.label).not.toContain('CARO');
+      // Simplified labels: ANÚNCIO DESTAQUE, ANÚNCIO, ANÚNCIO RECENTE
+      expect(result.label).toContain('AN\u00DANCIO');
     }
   });
 });

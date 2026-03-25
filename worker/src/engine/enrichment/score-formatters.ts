@@ -1,9 +1,10 @@
 /**
- * Opportunity Score — Formatters (V2.1 Hardened)
+ * Opportunity Score — Formatters (V3)
  *
  * Pure formatting functions with zero external dependencies.
  * Safe to import from notification services without triggering DB initialization.
  *
+ * V3: Respects scoreMode — 'simplified' mode shows NO price-related labels.
  * V2.1: Shows confidence level. Breakdown details only for meaningful adjustments.
  */
 
@@ -43,9 +44,19 @@ function buildBreakdownLinesTelegram(result: OpportunityResult): string {
 // ─── Telegram ───────────────────────────────────────────────────────────────
 
 export function formatScoreTelegram(result: OpportunityResult): string {
+  const isSimplified = result.scoreMode === 'simplified';
+
+  if (isSimplified) {
+    // V3 Simplified: show only label + breakdown, NO score number, NO confidence badge
+    let text = `\n${result.label}`;
+    text += buildBreakdownLinesTelegram(result);
+    return text;
+  }
+
+  // FULL mode: show score, label, confidence, breakdown
   let text = `\n\u2B50 <b>Score:</b> ${result.score}/100\n${result.label}`;
 
-  // Confidence (always show)
+  // Confidence (always show in full mode)
   const confLabel = CONFIDENCE_LABELS[result.confidenceLevel] || result.confidenceLevel;
   text += `\n\uD83D\uDCCA Confian\u00E7a: ${confLabel}`;
 
@@ -58,6 +69,18 @@ export function formatScoreTelegram(result: OpportunityResult): string {
 // ─── Email HTML ─────────────────────────────────────────────────────────────
 
 export function formatScoreEmail(result: OpportunityResult): string {
+  const isSimplified = result.scoreMode === 'simplified';
+
+  if (isSimplified) {
+    // V3 Simplified: minimal badge, no score number
+    return `
+    <div style="text-align: center; margin: 15px 0;">
+      <p style="margin: 0; font-size: 14px; font-weight: 600; color: #333;">${result.label}</p>
+    </div>
+    `;
+  }
+
+  // FULL mode: score badge + confidence + breakdown
   let badgeColor: string;
   if (result.score >= 85) badgeColor = '#e74c3c';
   else if (result.score >= 70) badgeColor = '#27ae60';
@@ -106,6 +129,23 @@ export function formatScoreEmail(result: OpportunityResult): string {
 // ─── Plain Text ─────────────────────────────────────────────────────────────
 
 export function formatScoreText(result: OpportunityResult): string {
+  const isSimplified = result.scoreMode === 'simplified';
+
+  if (isSimplified) {
+    let text = result.label;
+    const bd = result.breakdown;
+    if (bd) {
+      const parts: string[] = [];
+      if (bd.timeBoost > 0) parts.push(`Novo (+${bd.timeBoost})`);
+      if (bd.sellerScore !== 0) parts.push(`Vendedor (${bd.sellerScore > 0 ? '+' : ''}${bd.sellerScore})`);
+      if (parts.length > 0) {
+        text += ` | ${parts.join(', ')}`;
+      }
+    }
+    return text;
+  }
+
+  // FULL mode
   const confLabel = CONFIDENCE_LABELS[result.confidenceLevel] || result.confidenceLevel;
   let text = `\u2B50 Score: ${result.score}/100 \u2014 ${result.label} | Confian\u00E7a: ${confLabel}`;
 

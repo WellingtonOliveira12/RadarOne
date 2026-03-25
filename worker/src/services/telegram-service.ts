@@ -1,7 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import type { FipeEnrichment } from '../engine/enrichment/fipe-types';
 import { formatFipeTelegram } from '../engine/enrichment/fipe';
-import type { OpportunityResult } from '../engine/enrichment/score-types';
+import type { OpportunityResult, AppleReferenceMatch } from '../engine/enrichment/score-types';
 import { formatScoreTelegram } from '../engine/enrichment/score-formatters';
 
 /**
@@ -26,7 +26,9 @@ interface AdAlert {
     url: string;
     imageUrl?: string;
     location?: string;
+    publishedAt?: Date;
     fipe?: FipeEnrichment;
+    appleRef?: AppleReferenceMatch;
     opportunity?: OpportunityResult;
   };
 }
@@ -71,6 +73,19 @@ export class TelegramService {
         message += '\n';
       }
 
+      // Apple Reference (if available and no FIPE)
+      if (!data.ad.fipe && data.ad.appleRef && data.ad.price) {
+        const refFormatted = new Intl.NumberFormat('pt-BR', {
+          style: 'currency', currency: 'BRL', maximumFractionDigits: 0,
+        }).format(data.ad.appleRef.referencePrice);
+        const delta = ((data.ad.price - data.ad.appleRef.referencePrice) / data.ad.appleRef.referencePrice);
+        const pct = Math.round(delta * 100);
+        const pctStr = `${pct >= 0 ? '+' : ''}${pct}%`;
+        const emoji = delta <= -0.05 ? '\uD83D\uDD25' : delta <= 0.10 ? '\u2696\uFE0F' : '\uD83D\uDEA8';
+        const classLabel = delta <= -0.05 ? 'abaixo da ref.' : delta <= 0.10 ? 'na m\u00E9dia' : 'acima da ref.';
+        message += `\n\uD83C\uDF4F <b>Ref. Apple:</b> ${refFormatted}\n${emoji} ${pctStr} ${classLabel}\n`;
+      }
+
       // Opportunity Score (if available)
       if (data.ad.opportunity) {
         message += formatScoreTelegram(data.ad.opportunity);
@@ -78,7 +93,11 @@ export class TelegramService {
       }
 
       if (data.ad.location) {
-        message += `📍 ${this.escapeHtml(data.ad.location)}\n`;
+        let locationLine = `📍 ${this.escapeHtml(data.ad.location)}`;
+        if (data.ad.publishedAt) {
+          locationLine += ` / ${this.formatRelativeDate(data.ad.publishedAt)}`;
+        }
+        message += `${locationLine}\n`;
       }
 
       if (data.ad.description) {
@@ -157,5 +176,26 @@ export class TelegramService {
       style: 'currency',
       currency: 'BRL',
     }).format(price);
+  }
+
+  /**
+   * Formats a date as relative text in Portuguese.
+   *   Today at 19:26      → "Hoje, 19:26"
+   *   Yesterday at 08:51  → "Ontem, 08:51"
+   *   Other               → "25/03, 22:32"
+   */
+  private static formatRelativeDate(date: Date): string {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+    const isToday = date.toDateString() === now.toDateString();
+    if (isToday) return `Hoje, ${time}`;
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) return `Ontem, ${time}`;
+
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}, ${time}`;
   }
 }
