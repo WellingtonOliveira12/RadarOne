@@ -17,6 +17,7 @@
     "prisma:migrate:safe": "node dist/scripts/run-migrations-safe.js",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node-dev prisma/seed.ts",
+    "seed:apple": "ts-node-dev prisma/seed-apple-references.ts",
     "seed:e2e": "ts-node-dev prisma/seed-e2e.ts",
     "trial:list": "ts-node-dev scripts/setup-trial-scenario.ts --list",
     "trial:expired": "ts-node-dev scripts/setup-trial-scenario.ts --expired",
@@ -63,6 +64,7 @@
     "resend": "^6.6.0",
     "typescript": "^5.9.3",
     "web-push": "^3.6.7",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

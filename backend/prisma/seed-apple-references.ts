@@ -1,10 +1,20 @@
 /**
  * Seed Apple Price References from the provided spreadsheet data.
- * Run: npx ts-node prisma/seed-apple-references.ts
+ * Run: cd backend && npm run seed:apple
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
-const prisma = new PrismaClient();
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_SSL === 'true'
+    ? { rejectUnauthorized: false }
+    : undefined,
+});
+
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 const APPLE_REFERENCES = [
   { model: 'iPhone 11', storage: '64 GB', referencePrice: 650 },
@@ -67,4 +77,7 @@ async function main() {
 
 main()
   .catch(console.error)
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });
