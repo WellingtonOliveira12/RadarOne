@@ -67,7 +67,7 @@ export default function AdminAppleReferencePage() {
     try {
       setLoading(true);
       const token = getToken();
-      const data = await api.get<AppleReference[]>('/admin/apple-references', token);
+      const data = await api.get<AppleReference[]>('/api/admin/apple-references', token);
       setRefs(data);
       setError('');
     } catch (err: any) {
@@ -91,7 +91,7 @@ export default function AdminAppleReferencePage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`${BASE_URL}/admin/apple-references/upload`, {
+      const response = await fetch(`${BASE_URL}/api/admin/apple-references/upload`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -142,7 +142,7 @@ export default function AdminAppleReferencePage() {
     if (!editItem) return;
     try {
       const token = getToken();
-      await api.put(`/admin/apple-references/${editItem.id}`, {
+      await api.put(`/api/admin/apple-references/${editItem.id}`, {
         model: editModel,
         storage: editStorage,
         referencePrice: editPrice,
@@ -159,7 +159,7 @@ export default function AdminAppleReferencePage() {
     if (!confirm('Excluir esta referência?')) return;
     try {
       const token = getToken();
-      await api.delete(`/admin/apple-references/${id}`, token);
+      await api.delete(`/api/admin/apple-references/${id}`, token);
       toast({ title: 'Excluído!', status: 'success', duration: 3000 });
       fetchRefs();
     } catch (err: any) {
