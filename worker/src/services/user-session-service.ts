@@ -295,35 +295,55 @@ class UserSessionService {
         source: 'user_upload',
       };
 
-      // 7. Upsert no banco (usando índice legado userId_site_domain)
-      const session = await prisma.userSession.upsert({
+      // 7. Find existing session or create new one (multi-session aware)
+      const existingSession = await prisma.userSession.findFirst({
         where: {
-          userId_site_domain: {
-            userId,
-            site,
-            domain: config.domain,
-          },
-        },
-        create: {
           userId,
           site,
           domain: config.domain,
           accountLabel: accountLabel || null,
-          status: UserSessionStatus.ACTIVE,
-          encryptedStorageState,
-          metadata,
-          expiresAt,
-        },
-        update: {
-          status: UserSessionStatus.ACTIVE,
-          encryptedStorageState,
-          accountLabel: accountLabel || null,
-          metadata,
-          expiresAt,
-          lastUsedAt: new Date(),
-          lastErrorAt: null,
         },
       });
+
+      const session = existingSession
+        ? await prisma.userSession.update({
+            where: { id: existingSession.id },
+            data: {
+              status: UserSessionStatus.ACTIVE,
+              encryptedStorageState,
+              metadata,
+              expiresAt,
+              lastUsedAt: new Date(),
+              lastErrorAt: null,
+              consecutiveFailures: 0,
+              cooldownUntil: null,
+              reasonCode: null,
+            },
+          })
+        : await prisma.userSession.create({
+            data: {
+              userId,
+              site,
+              domain: config.domain,
+              accountLabel: accountLabel || null,
+              status: UserSessionStatus.ACTIVE,
+              isPrimary: false,
+              encryptedStorageState,
+              metadata,
+              expiresAt,
+            },
+          });
+
+      // Auto-promote to primary if it's the only session for this user/site
+      const sessionCount = await prisma.userSession.count({
+        where: { userId, site },
+      });
+      if (sessionCount === 1) {
+        await prisma.userSession.update({
+          where: { id: session.id },
+          data: { isPrimary: true },
+        });
+      }
 
       logger.info(
         {
@@ -356,16 +376,29 @@ class UserSessionService {
     // Função de cleanup padrão
     const noopCleanup = async () => {};
 
-    // 1. Busca sessão do usuário (usando índice legado userId_site_domain)
-    const session = await prisma.userSession.findUnique({
-      where: {
-        userId_site_domain: {
-          userId,
-          site,
-          domain,
-        },
-      },
-    });
+    // 1. Find the best eligible session from pool (or specific by accountLabel)
+    const session = accountLabel
+      ? await prisma.userSession.findFirst({
+          where: { userId, site, domain, accountLabel },
+        })
+      : await prisma.userSession.findFirst({
+          where: {
+            userId,
+            site,
+            domain,
+            status: UserSessionStatus.ACTIVE,
+            OR: [
+              { cooldownUntil: null },
+              { cooldownUntil: { lte: new Date() } },
+            ],
+          },
+          orderBy: [
+            { isPrimary: 'desc' },
+            { priority: 'asc' },
+            { consecutiveFailures: 'asc' },
+            { lastUsedAt: 'asc' },
+          ],
+        });
 
     if (!session) {
       return {
@@ -523,14 +556,17 @@ class UserSessionService {
     accountLabel?: string
   ): Promise<{ notified: boolean }> {
     const config = this.getSiteConfig(site);
-    const session = await prisma.userSession.findUnique({
+    const domain = config?.domain || site.toLowerCase();
+
+    // Find session: by accountLabel if specified, or first matching session
+    const session = await prisma.userSession.findFirst({
       where: {
-        userId_site_domain: {
-          userId,
-          site,
-          domain: config?.domain || site.toLowerCase(),
-        },
+        userId,
+        site,
+        domain,
+        ...(accountLabel ? { accountLabel } : {}),
       },
+      orderBy: { isPrimary: 'desc' },
     });
 
     if (!session) {
@@ -607,22 +643,24 @@ class UserSessionService {
    */
   async hasValidSession(userId: string, site: string, accountLabel?: string): Promise<boolean> {
     const config = this.getSiteConfig(site);
-    const session = await prisma.userSession.findUnique({
+    const domain = config?.domain || site.toLowerCase();
+
+    // Pool-aware: check if ANY session is active for this user/site
+    const count = await prisma.userSession.count({
       where: {
-        userId_site_domain: {
-          userId,
-          site,
-          domain: config?.domain || site.toLowerCase(),
-        },
+        userId,
+        site,
+        domain,
+        status: UserSessionStatus.ACTIVE,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } },
+        ],
+        ...(accountLabel ? { accountLabel } : {}),
       },
-      select: { status: true, expiresAt: true },
     });
 
-    if (!session) return false;
-    if (session.status !== UserSessionStatus.ACTIVE) return false;
-    if (session.expiresAt && new Date() > session.expiresAt) return false;
-
-    return true;
+    return count > 0;
   }
 
   /**
@@ -689,39 +727,64 @@ class UserSessionService {
     lastUsedAt?: Date | null;
     expiresAt?: Date | null;
     needsAction?: boolean;
+    poolSize?: number;
+    activeCount?: number;
   }> {
     const config = this.getSiteConfig(site);
-    const session = await prisma.userSession.findUnique({
-      where: {
-        userId_site_domain: {
-          userId,
-          site,
-          domain: config?.domain || site.toLowerCase(),
-        },
-      },
+    const domain = config?.domain || site.toLowerCase();
+
+    // Pool-aware: fetch all sessions for this user/site
+    const sessions = await prisma.userSession.findMany({
+      where: { userId, site, domain },
       select: {
         status: true,
         lastUsedAt: true,
         expiresAt: true,
+        cooldownUntil: true,
       },
+      orderBy: [{ isPrimary: 'desc' }, { priority: 'asc' }],
     });
 
-    if (!session) {
-      return { exists: false, needsAction: this.siteRequiresAuth(site) };
+    if (sessions.length === 0) {
+      return { exists: false, needsAction: this.siteRequiresAuth(site), poolSize: 0, activeCount: 0 };
     }
 
-    const needsAction =
-      session.status === UserSessionStatus.NEEDS_REAUTH ||
-      session.status === UserSessionStatus.EXPIRED ||
-      session.status === UserSessionStatus.INVALID ||
-      !!(session.expiresAt && new Date() > session.expiresAt);
+    const now = new Date();
+
+    // Count active sessions (eligible for scraping)
+    const activeSessions = sessions.filter(
+      (s) =>
+        s.status === UserSessionStatus.ACTIVE &&
+        (!s.expiresAt || s.expiresAt > now) &&
+        (!s.cooldownUntil || s.cooldownUntil <= now)
+    );
+
+    // If at least one active session exists, pool is usable
+    if (activeSessions.length > 0) {
+      const best = activeSessions[0];
+      return {
+        exists: true,
+        status: best.status,
+        lastUsedAt: best.lastUsedAt,
+        expiresAt: best.expiresAt,
+        needsAction: false,
+        poolSize: sessions.length,
+        activeCount: activeSessions.length,
+      };
+    }
+
+    // No active sessions — report the "best" status (most relevant for user action)
+    const primaryOrFirst = sessions[0];
+    const needsAction = true; // All sessions need attention
 
     return {
       exists: true,
-      status: session.status,
-      lastUsedAt: session.lastUsedAt,
-      expiresAt: session.expiresAt,
+      status: primaryOrFirst.status,
+      lastUsedAt: primaryOrFirst.lastUsedAt,
+      expiresAt: primaryOrFirst.expiresAt,
       needsAction,
+      poolSize: sessions.length,
+      activeCount: 0,
     };
   }
 

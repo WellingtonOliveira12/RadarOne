@@ -23,10 +23,13 @@ const { mockPrisma, mockEncrypt, mockDecrypt, mockIsValid, mockExtractMeta } = v
       userSession: {
         upsert: vi.fn(),
         findUnique: vi.fn(),
+        findFirst: vi.fn(),
+        create: vi.fn(),
         update: vi.fn(),
         updateMany: vi.fn(),
         findMany: vi.fn(),
         deleteMany: vi.fn(),
+        count: vi.fn(),
       },
     } as any,
     mockEncrypt: vi.fn(),
@@ -122,7 +125,11 @@ describe('saveSession', () => {
     mockIsValid.mockReturnValue(true);
     mockExtractMeta.mockReturnValue(DEFAULT_META);
     mockEncrypt.mockReturnValue('encrypted-state');
-    mockPrisma.userSession.upsert.mockResolvedValue(makeDbSession({ id: 'session-new' }));
+    // New flow: findFirst (returns null = create new), create returns session, count returns 1
+    mockPrisma.userSession.findFirst.mockResolvedValue(null);
+    mockPrisma.userSession.create.mockResolvedValue(makeDbSession({ id: 'session-new' }));
+    mockPrisma.userSession.update.mockResolvedValue(makeDbSession({ id: 'session-new' }));
+    mockPrisma.userSession.count.mockResolvedValue(1);
   });
 
   it('returns error for unsupported site', async () => {
@@ -132,7 +139,7 @@ describe('saveSession', () => {
     expect(result.sessionId).toBe('');
     expect(result.message).toContain('Site não suportado');
     expect(result.message).toContain('UNKNOWN_SITE');
-    expect(mockPrisma.userSession.upsert).not.toHaveBeenCalled();
+    expect(mockPrisma.userSession.findFirst).not.toHaveBeenCalled();
   });
 
   it('returns error for invalid storageState JSON', async () => {
@@ -143,10 +150,10 @@ describe('saveSession', () => {
     expect(result.success).toBe(false);
     expect(result.sessionId).toBe('');
     expect(result.message).toContain('storageState inválido');
-    expect(mockPrisma.userSession.upsert).not.toHaveBeenCalled();
+    expect(mockPrisma.userSession.findFirst).not.toHaveBeenCalled();
   });
 
-  it('upserts session and returns success with meta', async () => {
+  it('creates new session and returns success with meta', async () => {
     const result = await saveSession('user-1', 'MERCADO_LIVRE', VALID_STORAGE_STATE, 'my-account');
 
     expect(result.success).toBe(true);
@@ -157,21 +164,33 @@ describe('saveSession', () => {
       originsCount: 0,
       domains: ['mercadolivre.com.br'],
     });
-    expect(mockPrisma.userSession.upsert).toHaveBeenCalledOnce();
+    expect(mockPrisma.userSession.findFirst).toHaveBeenCalledOnce();
+    expect(mockPrisma.userSession.create).toHaveBeenCalledOnce();
+  });
+
+  it('updates existing session when found', async () => {
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession({ id: 'existing-1' }));
+    mockPrisma.userSession.count.mockResolvedValue(1);
+
+    const result = await saveSession('user-1', 'MERCADO_LIVRE', VALID_STORAGE_STATE);
+
+    expect(result.success).toBe(true);
+    expect(mockPrisma.userSession.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'existing-1' } })
+    );
+    expect(mockPrisma.userSession.create).not.toHaveBeenCalled();
   });
 
   it('passes correct domain for FACEBOOK_MARKETPLACE', async () => {
     await saveSession('user-1', 'FACEBOOK_MARKETPLACE', VALID_STORAGE_STATE);
 
-    expect(mockPrisma.userSession.upsert).toHaveBeenCalledWith(
+    expect(mockPrisma.userSession.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          userId_site_domain: {
-            userId: 'user-1',
-            site: 'FACEBOOK_MARKETPLACE',
-            domain: 'facebook.com',
-          },
-        },
+        where: expect.objectContaining({
+          userId: 'user-1',
+          site: 'FACEBOOK_MARKETPLACE',
+          domain: 'facebook.com',
+        }),
       })
     );
   });
@@ -179,19 +198,16 @@ describe('saveSession', () => {
   it('saves without accountLabel when omitted', async () => {
     await saveSession('user-1', 'MERCADO_LIVRE', VALID_STORAGE_STATE);
 
-    const call = mockPrisma.userSession.upsert.mock.calls[0][0];
-    expect(call.update.accountLabel).toBeNull();
-    expect(call.create.accountLabel).toBeNull();
+    const createCall = mockPrisma.userSession.create.mock.calls[0]?.[0];
+    expect(createCall?.data?.accountLabel).toBeNull();
   });
 
   it('sets ACTIVE status and expiresAt on save', async () => {
     await saveSession('user-1', 'MERCADO_LIVRE', VALID_STORAGE_STATE);
 
-    const call = mockPrisma.userSession.upsert.mock.calls[0][0];
-    expect(call.update.status).toBe('ACTIVE');
-    expect(call.create.status).toBe('ACTIVE');
-    expect(call.update.expiresAt).toBeInstanceOf(Date);
-    expect(call.create.expiresAt).toBeInstanceOf(Date);
+    const createCall = mockPrisma.userSession.create.mock.calls[0]?.[0];
+    expect(createCall?.data?.status).toBe('ACTIVE');
+    expect(createCall?.data?.expiresAt).toBeInstanceOf(Date);
   });
 });
 
@@ -217,7 +233,7 @@ describe('loadSession', () => {
   });
 
   it('returns error when session not found', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(null);
+    mockPrisma.userSession.findFirst.mockResolvedValue(null);
 
     const result = await loadSession('user-1', 'MERCADO_LIVRE');
 
@@ -228,7 +244,7 @@ describe('loadSession', () => {
   });
 
   it('returns error when session status is NEEDS_REAUTH', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession({ status: 'NEEDS_REAUTH' }));
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession({ status: 'NEEDS_REAUTH' }));
 
     const result = await loadSession('user-1', 'MERCADO_LIVRE');
 
@@ -239,7 +255,7 @@ describe('loadSession', () => {
   });
 
   it('returns error when session status is EXPIRED', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession({ status: 'EXPIRED' }));
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession({ status: 'EXPIRED' }));
 
     const result = await loadSession('user-1', 'MERCADO_LIVRE');
 
@@ -250,7 +266,7 @@ describe('loadSession', () => {
   });
 
   it('returns error when session status is INVALID', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession({ status: 'INVALID' }));
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession({ status: 'INVALID' }));
 
     const result = await loadSession('user-1', 'MERCADO_LIVRE');
 
@@ -262,7 +278,7 @@ describe('loadSession', () => {
 
   it('marks session expired and returns error when expiresAt is in the past', async () => {
     const pastDate = new Date(Date.now() - 1000); // 1 second ago
-    mockPrisma.userSession.findUnique.mockResolvedValue(
+    mockPrisma.userSession.findFirst.mockResolvedValue(
       makeDbSession({ status: 'ACTIVE', expiresAt: pastDate })
     );
 
@@ -276,7 +292,7 @@ describe('loadSession', () => {
   });
 
   it('returns error when encryptedStorageState is null', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(
+    mockPrisma.userSession.findFirst.mockResolvedValue(
       makeDbSession({ status: 'ACTIVE', encryptedStorageState: null })
     );
 
@@ -288,7 +304,7 @@ describe('loadSession', () => {
   });
 
   it('returns decrypted storageState on success', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession());
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession());
     mockDecrypt.mockReturnValue(VALID_STORAGE_STATE);
 
     const result = await loadSession('user-1', 'MERCADO_LIVRE');
@@ -306,7 +322,7 @@ describe('loadSession', () => {
   });
 
   it('returns error when decryption throws', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession());
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession());
     mockDecrypt.mockImplementation(() => { throw new Error('decryption failed'); });
 
     const result = await loadSession('user-1', 'MERCADO_LIVRE');
@@ -317,7 +333,7 @@ describe('loadSession', () => {
   });
 
   it('loads session with null expiresAt (never expires)', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(
+    mockPrisma.userSession.findFirst.mockResolvedValue(
       makeDbSession({ status: 'ACTIVE', expiresAt: null })
     );
 
@@ -344,7 +360,7 @@ describe('markSessionNeedsReauth', () => {
   });
 
   it('returns false when session not found', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(null);
+    mockPrisma.userSession.findFirst.mockResolvedValue(null);
 
     const result = await markSessionNeedsReauth('user-1', 'MERCADO_LIVRE');
     expect(result).toBe(false);
@@ -352,7 +368,7 @@ describe('markSessionNeedsReauth', () => {
   });
 
   it('updates session status to NEEDS_REAUTH with reason', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession());
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession());
     mockPrisma.userSession.update.mockResolvedValue({});
 
     const result = await markSessionNeedsReauth('user-1', 'MERCADO_LIVRE', 'session expired by site');
@@ -373,7 +389,7 @@ describe('markSessionNeedsReauth', () => {
   });
 
   it('uses default reason when none provided', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession());
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession());
     mockPrisma.userSession.update.mockResolvedValue({});
 
     await markSessionNeedsReauth('user-1', 'MERCADO_LIVRE');
@@ -383,7 +399,7 @@ describe('markSessionNeedsReauth', () => {
   });
 
   it('returns false and logs error on exception', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession());
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession());
     mockPrisma.userSession.update.mockRejectedValue(new Error('DB error'));
 
     const result = await markSessionNeedsReauth('user-1', 'MERCADO_LIVRE');
@@ -502,7 +518,7 @@ describe('getSessionStatus', () => {
   });
 
   it('returns null when session not found', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(null);
+    mockPrisma.userSession.findFirst.mockResolvedValue(null);
 
     const result = await getSessionStatus('user-1', 'MERCADO_LIVRE');
     expect(result).toBeNull();
@@ -510,22 +526,22 @@ describe('getSessionStatus', () => {
 
   it('returns SessionInfo when session exists', async () => {
     const session = makeDbSession({ status: 'ACTIVE' });
-    mockPrisma.userSession.findUnique.mockResolvedValue(session);
+    mockPrisma.userSession.findFirst.mockResolvedValue(session);
 
     const result = await getSessionStatus('user-1', 'MERCADO_LIVRE');
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe('session-1');
     expect(result!.status).toBe('ACTIVE');
-    expect(mockPrisma.userSession.findUnique).toHaveBeenCalledWith({
-      where: {
-        userId_site_domain: {
+    expect(mockPrisma.userSession.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
           userId: 'user-1',
           site: 'MERCADO_LIVRE',
           domain: 'mercadolivre.com.br',
-        },
-      },
-    });
+        }),
+      })
+    );
   });
 });
 
@@ -584,21 +600,21 @@ describe('hasActiveSession', () => {
   });
 
   it('returns true when session status is ACTIVE', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession({ status: 'ACTIVE' }));
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession({ status: 'ACTIVE' }));
 
     const result = await hasActiveSession('user-1', 'MERCADO_LIVRE');
     expect(result).toBe(true);
   });
 
   it('returns false when session status is NEEDS_REAUTH', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession({ status: 'NEEDS_REAUTH' }));
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession({ status: 'NEEDS_REAUTH' }));
 
     const result = await hasActiveSession('user-1', 'MERCADO_LIVRE');
     expect(result).toBe(false);
   });
 
   it('returns false when session status is EXPIRED', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(makeDbSession({ status: 'EXPIRED' }));
+    mockPrisma.userSession.findFirst.mockResolvedValue(makeDbSession({ status: 'EXPIRED' }));
 
     const result = await hasActiveSession('user-1', 'MERCADO_LIVRE');
     expect(result).toBe(false);
@@ -610,7 +626,7 @@ describe('hasActiveSession', () => {
   });
 
   it('returns false when no session in DB', async () => {
-    mockPrisma.userSession.findUnique.mockResolvedValue(null);
+    mockPrisma.userSession.findFirst.mockResolvedValue(null);
 
     const result = await hasActiveSession('user-1', 'MERCADO_LIVRE');
     expect(result).toBe(false);

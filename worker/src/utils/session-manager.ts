@@ -107,31 +107,35 @@ class SessionManager {
       // Criptografa cookies
       const encryptedCookies = this.encrypt(JSON.stringify(cookies));
 
-      await prisma.userSession.upsert({
-        where: {
-          userId_site_domain: {
+      // Find existing or create (multi-session aware)
+      const existing = await prisma.userSession.findFirst({
+        where: { userId, site, domain, accountLabel: null },
+      });
+
+      if (existing) {
+        await prisma.userSession.update({
+          where: { id: existing.id },
+          data: {
+            cookies: encryptedCookies as any,
+            localStorage: options?.localStorage as any,
+            metadata: options?.metadata as any,
+            expiresAt,
+            lastUsedAt: new Date(),
+          },
+        });
+      } else {
+        await prisma.userSession.create({
+          data: {
             userId,
             site,
             domain,
+            cookies: encryptedCookies as any,
+            localStorage: options?.localStorage as any,
+            metadata: options?.metadata as any,
+            expiresAt,
           },
-        },
-        create: {
-          userId,
-          site,
-          domain,
-          cookies: encryptedCookies as any,
-          localStorage: options?.localStorage as any,
-          metadata: options?.metadata as any,
-          expiresAt,
-        },
-        update: {
-          cookies: encryptedCookies as any,
-          localStorage: options?.localStorage as any,
-          metadata: options?.metadata as any,
-          expiresAt,
-          lastUsedAt: new Date(),
-        },
-      });
+        });
+      }
 
       logger.info({
         userId,

@@ -15,6 +15,7 @@ import { circuitBreaker } from '../utils/circuit-breaker';
 import { log } from '../utils/logger';
 import { userSessionService } from './user-session-service';
 import { isAuthError } from './session-provider';
+import { sessionPoolService, MAX_FAILOVER_ATTEMPTS } from './session-pool.service';
 import { StatsRecorder, mapPageType } from './stats-recorder';
 import { getDefaultUrl } from '../engine/default-urls';
 import { buildSearchUrl } from '../engine/url-builder';
@@ -178,11 +179,14 @@ export class MonitorRunner {
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // VERIFICAÇÃO DE SESSÃO DO USUÁRIO
+      // SESSION POOL VERIFICATION + FAILOVER
       // ═══════════════════════════════════════════════════════════════
       const siteRequiresAuth = userSessionService.siteRequiresAuth(monitor.site);
 
       if (siteRequiresAuth) {
+        // Recover sessions whose cooldown expired (best-effort, non-blocking)
+        await sessionPoolService.recoverCooledDownSessions().catch(() => {});
+
         const sessionStatus = await userSessionService.getSessionStatus(
           monitor.userId,
           monitor.site
@@ -194,11 +198,13 @@ export class MonitorRunner {
           exists: sessionStatus.exists,
           status: sessionStatus.status || 'N/A',
           needsAction: sessionStatus.needsAction || false,
+          poolSize: sessionStatus.poolSize || 0,
+          activeCount: sessionStatus.activeCount || 0,
           expiresAt: sessionStatus.expiresAt?.toISOString() || null,
           lastUsedAt: sessionStatus.lastUsedAt?.toISOString() || null,
         });
 
-        // Se não existe sessão e site requer auth → SKIPPED + notify user
+        // No sessions configured → SKIPPED + notify user
         if (!sessionStatus.exists) {
           log.info('MONITOR_SKIPPED: Sessão necessária mas não configurada', {
             monitorId: monitor.id,
@@ -212,47 +218,45 @@ export class MonitorRunner {
             executionTime: Date.now() - startTime,
           });
 
-          // Notify user proactively that session setup is needed
           await this.sendSessionRequiredNotification(monitor);
-
-          // NÃO incrementa circuit breaker!
           return;
         }
 
-        // Se sessão precisa de ação do usuário → SKIPPED + re-notifica com cooldown
+        // All sessions need action (none active) → SKIPPED + notify
         if (sessionStatus.needsAction) {
-          log.info('MONITOR_SKIPPED: Sessão precisa ser reconectada', {
+          log.info('MONITOR_SKIPPED: Pool sem sessões ativas', {
             monitorId: monitor.id,
             site: monitor.site,
             status: sessionStatus.status,
-            reason: 'NEEDS_REAUTH',
+            poolSize: sessionStatus.poolSize,
+            activeCount: sessionStatus.activeCount,
+            reason: 'SESSION_POOL_EMPTY',
           });
 
-          // Re-notifica com cooldown de 6h (idempotente: não muda status se já NEEDS_REAUTH)
           const { notified } = await userSessionService.markNeedsReauth(
             monitor.userId,
             monitor.site,
-            `Sessão ${sessionStatus.status} — monitor SKIPado`
+            `Pool vazio — todas sessões ${sessionStatus.status}`
           );
 
           if (notified) {
-            await this.sendReauthNotification(monitor);
+            await this.sendPoolDegradedNotification(monitor, sessionStatus.poolSize || 0, 0);
           }
 
           await this.logExecution(monitor.id, {
             status: 'SKIPPED',
-            error: `NEEDS_REAUTH: Sessão ${sessionStatus.status}. Reconecte sua conta.`,
+            error: `SESSION_POOL_EMPTY: ${sessionStatus.poolSize} sessões, 0 ativas. Reconecte.`,
             executionTime: Date.now() - startTime,
           });
 
-          // NÃO incrementa circuit breaker!
           return;
         }
       }
       // ═══════════════════════════════════════════════════════════════
 
-      // Executa scraping com circuit breaker
-      // Para sites que requerem auth, usa chave por userId+site para não afetar outros usuários
+      // ═══════════════════════════════════════════════════════════════
+      // SCRAPING WITH FAILOVER (multi-session)
+      // ═══════════════════════════════════════════════════════════════
       log.info('SCRAPER_START', {
         monitorId: monitor.id,
         site: monitor.site,
@@ -260,9 +264,15 @@ export class MonitorRunner {
         mode: (monitor as any).mode || 'URL_ONLY',
       });
 
-      const ads = siteRequiresAuth
-        ? await circuitBreaker.executeForUser(monitor.site, monitor.userId, () => this.scrape(monitor))
-        : await circuitBreaker.execute(monitor.site, () => this.scrape(monitor));
+      let ads: Ad[];
+
+      if (!siteRequiresAuth) {
+        // Non-auth sites: simple execution, no failover needed
+        ads = await circuitBreaker.execute(monitor.site, () => this.scrape(monitor));
+      } else {
+        // Auth sites: failover loop across session pool
+        ads = await this.executeWithFailover(monitor, startTime);
+      }
 
       log.info('SCRAPER_RESULT', {
         monitorId: monitor.id,
@@ -796,6 +806,196 @@ export class MonitorRunner {
       });
     } catch {
       // Best-effort — notification was already sent
+    }
+  }
+
+  /**
+   * Execute scraping with automatic failover across session pool.
+   * Tries the best session, and on auth failure retries with next eligible session.
+   * Max attempts: MAX_FAILOVER_ATTEMPTS (3).
+   */
+  private static async executeWithFailover(monitor: any, startTime: number): Promise<Ad[]> {
+    const excludeIds: string[] = [];
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= MAX_FAILOVER_ATTEMPTS; attempt++) {
+      // Select best eligible session from pool
+      const selection = await sessionPoolService.selectSession(
+        monitor.userId,
+        monitor.site,
+        excludeIds
+      );
+
+      if (!selection.session) {
+        // No more sessions available
+        log.warn('SESSION_POOL_EXHAUSTED', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          attempt,
+          totalExcluded: excludeIds.length,
+          poolHealth: selection.poolHealth,
+          reason: selection.reason,
+        });
+
+        // Send pool degraded/empty notification
+        const poolHealth = await sessionPoolService.getPoolHealth(monitor.userId, monitor.site);
+        const { notified } = await userSessionService.markNeedsReauth(
+          monitor.userId,
+          monitor.site,
+          `Pool exhausted after ${attempt - 1} failover attempts`
+        );
+
+        if (notified) {
+          await this.sendPoolDegradedNotification(
+            monitor,
+            poolHealth.totalSessions,
+            poolHealth.activeSessions
+          );
+        }
+
+        // Throw the last error or a new one so the outer catch handles logging
+        throw lastError || new Error(`SESSION_POOL_EXHAUSTED: No eligible sessions for ${monitor.site}`);
+      }
+
+      const sessionId = selection.session.id;
+      excludeIds.push(sessionId);
+
+      if (attempt > 1) {
+        log.info('SESSION_FAILOVER_TRIGGERED', {
+          monitorId: monitor.id,
+          site: monitor.site,
+          attempt,
+          sessionId,
+          isPrimary: selection.session.isPrimary,
+          eligibleRemaining: selection.totalEligible - 1,
+        });
+      }
+
+      try {
+        // Execute scraping with per-user circuit breaker
+        const ads = await circuitBreaker.executeForUser(
+          monitor.site,
+          monitor.userId,
+          () => this.scrape(monitor)
+        );
+
+        // Success: mark session healthy and reset failures
+        await sessionPoolService.markSessionSuccess(sessionId);
+
+        if (attempt > 1) {
+          log.info('SESSION_FAILOVER_SUCCESS', {
+            monitorId: monitor.id,
+            site: monitor.site,
+            attempt,
+            sessionId,
+          });
+        }
+
+        return ads;
+      } catch (error: any) {
+        lastError = error;
+
+        if (isAuthError(error)) {
+          // Auth error: quarantine this session and try next
+          log.warn('SESSION_AUTH_FAILURE', {
+            monitorId: monitor.id,
+            site: monitor.site,
+            sessionId,
+            attempt,
+            error: error.message,
+          });
+
+          await sessionPoolService.markSessionFailed(sessionId, error.message, 'auth');
+          // Continue to next iteration (try next session)
+          continue;
+        }
+
+        // Non-auth error: don't failover, propagate error
+        throw error;
+      }
+    }
+
+    // All attempts exhausted
+    throw lastError || new Error(`SESSION_FAILOVER_EXHAUSTED after ${MAX_FAILOVER_ATTEMPTS} attempts`);
+  }
+
+  /**
+   * Send notification when session pool is degraded or empty.
+   * Includes pool context: total sessions, active count, affected monitors.
+   */
+  private static async sendPoolDegradedNotification(
+    monitor: any,
+    totalSessions: number,
+    activeSessions: number
+  ): Promise<void> {
+    const telegramChatId =
+      monitor.user.notificationSettings?.telegramChatId ||
+      monitor.user.telegramAccounts?.[0]?.chatId ||
+      null;
+
+    const siteName = this.formatSiteName(monitor.site);
+    const connectionsUrl = 'https://radarone.com.br/dashboard/connections';
+    const isEmpty = activeSessions === 0;
+
+    const statusLabel = isEmpty ? 'INDISPONÍVEL' : 'DEGRADADO';
+    const emoji = isEmpty ? '🔴' : '🟡';
+
+    const telegramMessage =
+      `${emoji} <b>Pool de Sessões ${statusLabel} — ${siteName}</b>\n\n` +
+      `${isEmpty
+        ? 'Todas as sessões estão inválidas ou expiradas.'
+        : `Apenas ${activeSessions} de ${totalSessions} sessões ativas.`
+      }\n\n` +
+      `<b>Impacto:</b> Monitores do ${siteName} ${isEmpty ? 'estão pausados' : 'podem falhar'}.\n\n` +
+      `<b>O que fazer:</b>\n` +
+      `1. Acesse <a href="${connectionsUrl}">Connections</a>\n` +
+      `2. Reconecte as sessões expiradas do ${siteName}\n` +
+      `3. Seus monitores voltarão automaticamente\n\n` +
+      `Sessões: ${activeSessions}/${totalSessions} ativas`;
+
+    if (telegramChatId) {
+      try {
+        await TelegramService.sendMessage(telegramChatId, telegramMessage);
+        log.info('POOL_DEGRADED_NOTIFICATION_SENT', {
+          monitorId: monitor.id,
+          userId: monitor.userId,
+          site: monitor.site,
+          channel: 'TELEGRAM',
+          totalSessions,
+          activeSessions,
+        });
+      } catch (e) {
+        // Best-effort
+      }
+    }
+
+    if (monitor.user.email && emailService.isEnabled()) {
+      try {
+        await emailService.sendAdAlert({
+          to: monitor.user.email,
+          monitorName: `[${statusLabel}] Pool de Sessões — ${siteName}`,
+          ad: {
+            title: `Pool de sessões do ${siteName} ${isEmpty ? 'vazio' : 'degradado'}`,
+            description:
+              `${isEmpty
+                ? 'Todas as sessões estão inválidas. Monitores pausados.'
+                : `${activeSessions}/${totalSessions} sessões ativas. Risco de falha.`
+              } Acesse Connections e reconecte.`,
+            url: connectionsUrl,
+            price: undefined,
+          },
+        });
+        log.info('POOL_DEGRADED_NOTIFICATION_SENT', {
+          monitorId: monitor.id,
+          userId: monitor.userId,
+          site: monitor.site,
+          channel: 'EMAIL',
+          totalSessions,
+          activeSessions,
+        });
+      } catch (e) {
+        // Best-effort
+      }
     }
   }
 

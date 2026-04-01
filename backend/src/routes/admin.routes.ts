@@ -4,6 +4,7 @@ import { AdminUsersController } from '../controllers/admin-users.controller';
 import { AdminSubscriptionsController } from '../controllers/admin-subscriptions.controller';
 import { AdminMonitorsController } from '../controllers/admin-monitors.controller';
 import { AdminSystemController } from '../controllers/admin-system.controller';
+import { sessionService } from '../services/sessionService';
 import { AdminCouponsController } from '../controllers/admin-coupons.controller';
 import { AdminAppleReferenceController } from '../controllers/admin-apple-reference.controller';
 import { requireAdmin, requireAdminRole } from '../middlewares/admin.middleware';
@@ -73,6 +74,22 @@ router.get('/jobs', requireAdmin, AdminSystemController.listJobRuns);
 
 // Site Health (Observabilidade)
 router.get('/site-health', requireAdmin, AdminMonitorsController.getSiteHealth);
+
+// Session Pool Health (Multi-session observability)
+router.get('/session-pool-health', requireAdmin, async (req, res) => {
+  try {
+    const poolHealth = await sessionService.getPoolHealth();
+    const summary = {
+      totalPools: poolHealth.length,
+      healthy: poolHealth.filter(p => p.status === 'HEALTHY').length,
+      degraded: poolHealth.filter(p => p.status === 'DEGRADED').length,
+      empty: poolHealth.filter(p => p.status === 'EMPTY').length,
+    };
+    res.json({ success: true, summary, pools: poolHealth });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Audit Logs (FASE 3.1)
 router.get('/audit-logs/export', requireAdmin, AdminSystemController.exportAuditLogs); // IMPORTANTE: Vem ANTES de outros

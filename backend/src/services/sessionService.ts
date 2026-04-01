@@ -134,44 +134,58 @@ export async function saveSession(
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + DEFAULT_EXPIRATION_DAYS);
 
-  // Upsert (criar ou atualizar)
-  const session = await prisma.userSession.upsert({
-    where: {
-      userId_site_domain: {
-        userId,
-        site,
-        domain,
-      },
-    },
-    update: {
-      encryptedStorageState,
-      status: 'ACTIVE',
-      accountLabel: accountLabel || null,
-      metadata: {
-        ...meta,
-        uploadedAt: new Date().toISOString(),
-        lastValidatedAt: null,
-        lastErrorReason: null,
-      },
-      expiresAt,
-      lastUsedAt: new Date(),
-      lastErrorAt: null,
-    },
-    create: {
-      userId,
-      site,
-      domain,
-      encryptedStorageState,
-      status: 'ACTIVE',
-      accountLabel: accountLabel || null,
-      metadata: {
-        ...meta,
-        uploadedAt: new Date().toISOString(),
-      },
-      expiresAt,
-      lastUsedAt: new Date(),
-    },
+  // Find existing session or create new one (multi-session aware)
+  const existingSession = await prisma.userSession.findFirst({
+    where: { userId, site, domain, accountLabel: accountLabel || null },
   });
+
+  const session = existingSession
+    ? await prisma.userSession.update({
+        where: { id: existingSession.id },
+        data: {
+          encryptedStorageState,
+          status: 'ACTIVE',
+          accountLabel: accountLabel || null,
+          metadata: {
+            ...meta,
+            uploadedAt: new Date().toISOString(),
+            lastValidatedAt: null,
+            lastErrorReason: null,
+          },
+          expiresAt,
+          lastUsedAt: new Date(),
+          lastErrorAt: null,
+          consecutiveFailures: 0,
+          cooldownUntil: null,
+          reasonCode: null,
+        },
+      })
+    : await prisma.userSession.create({
+        data: {
+          userId,
+          site,
+          domain,
+          encryptedStorageState,
+          status: 'ACTIVE',
+          accountLabel: accountLabel || null,
+          isPrimary: false,
+          metadata: {
+            ...meta,
+            uploadedAt: new Date().toISOString(),
+          },
+          expiresAt,
+          lastUsedAt: new Date(),
+        },
+      });
+
+  // Auto-promote to primary if it's the only session for this user/site
+  const sessionCount = await prisma.userSession.count({ where: { userId, site } });
+  if (sessionCount === 1) {
+    await prisma.userSession.update({
+      where: { id: session.id },
+      data: { isPrimary: true },
+    });
+  }
 
   logInfo('SESSION_SERVICE: Session saved', { userId, site, cookiesCount: meta.cookiesCount });
 
@@ -206,14 +220,14 @@ export async function loadSession(
 
   const domain = siteConfig.domains[0];
 
-  const session = await prisma.userSession.findUnique({
-    where: {
-      userId_site_domain: {
-        userId,
-        site,
-        domain,
-      },
-    },
+  // Pool-aware: find best active session, or any session for this user/site
+  const session = await prisma.userSession.findFirst({
+    where: { userId, site, domain },
+    orderBy: [
+      { status: 'asc' }, // ACTIVE first
+      { isPrimary: 'desc' },
+      { lastUsedAt: 'desc' },
+    ],
   });
 
   if (!session) {
@@ -314,14 +328,10 @@ export async function markSessionNeedsReauth(
   const domain = siteConfig.domains[0];
 
   try {
-    const session = await prisma.userSession.findUnique({
-      where: {
-        userId_site_domain: {
-          userId,
-          site,
-          domain,
-        },
-      },
+    // Find session: prefer primary, or any matching
+    const session = await prisma.userSession.findFirst({
+      where: { userId, site, domain },
+      orderBy: [{ isPrimary: 'desc' }],
     });
 
     if (!session) return false;
@@ -331,6 +341,8 @@ export async function markSessionNeedsReauth(
       data: {
         status: 'NEEDS_REAUTH',
         lastErrorAt: new Date(),
+        lastFailureAt: new Date(),
+        reasonCode: reason || 'LOGIN_REQUIRED',
         metadata: {
           ...(session.metadata as object || {}),
           lastErrorReason: reason || 'Login required by site',
@@ -401,14 +413,10 @@ export async function getSessionStatus(
 
   const domain = siteConfig.domains[0];
 
-  const session = await prisma.userSession.findUnique({
-    where: {
-      userId_site_domain: {
-        userId,
-        site,
-        domain,
-      },
-    },
+  // Pool-aware: return primary session or first available
+  const session = await prisma.userSession.findFirst({
+    where: { userId, site, domain },
+    orderBy: [{ isPrimary: 'desc' }, { status: 'asc' }],
   });
 
   if (!session) return null;
@@ -475,6 +483,91 @@ function mapSessionToInfo(session: any): SessionInfo {
 }
 
 // ============================================================
+// POOL HEALTH
+// ============================================================
+
+export type PoolHealthStatus = 'HEALTHY' | 'DEGRADED' | 'EMPTY';
+
+export interface PoolHealthInfo {
+  userId: string;
+  site: string;
+  status: PoolHealthStatus;
+  totalSessions: number;
+  activeSessions: number;
+  needsReauthSessions: number;
+  coolingDownSessions: number;
+  disabledSessions: number;
+}
+
+/**
+ * Get pool health for all user/site combinations (admin endpoint).
+ */
+export async function getSessionPoolHealth(): Promise<PoolHealthInfo[]> {
+  const sessions = await prisma.userSession.findMany({
+    select: {
+      userId: true,
+      site: true,
+      status: true,
+      cooldownUntil: true,
+      expiresAt: true,
+    },
+  });
+
+  const groups = new Map<string, typeof sessions>();
+  for (const s of sessions) {
+    const key = `${s.userId}::${s.site}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(s);
+  }
+
+  const now = new Date();
+  const results: PoolHealthInfo[] = [];
+
+  for (const [key, group] of groups) {
+    const [userId, site] = key.split('::');
+    let active = 0;
+    let needsReauth = 0;
+    let coolingDown = 0;
+    let disabled = 0;
+
+    for (const s of group) {
+      if (s.expiresAt && s.expiresAt < now) continue;
+      switch (s.status) {
+        case 'ACTIVE':
+          if (s.cooldownUntil && s.cooldownUntil > now) coolingDown++;
+          else active++;
+          break;
+        case 'NEEDS_REAUTH':
+          needsReauth++;
+          break;
+        case 'COOLING_DOWN':
+          coolingDown++;
+          break;
+        case 'DISABLED':
+          disabled++;
+          break;
+      }
+    }
+
+    const status: PoolHealthStatus =
+      active === 0 ? 'EMPTY' : active >= 2 ? 'HEALTHY' : 'DEGRADED';
+
+    results.push({
+      userId,
+      site,
+      status,
+      totalSessions: group.length,
+      activeSessions: active,
+      needsReauthSessions: needsReauth,
+      coolingDownSessions: coolingDown,
+      disabledSessions: disabled,
+    });
+  }
+
+  return results;
+}
+
+// ============================================================
 // EXPORTS
 // ============================================================
 
@@ -487,5 +580,6 @@ export const sessionService = {
   getStatus: getSessionStatus,
   delete: deleteSession,
   hasActive: hasActiveSession,
+  getPoolHealth: getSessionPoolHealth,
   SUPPORTED_SITES,
 };

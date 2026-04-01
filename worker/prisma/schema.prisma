@@ -471,48 +471,60 @@ enum LogStatus {
 // ============================================
 
 enum UserSessionStatus {
-  ACTIVE // Sessão válida e funcionando
-  EXPIRED // Expirou por tempo
-  NEEDS_REAUTH // Site pediu login novamente
-  INVALID // Arquivo inválido/corrompido
+  ACTIVE // Session valid and working
+  EXPIRED // Expired by time
+  NEEDS_REAUTH // Site requested re-login
+  INVALID // Invalid/corrupted file
+  COOLING_DOWN // Temporarily quarantined after failure
+  DISABLED // Manually disabled by user/admin
 }
 
 model UserSession {
   id           String  @id @default(cuid())
   userId       String  @map("user_id")
-  site         String // Ex: "MERCADO_LIVRE", "SUPERBID"
-  domain       String // Ex: "mercadolivre.com.br"
-  accountLabel String? @map("account_label") // Rótulo para múltiplas contas (futuro)
+  site         String // e.g. "MERCADO_LIVRE", "SUPERBID"
+  domain       String // e.g. "mercadolivre.com.br"
+  accountLabel String? @map("account_label") // Label for multiple accounts
 
-  // Status da sessão (novo sistema)
+  // Session status
   status UserSessionStatus @default(ACTIVE)
 
-  // Dados criptografados - NOVO SISTEMA (AES-256-GCM)
-  // Formato: storageState completo do Playwright { cookies: [], origins: [] }
+  // Encrypted data - AES-256-GCM
   encryptedStorageState String? @map("encrypted_storage_state") @db.Text
 
-  // Campos para sistema LEGADO (mantidos para compatibilidade)
-  cookies      Json? // Usado pelo session-manager.ts legado
+  // Legacy fields (kept for compatibility)
+  cookies      Json?
   localStorage Json? @map("local_storage")
 
-  // Metadados
-  metadata Json? // cookieCount, uploadedAt, lastErrorReason, cooldownNotifiedAt, etc.
+  // Metadata (cookieCount, uploadedAt, lastErrorReason, cooldownNotifiedAt, etc.)
+  metadata Json?
 
-  // Controle de tempo
+  // Pool management fields
+  isPrimary           Boolean  @default(false) @map("is_primary")
+  priority            Int      @default(0) // Lower = higher priority
+  consecutiveFailures Int      @default(0) @map("consecutive_failures")
+  failureCount        Int      @default(0) @map("failure_count")
+  cooldownUntil       DateTime? @map("cooldown_until")
+  lastSuccessAt       DateTime? @map("last_success_at")
+  lastFailureAt       DateTime? @map("last_failure_at")
+  reasonCode          String?  @map("reason_code") // e.g. "VERIFICATION_REQUIRED", "AUTH_EXPIRED"
+
+  // Time control
   expiresAt   DateTime? @map("expires_at")
   lastUsedAt  DateTime? @default(now()) @map("last_used_at")
   lastErrorAt DateTime? @map("last_error_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  // Relações
+  // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Índice único LEGADO (usado por session-manager.ts)
-  @@unique([userId, site, domain])
+  // Multi-session: allow multiple sessions per user/site/domain
+  @@unique([userId, site, domain, accountLabel], map: "user_sessions_pool_unique")
   @@index([userId])
   @@index([site, status])
   @@index([expiresAt])
+  @@index([userId, site, status], map: "user_sessions_pool_lookup")
   @@map("user_sessions")
 }
 
