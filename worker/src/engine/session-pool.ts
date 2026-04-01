@@ -111,6 +111,7 @@ export class SessionPool {
         break;
       case 'LOGIN_REQUIRED':
       case 'CHECKPOINT':
+      case 'VERIFICATION_REQUIRED':
         healthScore = Math.max(0, healthScore - 50);
         consecutiveFailures++;
         break;

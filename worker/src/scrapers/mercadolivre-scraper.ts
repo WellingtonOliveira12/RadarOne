@@ -43,12 +43,14 @@ export async function scrapeMercadoLivre(monitor: MonitorWithFilters): Promise<S
         `pageType=${result.diagnosis.pageType}`
     );
 
-    // If engine returned 0 ads due to LOGIN_REQUIRED, throw auth error for circuit breaker
-    if (
-      result.ads.length === 0 &&
-      result.diagnosis.pageType === 'LOGIN_REQUIRED'
-    ) {
+    // If engine returned 0 ads due to auth issues, throw auth error for circuit breaker
+    if (result.ads.length === 0 && result.diagnosis.pageType === 'LOGIN_REQUIRED') {
       throw new Error('ML_LOGIN_REQUIRED: Mercado Livre exigindo login para esta busca');
+    }
+    if (result.ads.length === 0 && result.diagnosis.pageType === 'VERIFICATION_REQUIRED') {
+      throw new Error(
+        'ML_VERIFICATION_REQUIRED: Mercado Livre redirecionou para account-verification'
+      );
     }
 
     return result.ads;

@@ -286,6 +286,7 @@ export function isAuthError(error: Error | string): boolean {
 
   const authPatterns = [
     'login_required',
+    'verification_required',
     'needs_reauth',
     'session_required',
     'session_expired',

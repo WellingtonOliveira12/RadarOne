@@ -147,15 +147,22 @@ function classifyPage(
   finalUrl: string,
   config: SiteConfig
 ): PageType {
+  // HIGHEST PRIORITY: detect account-verification redirect by URL
+  // ML redirects to /gz/account-verification with bodyLength ~110, no login signals.
+  // Must check URL BEFORE signal-based heuristics to avoid silent EMPTY classification.
+  const verificationUrlPatterns = ['/account-verification', '/gz/account-verification'];
+  if (verificationUrlPatterns.some((p) => finalUrl.includes(p))) {
+    return 'VERIFICATION_REQUIRED';
+  }
+
   // Checkpoint (Facebook account verification) - highest priority
   if (signals.hasCheckpoint) {
     return 'CHECKPOINT';
   }
 
-  // Login required
+  // Login required (by page signals)
   if (signals.hasLoginText || signals.hasLoginForm) {
-    // Check if URL was redirected to login
-    const loginUrlPatterns = ['/login', '/signin', '/account-verification'];
+    const loginUrlPatterns = ['/login', '/signin'];
     const isLoginUrl = loginUrlPatterns.some((p) => finalUrl.includes(p));
     if (isLoginUrl || signals.hasLoginText) {
       return 'LOGIN_REQUIRED';

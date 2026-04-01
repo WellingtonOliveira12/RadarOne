@@ -277,6 +277,18 @@ export class MarketplaceEngine {
             `LOGIN_REQUIRED: ${this.config.site} requires authentication`
           );
 
+        case 'VERIFICATION_REQUIRED':
+          if (authResult.sessionId) {
+            await sessionPool.reportResult(authResult.sessionId, 'VERIFICATION_REQUIRED');
+          }
+          console.warn(
+            `VERIFICATION_REQUIRED: ${this.config.site} monitorId=${monitor.id} ` +
+            `redirected to account-verification. Session needs re-authentication.`
+          );
+          throw new Error(
+            `VERIFICATION_REQUIRED: ${this.config.site} redirected to account-verification`
+          );
+
         case 'CHECKPOINT':
           if (authResult.sessionId) {
             await sessionPool.reportResult(authResult.sessionId, 'CHECKPOINT');
@@ -768,6 +780,7 @@ export class MarketplaceEngine {
       /^\/accounts\/login(\/)?$/,     // /accounts/login
       /^\/signin(\/)?$/,              // /signin
       /^\/auth\/login(\/)?$/,         // /auth/login
+      /^\/gz\/account-verification/,  // ML account verification redirect
     ];
 
     return loginPathPatterns.some((pattern) => pattern.test(pathname));

@@ -42,6 +42,7 @@ export type PageType =
   | 'BLOCKED'
   | 'CAPTCHA'
   | 'LOGIN_REQUIRED'
+  | 'VERIFICATION_REQUIRED'
   | 'CHECKPOINT'
   | 'NO_RESULTS'
   | 'EMPTY'

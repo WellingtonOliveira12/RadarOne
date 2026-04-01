@@ -18,6 +18,7 @@ import { ResilientScheduler } from './services/resilient-scheduler';
 import { initSentry, captureException } from './monitoring/sentry';
 import { startHealthServer } from './health-server';
 import { browserManager } from './engine/browser-manager';
+import { startWatchdog, stopWatchdog } from './services/pipeline-watchdog';
 
 // Inicializa Sentry para monitoramento de erros
 initSentry();
@@ -79,12 +80,18 @@ class Worker {
 
     // Start the resilient scheduler
     await this.scheduler.start();
+
+    // Start pipeline health watchdog (monitors EMPTY rates, session blocks, notification drops)
+    startWatchdog();
   }
 
   async stop() {
     console.log('\nShutting down worker...');
 
-    // 1. Stop scheduler (waits for active executions to drain)
+    // 1. Stop watchdog
+    stopWatchdog();
+
+    // 2. Stop scheduler (waits for active executions to drain)
     await this.scheduler.stop();
 
     // 2. Close Redis queue if configured

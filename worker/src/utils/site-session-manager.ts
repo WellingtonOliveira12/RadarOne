@@ -257,6 +257,7 @@ export function detectAuthError(error: Error | string): {
   const lowerMessage = message.toLowerCase();
 
   if (lowerMessage.includes('login_required') ||
+      lowerMessage.includes('verification_required') ||
       lowerMessage.includes('acesse sua conta') ||
       lowerMessage.includes('account-verification')) {
     return { type: 'login_required', reason: message };

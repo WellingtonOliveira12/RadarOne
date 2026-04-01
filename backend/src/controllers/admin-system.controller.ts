@@ -561,6 +561,147 @@ export class AdminSystemController {
   }
 
   /**
+   * Pipeline Health Dashboard
+   * GET /api/admin/pipeline-health
+   *
+   * Returns real-time pipeline health metrics:
+   * - Execution distribution by pageType (last 1h)
+   * - Session status per user/site
+   * - Notification rate per hour (last 24h)
+   * - Monitors with consecutive failures
+   */
+  static async getPipelineHealth(req: Request, res: Response) {
+    try {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      const [
+        pageTypeDistribution,
+        sessionsWithIssues,
+        recentNotifications,
+        totalMonitors,
+        activeMonitors,
+      ] = await Promise.all([
+        // 1. Execution distribution by pageType (last 1 hour)
+        prisma.siteExecutionStats.groupBy({
+          by: ['pageType', 'site'],
+          _count: true,
+          where: { startedAt: { gte: oneHourAgo } },
+        }),
+
+        // 2. Sessions that are not ACTIVE
+        prisma.userSession.findMany({
+          where: {
+            status: { not: 'ACTIVE' },
+          },
+          select: {
+            id: true,
+            userId: true,
+            site: true,
+            status: true,
+            lastUsedAt: true,
+            metadata: true,
+          },
+          orderBy: { lastUsedAt: 'desc' },
+          take: 20,
+        }),
+
+        // 3. Notification count per hour (last 24h)
+        prisma.notificationLog.groupBy({
+          by: ['status'],
+          _count: true,
+          where: {
+            createdAt: { gte: twentyFourHoursAgo },
+            title: { not: { startsWith: '[SESSION' } },
+          },
+        }),
+
+        // 4. Total monitors
+        prisma.monitor.count(),
+
+        // 5. Active monitors
+        prisma.monitor.count({ where: { active: true } }),
+      ]);
+
+      // Aggregate pageType distribution
+      const pageTypeSummary: Record<string, number> = {};
+      const siteBreakdown: Record<string, Record<string, number>> = {};
+      let totalExecutions = 0;
+
+      for (const entry of pageTypeDistribution) {
+        const pt = entry.pageType as string;
+        pageTypeSummary[pt] = (pageTypeSummary[pt] || 0) + entry._count;
+        totalExecutions += entry._count;
+
+        if (!siteBreakdown[entry.site]) siteBreakdown[entry.site] = {};
+        siteBreakdown[entry.site][pt] = entry._count;
+      }
+
+      // Calculate rates
+      const emptyRate = totalExecutions > 0
+        ? ((pageTypeSummary['EMPTY'] || 0) + (pageTypeSummary['VERIFICATION_REQUIRED'] || 0)) / totalExecutions
+        : 0;
+      const contentRate = totalExecutions > 0
+        ? (pageTypeSummary['CONTENT'] || 0) / totalExecutions
+        : 0;
+
+      // Notification summary
+      const notifSummary: Record<string, number> = {};
+      for (const entry of recentNotifications) {
+        notifSummary[entry.status] = entry._count;
+      }
+
+      // Health status
+      let healthStatus: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' = 'HEALTHY';
+      if (emptyRate > 0.5 || (pageTypeSummary['VERIFICATION_REQUIRED'] || 0) > 0) {
+        healthStatus = 'CRITICAL';
+      } else if (emptyRate > 0.3 || contentRate < 0.5) {
+        healthStatus = 'DEGRADED';
+      }
+
+      return res.json({
+        healthStatus,
+        window: '1h',
+        executions: {
+          total: totalExecutions,
+          byPageType: pageTypeSummary,
+          bySite: siteBreakdown,
+          rates: {
+            empty: Math.round(emptyRate * 1000) / 10,
+            content: Math.round(contentRate * 1000) / 10,
+            verificationRequired: totalExecutions > 0
+              ? Math.round(((pageTypeSummary['VERIFICATION_REQUIRED'] || 0) / totalExecutions) * 1000) / 10
+              : 0,
+          },
+        },
+        sessions: {
+          withIssues: sessionsWithIssues.map((s) => ({
+            id: s.id,
+            userId: s.userId,
+            site: s.site,
+            status: s.status,
+            lastUsedAt: s.lastUsedAt,
+            healthScore: (s.metadata as any)?.healthScore ?? null,
+            consecutiveFailures: (s.metadata as any)?.consecutiveFailures ?? 0,
+          })),
+        },
+        notifications: {
+          last24h: notifSummary,
+          totalSuccess: notifSummary['SUCCESS'] || 0,
+          totalFailed: notifSummary['FAILED'] || 0,
+        },
+        monitors: {
+          total: totalMonitors,
+          active: activeMonitors,
+        },
+      });
+    } catch (error) {
+      logError('Erro ao buscar pipeline health', { err: error });
+      return res.status(500).json({ error: 'Erro ao buscar pipeline health' });
+    }
+  }
+
+  /**
    * 14. Listar alertas administrativos (FASE 4.1 - Melhorado)
    * GET /api/admin/alerts
    *
