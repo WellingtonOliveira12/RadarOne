@@ -1110,13 +1110,23 @@ export class MonitorRunner {
   }
 
   /**
-   * Processa anúncios: salva novos e atualiza existentes
+   * Processa anúncios: identifica novos, detecta mudanças de preço e re-alertas.
+   *
+   * An ad is considered "new" (notification-worthy) if:
+   * 1. Never seen before (genuinely new externalId), OR
+   * 2. Price changed significantly (>5% or >R$50) since last seen, OR
+   * 3. Not alerted for 24h+ and still appearing (re-alert window)
+   *
+   * This prevents indefinite silence when the marketplace has active listings
+   * that keep appearing in scrape results with the same externalId.
    */
   private static async processAds(monitorId: string, ads: Ad[]): Promise<Ad[]> {
     const newAds: Ad[] = [];
+    const PRICE_CHANGE_THRESHOLD_PERCENT = 0.05; // 5%
+    const PRICE_CHANGE_THRESHOLD_ABS = 50; // R$50
+    const REALERT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
     for (const ad of ads) {
-      // Verifica se anúncio já existe
       const existing = await prisma.adSeen.findUnique({
         where: {
           monitorId_externalId: {
@@ -1126,14 +1136,8 @@ export class MonitorRunner {
         },
       });
 
-      if (existing) {
-        // Atualiza lastSeenAt
-        await prisma.adSeen.update({
-          where: { id: existing.id },
-          data: { lastSeenAt: new Date() },
-        });
-      } else {
-        // Cria novo registro
+      if (!existing) {
+        // Case 1: Genuinely new ad — first time seeing this externalId
         await prisma.adSeen.create({
           data: {
             monitorId,
@@ -1147,7 +1151,65 @@ export class MonitorRunner {
             publishedAt: ad.publishedAt,
           },
         });
+        newAds.push(ad);
+        continue;
+      }
 
+      // Ad was seen before — check for re-alert conditions
+      const now = new Date();
+      let shouldRealert = false;
+      let realertReason = '';
+
+      // Case 2: Price changed significantly
+      if (ad.price != null && existing.price != null && ad.price !== existing.price) {
+        const priceDiff = Math.abs(ad.price - existing.price);
+        const percentChange = priceDiff / existing.price;
+
+        if (percentChange >= PRICE_CHANGE_THRESHOLD_PERCENT || priceDiff >= PRICE_CHANGE_THRESHOLD_ABS) {
+          shouldRealert = true;
+          realertReason = `price_changed:${existing.price}→${ad.price}`;
+        }
+      }
+
+      // Case 3: Re-alert window expired (24h since last alert)
+      if (!shouldRealert && existing.alertSent) {
+        const lastAlertTime = existing.alertSentAt?.getTime() || existing.firstSeenAt.getTime();
+        if (now.getTime() - lastAlertTime >= REALERT_WINDOW_MS) {
+          shouldRealert = true;
+          realertReason = 'realert_window_24h';
+        }
+      }
+
+      // Case 3b: Never alerted but seen for 24h+ (edge case: first alert failed)
+      if (!shouldRealert && !existing.alertSent) {
+        const timeSinceFirstSeen = now.getTime() - existing.firstSeenAt.getTime();
+        if (timeSinceFirstSeen >= REALERT_WINDOW_MS) {
+          shouldRealert = true;
+          realertReason = 'never_alerted_24h';
+        }
+      }
+
+      // Update existing record
+      await prisma.adSeen.update({
+        where: { id: existing.id },
+        data: {
+          lastSeenAt: now,
+          title: ad.title,
+          price: ad.price,
+          url: ad.url,
+          ...(shouldRealert ? { alertSent: false, alertSentAt: null } : {}),
+        },
+      });
+
+      if (shouldRealert) {
+        log.info('AD_REALERT_TRIGGERED', {
+          monitorId,
+          externalId: ad.externalId,
+          reason: realertReason,
+          title: ad.title.substring(0, 60),
+          oldPrice: existing.price,
+          newPrice: ad.price,
+        });
         newAds.push(ad);
       }
     }
