@@ -304,28 +304,51 @@ export class MonitorRunner {
       const allNewAds = await this.processAds(monitor.id, ads);
 
       // V3: Relevance filter — remove noise ads before enrichment
+      // CRITICAL: Only apply keyword-in-title filtering when the monitor has
+      // EXPLICIT keywords configured. When keywords come from monitor_name_fallback,
+      // the extracted words (e.g., "geral", "ip15promax") are meaningless and would
+      // reject all valid ads like "Apple iPhone 15 (128 Gb) - Preto".
+      // URL-based filters (category, price, condition) already ensure relevance.
       const monitorKeywordsRaw = (monitor as any).filtersJson?.keywords
         || (monitor as any).filtersJson?.keyword
         || (monitor.keywords && monitor.keywords.length > 0 ? monitor.keywords.join(' ') : '')
         || null;
       const monitorKeywords = monitorKeywordsRaw || monitor.name;
       const keywordsSource = monitorKeywordsRaw ? 'explicit' : 'monitor_name_fallback';
+      const skipRelevanceFilter = keywordsSource === 'monitor_name_fallback';
 
       const newAds: Ad[] = [];
       let relevanceFiltered = 0;
-      for (const ad of allNewAds) {
-        const relevance = checkRelevance(ad.title, monitor.name, monitorKeywords);
-        if (relevance.relevant) {
-          newAds.push(ad);
-        } else {
-          relevanceFiltered++;
-          log.info('AD_RELEVANCE_REJECTED', {
+
+      if (skipRelevanceFilter) {
+        // No explicit keywords → accept all new ads (URL filters already ensure relevance)
+        newAds.push(...allNewAds);
+        if (allNewAds.length > 0) {
+          log.info('RELEVANCE_FILTER_BYPASSED', {
             monitorId: monitor.id,
-            adId: ad.externalId,
-            title: ad.title.substring(0, 60),
-            reason: relevance.reason,
-            relevanceScore: relevance.score,
+            site: monitor.site,
+            reason: 'monitor_name_fallback_keywords',
+            newAdsAccepted: allNewAds.length,
+            monitorName: monitor.name.substring(0, 60),
           });
+        }
+      } else {
+        // Explicit keywords → apply relevance filter normally
+        for (const ad of allNewAds) {
+          const relevance = checkRelevance(ad.title, monitor.name, monitorKeywords);
+          if (relevance.relevant) {
+            newAds.push(ad);
+          } else {
+            relevanceFiltered++;
+            log.info('AD_RELEVANCE_REJECTED', {
+              monitorId: monitor.id,
+              adId: ad.externalId,
+              title: ad.title.substring(0, 60),
+              reason: relevance.reason,
+              relevanceScore: relevance.score,
+              monitorKeywords: monitorKeywords.substring(0, 60),
+            });
+          }
         }
       }
 
@@ -337,10 +360,12 @@ export class MonitorRunner {
         duplicates: ads.length - allNewAds.length,
         relevanceFiltered,
         keywordsSource,
+        skipRelevanceFilter,
+        candidateNewAds: allNewAds.length,
         monitorKeywords: monitorKeywords.substring(0, 100),
       });
 
-      // V3: Warn when all new ads were filtered by relevance (diagnostic)
+      // Warn when all new ads were filtered by relevance (only relevant for explicit keywords)
       if (relevanceFiltered > 0 && newAds.length === 0 && allNewAds.length > 0) {
         log.warn('ALL_NEW_ADS_FILTERED_BY_RELEVANCE', {
           monitorId: monitor.id,

@@ -162,7 +162,7 @@ async function runHealthCheck(): Promise<void> {
       );
     }
 
-    // Check 3: Notification drop
+    // Check 3: Notification drop (short window — 60min)
     const notifLookback = new Date(
       Date.now() - THRESHOLDS.notificationDropLookbackMin * 60 * 1000
     );
@@ -178,6 +178,27 @@ async function runHealthCheck(): Promise<void> {
       alerts.push(
         `NOTIFICATION_DROP: Zero ad notifications sent in the last ` +
         `${THRESHOLDS.notificationDropLookbackMin}min despite ${totalExecutions} executions`
+      );
+    }
+
+    // Check 4: Prolonged silence — zero notifications for 4+ hours despite activity
+    // This catches systemic issues like relevance filter killing all new ads
+    const prolongedLookback = new Date(Date.now() - 4 * 60 * 60 * 1000); // 4 hours
+    const prolongedNotifications = await prisma.notificationLog.count({
+      where: {
+        createdAt: { gte: prolongedLookback },
+        status: 'SUCCESS',
+        title: { not: { startsWith: '[SESSION' } },
+      },
+    });
+    const prolongedExecutions = await prisma.siteExecutionStats.count({
+      where: { startedAt: { gte: prolongedLookback }, adsFound: { gt: 0 } },
+    });
+
+    if (prolongedNotifications === 0 && prolongedExecutions >= 10) {
+      alerts.push(
+        `PROLONGED_SILENCE: Zero notifications in 4h despite ${prolongedExecutions} executions with ads. ` +
+        `Possible: all_duplicates, relevance_filter_too_strict, or dispatch failure.`
       );
     }
 
