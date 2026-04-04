@@ -1124,7 +1124,8 @@ export class MonitorRunner {
     const newAds: Ad[] = [];
     const PRICE_CHANGE_THRESHOLD_PERCENT = 0.05; // 5%
     const PRICE_CHANGE_THRESHOLD_ABS = 50; // R$50
-    const REALERT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const REALERT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h for previously-alerted ads
+    const NEVER_ALERTED_WINDOW_MS = 6 * 60 * 60 * 1000; // 6h for never-alerted ads (faster activation)
 
     for (const ad of ads) {
       const existing = await prisma.adSeen.findUnique({
@@ -1160,7 +1161,7 @@ export class MonitorRunner {
       let shouldRealert = false;
       let realertReason = '';
 
-      // Case 2: Price changed significantly
+      // Case 2: Price changed significantly (>5% or >R$50)
       if (ad.price != null && existing.price != null && ad.price !== existing.price) {
         const priceDiff = Math.abs(ad.price - existing.price);
         const percentChange = priceDiff / existing.price;
@@ -1171,7 +1172,7 @@ export class MonitorRunner {
         }
       }
 
-      // Case 3: Re-alert window expired (24h since last alert)
+      // Case 3: Previously alerted, but 24h+ since last alert → re-alert
       if (!shouldRealert && existing.alertSent) {
         const lastAlertTime = existing.alertSentAt?.getTime() || existing.firstSeenAt.getTime();
         if (now.getTime() - lastAlertTime >= REALERT_WINDOW_MS) {
@@ -1180,12 +1181,12 @@ export class MonitorRunner {
         }
       }
 
-      // Case 3b: Never alerted but seen for 24h+ (edge case: first alert failed)
+      // Case 3b: NEVER alerted + seen for 6h+ → alert now (catches transition from old logic)
       if (!shouldRealert && !existing.alertSent) {
         const timeSinceFirstSeen = now.getTime() - existing.firstSeenAt.getTime();
-        if (timeSinceFirstSeen >= REALERT_WINDOW_MS) {
+        if (timeSinceFirstSeen >= NEVER_ALERTED_WINDOW_MS) {
           shouldRealert = true;
-          realertReason = 'never_alerted_24h';
+          realertReason = 'never_alerted_6h';
         }
       }
 
@@ -1209,6 +1210,8 @@ export class MonitorRunner {
           title: ad.title.substring(0, 60),
           oldPrice: existing.price,
           newPrice: ad.price,
+          firstSeenAgeHours: Math.round((now.getTime() - existing.firstSeenAt.getTime()) / 3600000),
+          alertSent: existing.alertSent,
         });
         newAds.push(ad);
       }
