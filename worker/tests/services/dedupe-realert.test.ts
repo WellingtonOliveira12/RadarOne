@@ -15,8 +15,8 @@ import { describe, it, expect } from 'vitest';
 
 const PRICE_CHANGE_THRESHOLD_PERCENT = 0.05; // 5%
 const PRICE_CHANGE_THRESHOLD_ABS = 50; // R$50
-const REALERT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours (for previously-alerted ads)
-const NEVER_ALERTED_WINDOW_MS = 6 * 60 * 60 * 1000; // 6 hours (for never-alerted ads)
+const REALERT_WINDOW_MS = 12 * 60 * 60 * 1000; // 12 hours (for previously-alerted ads)
+const NEVER_ALERTED_WINDOW_MS = 2 * 60 * 60 * 1000; // 2 hours (for never-alerted ads)
 
 // ─── Pure logic functions ───────────────────────────────────
 
@@ -112,30 +112,30 @@ describe('Price Change Re-alert', () => {
 describe('24h Re-alert Window', () => {
   const now = new Date();
 
-  it('triggers re-alert when last alert was 25h ago', () => {
-    const alertSentAt = new Date(now.getTime() - 25 * 60 * 60 * 1000);
+  it('triggers re-alert when last alert was 13h ago (>12h window)', () => {
+    const alertSentAt = new Date(now.getTime() - 13 * 60 * 60 * 1000);
     const firstSeenAt = new Date(now.getTime() - 48 * 60 * 60 * 1000);
     const result = shouldRealertForWindow(true, alertSentAt, firstSeenAt, now);
     expect(result.shouldRealert).toBe(true);
     expect(result.reason).toBe('realert_window_24h');
   });
 
-  it('does NOT trigger when last alert was 23h ago', () => {
-    const alertSentAt = new Date(now.getTime() - 23 * 60 * 60 * 1000);
+  it('does NOT trigger when last alert was 11h ago (<12h window)', () => {
+    const alertSentAt = new Date(now.getTime() - 11 * 60 * 60 * 1000);
     const firstSeenAt = new Date(now.getTime() - 48 * 60 * 60 * 1000);
     const result = shouldRealertForWindow(true, alertSentAt, firstSeenAt, now);
     expect(result.shouldRealert).toBe(false);
   });
 
-  it('triggers for never-alerted ad seen 7h ago (>6h window)', () => {
-    const firstSeenAt = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+  it('triggers for never-alerted ad seen 3h ago (>2h window)', () => {
+    const firstSeenAt = new Date(now.getTime() - 3 * 60 * 60 * 1000);
     const result = shouldRealertForWindow(false, null, firstSeenAt, now);
     expect(result.shouldRealert).toBe(true);
     expect(result.reason).toBe('never_alerted_6h');
   });
 
-  it('does NOT trigger for never-alerted ad seen 5h ago (<6h window)', () => {
-    const firstSeenAt = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+  it('does NOT trigger for never-alerted ad seen 1h ago (<2h window)', () => {
+    const firstSeenAt = new Date(now.getTime() - 1 * 60 * 60 * 1000);
     const result = shouldRealertForWindow(false, null, firstSeenAt, now);
     expect(result.shouldRealert).toBe(false);
   });

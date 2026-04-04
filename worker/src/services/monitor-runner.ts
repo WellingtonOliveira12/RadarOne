@@ -1124,8 +1124,8 @@ export class MonitorRunner {
     const newAds: Ad[] = [];
     const PRICE_CHANGE_THRESHOLD_PERCENT = 0.05; // 5%
     const PRICE_CHANGE_THRESHOLD_ABS = 50; // R$50
-    const REALERT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h for previously-alerted ads
-    const NEVER_ALERTED_WINDOW_MS = 6 * 60 * 60 * 1000; // 6h for never-alerted ads (faster activation)
+    const REALERT_WINDOW_MS = 12 * 60 * 60 * 1000; // 12h for previously-alerted ads
+    const NEVER_ALERTED_WINDOW_MS = 2 * 60 * 60 * 1000; // 2h for never-alerted ads (fast activation)
 
     for (const ad of ads) {
       const existing = await prisma.adSeen.findUnique({
