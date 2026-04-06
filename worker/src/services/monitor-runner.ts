@@ -317,7 +317,7 @@ export class MonitorRunner {
       const keywordsSource = monitorKeywordsRaw ? 'explicit' : 'monitor_name_fallback';
       const skipRelevanceFilter = keywordsSource === 'monitor_name_fallback';
 
-      const newAds: Ad[] = [];
+      let newAds: Ad[] = [];
       let relevanceFiltered = 0;
 
       if (skipRelevanceFilter) {
@@ -375,6 +375,26 @@ export class MonitorRunner {
           keywordsSource,
           monitorKeywords: monitorKeywords.substring(0, 100),
         });
+      }
+
+      // Cross-monitor dedupe: prevent same ad alerting across sibling monitors (same user + site)
+      let crossMonitorFiltered = 0;
+      if (newAds.length > 0) {
+        const dedupeResult = await this.filterCrossMonitorDuplicates(
+          { id: monitor.id, userId: monitor.userId, site: monitor.site },
+          newAds,
+        );
+        crossMonitorFiltered = dedupeResult.filtered;
+        newAds = dedupeResult.passed;
+        if (crossMonitorFiltered > 0) {
+          log.info('CROSS_MONITOR_DEDUPE_APPLIED', {
+            monitorId: monitor.id,
+            site: monitor.site,
+            before: crossMonitorFiltered + dedupeResult.passed.length,
+            after: dedupeResult.passed.length,
+            filtered: crossMonitorFiltered,
+          });
+        }
       }
 
       // Enriquece anúncios com FIPE (best-effort, never blocks)
@@ -1110,22 +1130,84 @@ export class MonitorRunner {
   }
 
   /**
+   * Filters out ads already alerted to the same user from sibling monitors
+   * (same user + same site) within a 24h window.
+   * Prevents cross-monitor duplicates (e.g., same MLB in PG2 and PG3).
+   */
+  private static async filterCrossMonitorDuplicates(
+    monitor: { id: string; userId: string; site: string },
+    ads: Ad[],
+  ): Promise<{ passed: Ad[]; filtered: number }> {
+    if (ads.length === 0) return { passed: [], filtered: 0 };
+
+    const CROSS_MONITOR_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
+    const windowStart = new Date(Date.now() - CROSS_MONITOR_WINDOW_MS);
+
+    // Get sibling monitor IDs (same user, same site, excluding current)
+    const siblingMonitors = await prisma.monitor.findMany({
+      where: {
+        userId: monitor.userId,
+        site: monitor.site as any,
+        id: { not: monitor.id },
+      },
+      select: { id: true },
+    });
+
+    if (siblingMonitors.length === 0) {
+      return { passed: ads, filtered: 0 };
+    }
+
+    const siblingIds = siblingMonitors.map((m) => m.id);
+    const externalIds = ads.map((ad) => ad.externalId);
+
+    // Find ads already alerted from sibling monitors within window
+    const alreadyAlerted = await prisma.adSeen.findMany({
+      where: {
+        monitorId: { in: siblingIds },
+        externalId: { in: externalIds },
+        alertSent: true,
+        alertSentAt: { gte: windowStart },
+      },
+      select: { externalId: true },
+    });
+
+    if (alreadyAlerted.length === 0) {
+      return { passed: ads, filtered: 0 };
+    }
+
+    const alertedSet = new Set(alreadyAlerted.map((a) => a.externalId));
+    const passed: Ad[] = [];
+    let filtered = 0;
+
+    for (const ad of ads) {
+      if (alertedSet.has(ad.externalId)) {
+        filtered++;
+        log.info('AD_CROSS_MONITOR_DEDUPE', {
+          monitorId: monitor.id,
+          externalId: ad.externalId,
+          title: ad.title.substring(0, 60),
+          reason: 'already_alerted_from_sibling_monitor_within_24h',
+        });
+      } else {
+        passed.push(ad);
+      }
+    }
+
+    return { passed, filtered };
+  }
+
+  /**
    * Processa anúncios: identifica novos, detecta mudanças de preço e re-alertas.
    *
    * An ad is considered "new" (notification-worthy) if:
    * 1. Never seen before (genuinely new externalId), OR
-   * 2. Price changed significantly (>5% or >R$50) since last seen, OR
-   * 3. Not alerted for 24h+ and still appearing (re-alert window)
-   *
-   * This prevents indefinite silence when the marketplace has active listings
-   * that keep appearing in scrape results with the same externalId.
+   * 2. Price changed significantly (>5% or >R$50) since last seen
    */
   private static async processAds(monitorId: string, ads: Ad[]): Promise<Ad[]> {
     const newAds: Ad[] = [];
     const PRICE_CHANGE_THRESHOLD_PERCENT = 0.05; // 5%
     const PRICE_CHANGE_THRESHOLD_ABS = 50; // R$50
-    const REALERT_WINDOW_MS = 12 * 60 * 60 * 1000; // 12h for previously-alerted ads
-    const NEVER_ALERTED_WINDOW_MS = 2 * 60 * 60 * 1000; // 2h for never-alerted ads (fast activation)
+    const NEVER_ALERTED_WINDOW_MS = 72 * 60 * 60 * 1000; // 72h safety net for never-alerted ads
 
     for (const ad of ads) {
       const existing = await prisma.adSeen.findUnique({
@@ -1172,21 +1254,12 @@ export class MonitorRunner {
         }
       }
 
-      // Case 3: Previously alerted, but 24h+ since last alert → re-alert
-      if (!shouldRealert && existing.alertSent) {
-        const lastAlertTime = existing.alertSentAt?.getTime() || existing.firstSeenAt.getTime();
-        if (now.getTime() - lastAlertTime >= REALERT_WINDOW_MS) {
-          shouldRealert = true;
-          realertReason = 'realert_window_24h';
-        }
-      }
-
-      // Case 3b: NEVER alerted + seen for 6h+ → alert now (catches transition from old logic)
+      // Case 3: NEVER alerted + seen for 72h+ → alert now (safety net for edge cases)
       if (!shouldRealert && !existing.alertSent) {
         const timeSinceFirstSeen = now.getTime() - existing.firstSeenAt.getTime();
         if (timeSinceFirstSeen >= NEVER_ALERTED_WINDOW_MS) {
           shouldRealert = true;
-          realertReason = 'never_alerted_6h';
+          realertReason = 'never_alerted_72h';
         }
       }
 
