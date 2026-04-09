@@ -187,7 +187,18 @@ export async function saveSession(
     });
   }
 
-  logInfo('SESSION_SERVICE: Session saved', { userId, site, cookiesCount: meta.cookiesCount });
+  const wasRestored = existingSession && existingSession.status !== 'ACTIVE';
+  if (wasRestored) {
+    logInfo('SESSION_RESTORED', {
+      userId,
+      site,
+      previousStatus: existingSession.status,
+      cookiesCount: meta.cookiesCount,
+      message: `Session restored from ${existingSession.status} to ACTIVE`,
+    });
+  } else {
+    logInfo('SESSION_SERVICE: Session saved', { userId, site, cookiesCount: meta.cookiesCount });
+  }
 
   return {
     success: true,

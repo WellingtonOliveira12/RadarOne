@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -23,6 +23,10 @@ import {
   MenuItem,
   Text,
   Container,
+  Alert,
+  AlertIcon,
+  AlertDescription,
+  CloseButton,
 } from '@chakra-ui/react';
 import { HamburgerIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +34,7 @@ import { useAuth } from '../context/AuthContext';
 import { APP_VERSION } from '../constants/app';
 import { getSubscriptionStatus } from '../utils/subscriptionHelpers';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { api } from '../services/api';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -44,6 +49,48 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const [degradedSites, setDegradedSites] = useState<string[]>([]);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  // Check session health on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkSessions() {
+      try {
+        const data = await api.request<{
+          sessions: Array<{ site: string; status: string }>;
+        }>('/api/sessions', { method: 'GET', skipAutoLogout: true });
+
+        if (cancelled) return;
+
+        const needsAction = data.sessions
+          .filter((s) => ['NEEDS_REAUTH', 'EXPIRED', 'INVALID'].includes(s.status))
+          .map((s) => s.site);
+
+        setDegradedSites(needsAction);
+      } catch {
+        // Silent — banner is best-effort
+      }
+    }
+
+    checkSessions();
+    // Re-check every 5 minutes
+    const interval = setInterval(checkSessions, 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const siteNameMap: Record<string, string> = {
+    MERCADO_LIVRE: 'Mercado Livre',
+    FACEBOOK_MARKETPLACE: 'Facebook Marketplace',
+    OLX: 'OLX',
+  };
+
+  const showSessionBanner = degradedSites.length > 0 && !bannerDismissed;
 
   // Verificar se user tem subscription válida (para mostrar/esconder links internos)
   const subscriptionStatus = getSubscriptionStatus(user);
@@ -205,6 +252,34 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
+
+      {/* Session Degraded Banner */}
+      {showSessionBanner && (
+        <Box bg="orange.50" borderBottom="1px" borderColor="orange.200">
+          <Container maxW="container.xl" py={3} px={{ base: 4, md: 6 }}>
+            <Alert status="warning" variant="subtle" borderRadius="md" bg="transparent" p={0}>
+              <AlertIcon color="orange.500" />
+              <AlertDescription flex={1} fontSize="sm">
+                {t('sessionBanner.message', {
+                  defaultValue: 'Seus monitores de {{sites}} estão pausados — sessão expirada.',
+                  sites: degradedSites.map((s) => siteNameMap[s] || s).join(', '),
+                })}
+                {' '}
+                <Link
+                  as={RouterLink}
+                  to="/settings/connections"
+                  color="orange.700"
+                  fontWeight="bold"
+                  textDecoration="underline"
+                >
+                  {t('sessionBanner.reconnect', { defaultValue: 'Reconectar agora' })}
+                </Link>
+              </AlertDescription>
+              <CloseButton size="sm" onClick={() => setBannerDismissed(true)} />
+            </Alert>
+          </Container>
+        </Box>
+      )}
 
       {/* Main Content */}
       <Box as="main" flex={1} w="100%">

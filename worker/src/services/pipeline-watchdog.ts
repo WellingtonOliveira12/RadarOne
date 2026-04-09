@@ -202,6 +202,36 @@ async function runHealthCheck(): Promise<void> {
       );
     }
 
+    // Check 5: All sessions dead (NEEDS_REAUTH / EXPIRED) — monitors running but scraping nothing
+    try {
+      const allSessions = await prisma.userSession.findMany({
+        select: { userId: true, site: true, status: true },
+      });
+
+      if (allSessions.length > 0) {
+        // Group by userId+site
+        const pools = new Map<string, { total: number; active: number }>();
+        for (const s of allSessions) {
+          const key = `${s.userId}:${s.site}`;
+          const pool = pools.get(key) || { total: 0, active: 0 };
+          pool.total++;
+          if (s.status === 'ACTIVE') pool.active++;
+          pools.set(key, pool);
+        }
+
+        const deadPools = Array.from(pools.entries()).filter(([, p]) => p.active === 0);
+        if (deadPools.length > 0) {
+          const sites = [...new Set(deadPools.map(([k]) => k.split(':')[1]))];
+          alerts.push(
+            `ALL_SESSIONS_DEAD: ${deadPools.length} user/site pool(s) have zero active sessions. ` +
+            `Sites affected: ${sites.join(', ')}. Monitors are running but scraping nothing.`
+          );
+        }
+      }
+    } catch (e: any) {
+      // Best-effort — don't fail health check for this
+    }
+
     // Log health report
     const report: HealthReport = {
       totalExecutions,

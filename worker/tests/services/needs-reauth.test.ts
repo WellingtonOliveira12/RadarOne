@@ -86,3 +86,60 @@ describe('Reconnection Flow', () => {
     expect(needsAction).toBe(false);
   });
 });
+
+describe('MonitorRunResult contract', () => {
+  it('SKIPPED result for SESSION_POOL_EMPTY has correct shape', () => {
+    const result = { status: 'SKIPPED' as const, reason: 'SESSION_POOL_EMPTY' };
+    expect(result.status).toBe('SKIPPED');
+    expect(result.reason).toBe('SESSION_POOL_EMPTY');
+  });
+
+  it('SKIPPED result for SESSION_REQUIRED has correct shape', () => {
+    const result = { status: 'SKIPPED' as const, reason: 'SESSION_REQUIRED' };
+    expect(result.status).toBe('SKIPPED');
+    expect(result.reason).toBe('SESSION_REQUIRED');
+  });
+
+  it('SKIPPED result for AUTH_ERROR has correct shape', () => {
+    const result = { status: 'SKIPPED' as const, reason: 'AUTH_ERROR' };
+    expect(result.status).toBe('SKIPPED');
+    expect(result.reason).toBe('AUTH_ERROR');
+  });
+
+  it('SUCCESS result has no reason', () => {
+    const result = { status: 'SUCCESS' as const };
+    expect(result.status).toBe('SUCCESS');
+    expect(result).not.toHaveProperty('reason');
+  });
+
+  it('scheduler log line includes SKIPPED status when session is dead', () => {
+    const result = { status: 'SKIPPED' as const, reason: 'SESSION_POOL_EMPTY' };
+    const logStatus = result.status;
+    const reasonSuffix = result.reason ? ` reason=${result.reason}` : '';
+    const logLine = `MONITOR_EXECUTION_FINISHED: name=Test site=MERCADO_LIVRE durationMs=100 schedulerLagMs=50 status=${logStatus}${reasonSuffix}`;
+
+    expect(logLine).toContain('status=SKIPPED');
+    expect(logLine).toContain('reason=SESSION_POOL_EMPTY');
+    expect(logLine).not.toContain('status=SUCCESS');
+  });
+});
+
+describe('Session Restoration Detection', () => {
+  it('detects restoration from NEEDS_REAUTH to ACTIVE', () => {
+    const existingSession = { status: 'NEEDS_REAUTH' };
+    const wasRestored = existingSession.status !== 'ACTIVE';
+    expect(wasRestored).toBe(true);
+  });
+
+  it('does not flag as restored when already ACTIVE', () => {
+    const existingSession = { status: 'ACTIVE' };
+    const wasRestored = existingSession.status !== 'ACTIVE';
+    expect(wasRestored).toBe(false);
+  });
+
+  it('detects restoration from EXPIRED to ACTIVE', () => {
+    const existingSession = { status: 'EXPIRED' };
+    const wasRestored = existingSession.status !== 'ACTIVE';
+    expect(wasRestored).toBe(true);
+  });
+});

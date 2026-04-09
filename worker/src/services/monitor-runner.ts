@@ -46,11 +46,17 @@ interface Ad {
   opportunity?: OpportunityResult;
 }
 
+/** Result returned by MonitorRunner.run() so the scheduler can log the real outcome. */
+export interface MonitorRunResult {
+  status: 'SUCCESS' | 'SKIPPED' | 'ERROR';
+  reason?: string;
+}
+
 export class MonitorRunner {
   /**
    * Executa um monitor
    */
-  static async run(monitor: any) {
+  static async run(monitor: any): Promise<MonitorRunResult> {
     const startTime = Date.now();
     log.monitorStart(monitor.id, monitor.name, monitor.site);
 
@@ -58,7 +64,7 @@ export class MonitorRunner {
       // Verifica se usuário tem assinatura ativa
       if (!monitor.user.subscriptions || monitor.user.subscriptions.length === 0) {
         log.warn('Usuário sem assinatura ativa', { monitorId: monitor.id });
-        return;
+        return { status: 'SKIPPED', reason: 'NO_SUBSCRIPTION' };
       }
 
       const subscription = monitor.user.subscriptions[0];
@@ -137,7 +143,7 @@ export class MonitorRunner {
               error: `STRUCTURED_FILTERS: No URL builder for ${monitor.site} and no searchUrl provided`,
               executionTime: Date.now() - startTime,
             });
-            return;
+            return { status: 'SKIPPED', reason: 'NO_URL_BUILDER' };
           } else if (this.isHomepageUrl(monitor.searchUrl, monitor.site)) {
             // URL builder returned null AND searchUrl is just a homepage (no search params).
             // Navigating to a marketplace homepage is useless — wastes browser slot + time.
@@ -152,7 +158,7 @@ export class MonitorRunner {
               error: `INVALID_CONFIG: ${monitor.site} monitor has no keywords and searchUrl is just the homepage. Add keywords via the dashboard.`,
               executionTime: Date.now() - startTime,
             });
-            return;
+            return { status: 'SKIPPED', reason: 'HOMEPAGE_FALLBACK' };
           }
         } catch (urlBuildError: any) {
           log.error('FB_URL_BUILD_FAILED', urlBuildError, {
@@ -164,7 +170,7 @@ export class MonitorRunner {
             error: urlBuildError.message,
             executionTime: Date.now() - startTime,
           });
-          return;
+          return { status: 'ERROR', reason: 'URL_BUILD_FAILED' };
         }
       }
 
@@ -175,7 +181,7 @@ export class MonitorRunner {
           queriesUsed: subscription.queriesUsed,
           queriesLimit: subscription.queriesLimit,
         });
-        return;
+        return { status: 'SKIPPED', reason: 'QUERIES_LIMIT' };
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -219,7 +225,7 @@ export class MonitorRunner {
           });
 
           await this.sendSessionRequiredNotification(monitor);
-          return;
+          return { status: 'SKIPPED', reason: 'SESSION_REQUIRED' };
         }
 
         // All sessions need action (none active) → SKIPPED + notify
@@ -249,7 +255,7 @@ export class MonitorRunner {
             executionTime: Date.now() - startTime,
           });
 
-          return;
+          return { status: 'SKIPPED', reason: 'SESSION_POOL_EMPTY' };
         }
       }
       // ═══════════════════════════════════════════════════════════════
@@ -574,6 +580,7 @@ export class MonitorRunner {
 
       const duration = Date.now() - startTime;
       log.monitorSuccess(monitor.id, ads.length, newAds.length, alertsSent, duration);
+      return { status: 'SUCCESS' } as MonitorRunResult;
     } catch (error: any) {
       const duration = Date.now() - startTime;
 
@@ -643,7 +650,7 @@ export class MonitorRunner {
 
         // NÃO alimenta circuit breaker!
         // O circuit breaker só deve abrir para falhas reais (timeout, crash, etc.)
-        return;
+        return { status: 'SKIPPED', reason: 'AUTH_ERROR' };
       }
       // ═══════════════════════════════════════════════════════════════
 
@@ -674,6 +681,7 @@ export class MonitorRunner {
         success: false,
         errorCode: error.message?.slice(0, 200),
       });
+      return { status: 'ERROR', reason: error.message?.slice(0, 100) };
     }
   }
 

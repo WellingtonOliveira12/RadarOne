@@ -24,7 +24,7 @@ vi.mock('../../src/lib/prisma', () => ({
 // Mock monitor runner
 vi.mock('../../src/services/monitor-runner', () => ({
   MonitorRunner: {
-    run: vi.fn().mockResolvedValue(undefined),
+    run: vi.fn().mockResolvedValue({ status: 'SUCCESS' }),
   },
 }));
 

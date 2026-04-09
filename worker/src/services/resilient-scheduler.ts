@@ -15,7 +15,7 @@
  */
 
 import { prisma } from '../lib/prisma';
-import { MonitorRunner } from './monitor-runner';
+import { MonitorRunner, type MonitorRunResult } from './monitor-runner';
 import { captureException } from '../monitoring/sentry';
 
 // ─── Configuration ──────────────────────────────────────────
@@ -427,7 +427,7 @@ export class ResilientScheduler {
       // Mark that scheduler already updated lastCheckedAt at start
       (monitor as any).__lastCheckedAtSetByScheduler = true;
 
-      await MonitorRunner.run(monitor);
+      const result: MonitorRunResult = await MonitorRunner.run(monitor) || { status: 'SUCCESS' };
       const durationMs = Date.now() - startTime;
       this.finishedCount++;
 
@@ -439,9 +439,11 @@ export class ResilientScheduler {
         this.executionTimes[monitor.site].shift();
       }
 
+      const logStatus = result.status;
+      const reasonSuffix = result.reason ? ` reason=${result.reason}` : '';
       console.log(
         `MONITOR_EXECUTION_FINISHED: name=${monitor.name} site=${monitor.site} ` +
-        `durationMs=${durationMs} schedulerLagMs=${schedulerLagMs} status=SUCCESS`
+        `durationMs=${durationMs} schedulerLagMs=${schedulerLagMs} status=${logStatus}${reasonSuffix}`
       );
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
