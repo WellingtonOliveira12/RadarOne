@@ -212,7 +212,8 @@ export class MarketplaceEngine {
           waitUntil: navWaitUntil,
           timeout: this.config.navigationTimeout,
         });
-        if (this.config.warmupUrl) {
+        // Wait for network to settle — needed for SPA sites (ML, OLX) that fetch via API
+        if (this.config.warmupUrl || this.config.renderWaitSelector) {
           try {
             await page.waitForLoadState('networkidle', { timeout: 15000 });
           } catch { /* non-fatal */ }

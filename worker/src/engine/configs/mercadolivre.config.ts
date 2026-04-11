@@ -90,10 +90,11 @@ export const mercadoLivreConfig: SiteConfig = {
     ],
     image: ['img'],
   },
+  renderWaitSelector: 'li.ui-search-layout__item, .ui-search-result, .poly-card',
   rateLimit: { tokensPerMin: 10 },
   timeouts: [5000, 10000, 20000],
   navigationTimeout: 45000,
-  renderDelay: 2000,
+  renderDelay: 3000,
   scroll: {
     strategy: 'fixed',
     fixedSteps: 3,
