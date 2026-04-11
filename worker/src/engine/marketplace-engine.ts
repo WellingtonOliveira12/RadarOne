@@ -489,8 +489,13 @@ export class MarketplaceEngine {
 
       diagnosis.selectorUsed = containerResult.selector;
 
-      // 7. Scroll
+      // 7. Scroll to trigger lazy-loading of all ads
       scrollsDone = await scrollPage(page, this.config.scroll);
+
+      // 7.5 Post-scroll stabilization — let lazy-loaded items render after final scroll
+      if (scrollsDone > 0) {
+        await page.waitForTimeout(1500);
+      }
 
       // 8. Extract ads
       const extractionResult = await extractAds(
