@@ -232,19 +232,29 @@ async function runHealthCheck(): Promise<void> {
       // Best-effort — don't fail health check for this
     }
 
-    // Check 6: Scraping degradation — CONTENT pages but very few ads
-    // Detects ML throttling: pages load but return far fewer ads than expected
-    if (contentCount > 0) {
-      const contentStats = stats.filter((s) => s.pageType === 'CONTENT');
-      const totalAdsInContent = contentStats.reduce((sum, s) => sum + s.adsFound, 0);
-      const avgAdsPerContent = totalAdsInContent / contentCount;
+    // Check 6: Per-platform scraping degradation — CONTENT pages but very few ads
+    // Detects throttling: pages load but return far fewer ads than expected
+    const siteGroups = new Map<string, { contentCount: number; totalAds: number }>();
+    for (const s of stats) {
+      if (s.pageType === 'CONTENT') {
+        const group = siteGroups.get(s.site) || { contentCount: 0, totalAds: 0 };
+        group.contentCount++;
+        group.totalAds += s.adsFound;
+        siteGroups.set(s.site, group);
+      }
+    }
 
-      if (contentCount >= 3 && avgAdsPerContent < 5) {
-        alerts.push(
-          `DEGRADAÇÃO_DE_SCRAPING: Páginas carregam (${contentCount} CONTENT) mas média de apenas ` +
-          `${avgAdsPerContent.toFixed(1)} anúncios/página. Esperado: 30-48. ` +
-          `Possível throttling por IP ou sessão queimada.`
-        );
+    for (const [site, group] of siteGroups) {
+      if (group.contentCount >= 3) {
+        const avg = group.totalAds / group.contentCount;
+        if (avg < 5) {
+          const siteLabel = site.replace(/_/g, ' ');
+          alerts.push(
+            `DEGRADAÇÃO_${site}: ${siteLabel} — páginas carregam (${group.contentCount} CONTENT) ` +
+            `mas média de apenas ${avg.toFixed(1)} anúncios/página. Esperado: 30-48. ` +
+            `Possível throttling por IP ou sessão queimada.`
+          );
+        }
       }
     }
 

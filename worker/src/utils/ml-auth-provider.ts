@@ -437,11 +437,10 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
   console.log(`ML_USER_AGENT: ${userAgent.slice(0, 60)}...`);
 
   // Proxy configuration (Brazilian IP for ML geo-parity)
-  const proxyUrl = process.env.PROXY_URL;
-  const proxyConfig = proxyUrl ? { proxy: { server: proxyUrl } } : {};
-  if (proxyUrl) {
-    console.log(`ML_PROXY: Configurado — ${proxyUrl.replace(/\/\/.*@/, '//<credentials>@')}`);
-  }
+  const { resolveProxyForSite } = await import('./proxy-resolver');
+  const proxyResolution = resolveProxyForSite('MERCADO_LIVRE');
+  const proxyConfig = proxyResolution.proxy ? { proxy: proxyResolution.proxy } : {};
+  console.log(`ML_PROXY: source=${proxyResolution.source} endpoint=${proxyResolution.masked}`);
 
   // Base context options shared across all auth paths
   const baseContextOpts = {
@@ -496,17 +495,23 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
 
   const page = await context.newPage();
 
-  // Log external IP for geo-verification (best-effort, non-blocking)
-  if (proxyUrl) {
+  // Geo-verify external IP when proxy is configured (best-effort, non-blocking)
+  if (proxyResolution.proxy) {
     try {
-      const ipPage = await context.newPage();
-      await ipPage.goto('https://api.ipify.org?format=json', { timeout: 10000 });
-      const ipText = await ipPage.textContent('body');
-      await ipPage.close();
-      const ip = ipText ? JSON.parse(ipText).ip : 'unknown';
-      console.log(`ML_EXTERNAL_IP: ${ip} (proxy=${proxyUrl.includes('@') ? 'authenticated' : 'direct'})`);
+      const { verifyGeo } = await import('./proxy-resolver');
+      const geoPage = await context.newPage();
+      const geo = await verifyGeo(geoPage);
+      await geoPage.close();
+      if (geo) {
+        console.log(`ML_GEO_VERIFY: ip=${geo.ip} country=${geo.country} region=${geo.region || 'N/A'}`);
+        if (geo.country !== 'BR') {
+          console.warn(`ML_GEO_WARNING: IP fora do Brasil (${geo.country}). ML pode limitar resultados.`);
+        }
+      } else {
+        console.log(`ML_GEO_VERIFY: Verificação falhou (proxy pode estar offline)`);
+      }
     } catch {
-      console.log(`ML_EXTERNAL_IP: Verificação falhou (proxy pode estar offline)`);
+      console.log(`ML_GEO_VERIFY: Verificação falhou`);
     }
   }
 

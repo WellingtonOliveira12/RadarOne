@@ -20,10 +20,11 @@ import { getAuthContext } from './auth-strategy';
 import { scrollPage } from './scroller';
 import { sessionPool } from './session-pool';
 
+import { humanDelay, preNavigationPause, postScrollWait } from '../utils/humanize';
+
 /** Applies ±15% jitter to a base delay to avoid bot-detectable patterns. */
 function applyJitter(baseMs: number): number {
-  const factor = 0.85 + Math.random() * 0.3; // [0.85, 1.15]
-  return Math.round(baseMs * factor);
+  return humanDelay(baseMs, 0.15);
 }
 
 /**
@@ -206,6 +207,10 @@ export class MarketplaceEngine {
       }
 
       if (!searchPerformed) {
+        // Pre-navigation pause: simulate human hesitation before navigating
+        const prePause = preNavigationPause(this.config.site);
+        await page.waitForTimeout(prePause);
+
         // Direct URL navigation (default path for all other sites)
         const navWaitUntil = this.config.warmupUrl ? 'load' as const : 'domcontentloaded' as const;
         await page.goto(monitor.searchUrl!, {
@@ -492,9 +497,10 @@ export class MarketplaceEngine {
       // 7. Scroll to trigger lazy-loading of all ads
       scrollsDone = await scrollPage(page, this.config.scroll);
 
-      // 7.5 Post-scroll stabilization — let lazy-loaded items render after final scroll
+      // 7.5 Post-scroll stabilization — humanized wait for lazy-loaded items
       if (scrollsDone > 0) {
-        await page.waitForTimeout(1500);
+        const stabilizationMs = postScrollWait(this.config.site);
+        await page.waitForTimeout(stabilizationMs);
       }
 
       // 8. Extract ads

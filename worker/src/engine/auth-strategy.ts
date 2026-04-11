@@ -88,7 +88,7 @@ export async function getAuthContext(
   } else {
     console.log(`ANONYMOUS_CONTEXT_USED: site=${site} userId=${userId} authMode=${authMode}`);
   }
-  return createAnonymousContext(antiDetection, browser);
+  return createAnonymousContext(antiDetection, browser, site);
 }
 
 /**
@@ -142,11 +142,20 @@ async function tryDatabaseAuth(
  */
 async function createAnonymousContext(
   antiDetection: AntiDetectionConfig,
-  browser?: Browser
+  browser?: Browser,
+  site?: string
 ): Promise<AuthContextResult> {
   const viewport = antiDetection.randomizeViewport
     ? getRandomViewport()
     : { width: 1920, height: 1080 };
+
+  // Resolve proxy for this site (per-platform or global fallback)
+  const { resolveProxyForSite } = await import('../utils/proxy-resolver');
+  const proxyResolution = resolveProxyForSite(site || 'UNKNOWN');
+  const proxyOpts = proxyResolution.proxy ? { proxy: proxyResolution.proxy } : {};
+  if (proxyResolution.source !== 'none') {
+    console.log(`PROXY_SELECTED: site=${site} source=${proxyResolution.source} endpoint=${proxyResolution.masked}`);
+  }
 
   // Use provided browser (from acquireContext) or fall back to getOrLaunch
   const { browserManager } = await import('./browser-manager');
@@ -157,6 +166,7 @@ async function createAnonymousContext(
     locale: 'pt-BR',
     viewport,
     deviceScaleFactor: 1,
+    ...proxyOpts,
   });
 
   const page = await context.newPage();

@@ -1,10 +1,10 @@
 import { Page } from 'playwright';
 import { ScrollConfig } from './types';
+import { scrollDelay } from '../utils/humanize';
 
-/** Applies ±20% jitter to a base delay to avoid bot-detectable patterns. */
-function applyJitter(baseMs: number): number {
-  const factor = 0.8 + Math.random() * 0.4; // [0.8, 1.2]
-  return Math.round(baseMs * factor);
+/** Applies humanized jitter to scroll delays (varies per step). */
+function applyJitter(baseMs: number, step = 0): number {
+  return scrollDelay(baseMs, step);
 }
 
 /**
@@ -37,7 +37,7 @@ async function scrollFixed(
       const height = document.body.scrollHeight;
       window.scrollTo(0, (height / (step.total)) * (step.current + 1));
     }, { current: i, total: steps });
-    await page.waitForTimeout(applyJitter(delayMs));
+    await page.waitForTimeout(applyJitter(delayMs, i));
   }
   return steps;
 }

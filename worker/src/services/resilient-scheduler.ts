@@ -224,15 +224,15 @@ export class ResilientScheduler {
           : now;
         const schedulerLagMs = Math.max(0, now.getTime() - idealDueAt.getTime());
 
-        // Apply jitter: ±15% of check interval
+        // Apply humanized jitter: varies by platform risk (high=±30%, medium=±20%, low=±10%)
         let jitterMs = 0;
         if (this.isFirstTick) {
           // On restart: spread monitors over RESTART_SPREAD_MS to prevent burst
           jitterMs = Math.round(Math.random() * RESTART_SPREAD_MS);
         } else {
-          // Normal: ±15% of check interval
-          const jitterRange = checkIntervalMs * 0.15;
-          jitterMs = Math.round((Math.random() - 0.5) * 2 * jitterRange);
+          // Humanized jitter per platform risk level
+          const { computeSchedulerJitter } = require('../utils/humanize');
+          jitterMs = computeSchedulerJitter(checkIntervalMs, monitor.site);
         }
 
         // Backlog policy: if severely overdue (>2x interval), don't add extra jitter
