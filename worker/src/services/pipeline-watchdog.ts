@@ -232,6 +232,22 @@ async function runHealthCheck(): Promise<void> {
       // Best-effort — don't fail health check for this
     }
 
+    // Check 6: Scraping degradation — CONTENT pages but very few ads
+    // Detects ML throttling: pages load but return far fewer ads than expected
+    if (contentCount > 0) {
+      const contentStats = stats.filter((s) => s.pageType === 'CONTENT');
+      const totalAdsInContent = contentStats.reduce((sum, s) => sum + s.adsFound, 0);
+      const avgAdsPerContent = totalAdsInContent / contentCount;
+
+      if (contentCount >= 3 && avgAdsPerContent < 5) {
+        alerts.push(
+          `DEGRADAÇÃO_DE_SCRAPING: Páginas carregam (${contentCount} CONTENT) mas média de apenas ` +
+          `${avgAdsPerContent.toFixed(1)} anúncios/página. Esperado: 30-48. ` +
+          `Possível throttling por IP ou sessão queimada.`
+        );
+      }
+    }
+
     // Log health report
     const report: HealthReport = {
       totalExecutions,

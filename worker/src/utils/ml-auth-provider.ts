@@ -436,6 +436,22 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
   const userAgent = randomUA();
   console.log(`ML_USER_AGENT: ${userAgent.slice(0, 60)}...`);
 
+  // Proxy configuration (Brazilian IP for ML geo-parity)
+  const proxyUrl = process.env.PROXY_URL;
+  const proxyConfig = proxyUrl ? { proxy: { server: proxyUrl } } : {};
+  if (proxyUrl) {
+    console.log(`ML_PROXY: Configurado — ${proxyUrl.replace(/\/\/.*@/, '//<credentials>@')}`);
+  }
+
+  // Base context options shared across all auth paths
+  const baseContextOpts = {
+    userAgent,
+    locale: 'pt-BR',
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 1,
+    ...proxyConfig,
+  };
+
   let context: BrowserContext;
 
   if (authState.loaded && authState.source === 'database' && authState.storageStateJson) {
@@ -444,20 +460,12 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
       const storageState = JSON.parse(authState.storageStateJson);
       context = await browser.newContext({
         storageState,
-        userAgent,
-        locale: 'pt-BR',
-        viewport: { width: 1920, height: 1080 },
-        deviceScaleFactor: 1,
+        ...baseContextOpts,
       });
       console.log(`ML_AUTH_CONTEXT: Contexto criado com storageState do banco (database)`);
     } catch (e: any) {
       console.log(`ML_AUTH_CONTEXT_ERROR: Falha ao carregar storageState do banco: ${e.message}`);
-      context = await browser.newContext({
-        userAgent,
-        locale: 'pt-BR',
-        viewport: { width: 1920, height: 1080 },
-        deviceScaleFactor: 1,
-      });
+      context = await browser.newContext(baseContextOpts);
       authState.loaded = false;
       authState.error = e.message;
     }
@@ -466,39 +474,41 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
     try {
       context = await browser.newContext({
         storageState: authState.path,
-        userAgent,
-        locale: 'pt-BR',
-        viewport: { width: 1920, height: 1080 },
-        deviceScaleFactor: 1,
+        ...baseContextOpts,
       });
       console.log(`ML_AUTH_CONTEXT: Contexto criado com storageState de ${authState.source}`);
     } catch (e: any) {
       console.log(`ML_AUTH_CONTEXT_ERROR: Falha ao carregar storageState: ${e.message}`);
-      // Fallback para contexto sem auth
-      context = await browser.newContext({
-        userAgent,
-        locale: 'pt-BR',
-        viewport: { width: 1920, height: 1080 },
-        deviceScaleFactor: 1,
-      });
+      context = await browser.newContext(baseContextOpts);
       authState.loaded = false;
       authState.error = e.message;
     }
   } else {
     // Cria contexto SEM storageState (anonimo)
     console.log(`ML_AUTH_FALLBACK: Usando contexto sem autenticacao`);
-    context = await browser.newContext({
-      userAgent,
-      locale: 'pt-BR',
-      viewport: { width: 1920, height: 1080 },
-      deviceScaleFactor: 1,
-    });
+    context = await browser.newContext(baseContextOpts);
   }
 
-  // Bloqueia recursos desnecessarios
-  await context.route('**/*.{png,jpg,jpeg,gif,svg,ico,woff,woff2}', route => route.abort());
+  // Block heavy resources that don't affect ad rendering (fonts, media)
+  // NOTE: Images are NOT blocked — ML uses image-based lazy loading
+  await context.route('**/*.{woff,woff2,ttf,otf,eot}', route => route.abort());
+  await context.route('**/*.{mp4,mp3,avi,mov,webm}', route => route.abort());
 
   const page = await context.newPage();
+
+  // Log external IP for geo-verification (best-effort, non-blocking)
+  if (proxyUrl) {
+    try {
+      const ipPage = await context.newPage();
+      await ipPage.goto('https://api.ipify.org?format=json', { timeout: 10000 });
+      const ipText = await ipPage.textContent('body');
+      await ipPage.close();
+      const ip = ipText ? JSON.parse(ipText).ip : 'unknown';
+      console.log(`ML_EXTERNAL_IP: ${ip} (proxy=${proxyUrl.includes('@') ? 'authenticated' : 'direct'})`);
+    } catch {
+      console.log(`ML_EXTERNAL_IP: Verificação falhou (proxy pode estar offline)`);
+    }
+  }
 
   return {
     browser,
