@@ -146,8 +146,8 @@ async function runHealthCheck(): Promise<void> {
       emptyRate > THRESHOLDS.highEmptyRate
     ) {
       alerts.push(
-        `HIGH_EMPTY_RATE: ${(emptyRate * 100).toFixed(0)}% of executions returned EMPTY ` +
-        `(${emptyCount}/${totalExecutions})`
+        `PÁGINAS_VAZIAS: ${(emptyRate * 100).toFixed(0)}% das execuções retornaram VAZIO ` +
+        `(${emptyCount}/${totalExecutions}). Possível bloqueio ou layout alterado.`
       );
     }
 
@@ -157,8 +157,8 @@ async function runHealthCheck(): Promise<void> {
       verificationRate > THRESHOLDS.highVerificationRate
     ) {
       alerts.push(
-        `SESSION_BLOCKING: ${(verificationRate * 100).toFixed(0)}% of executions hit ` +
-        `verification/login (${verificationCount}/${totalExecutions})`
+        `SESSÕES_BLOQUEADAS: ${(verificationRate * 100).toFixed(0)}% das execuções exigiram ` +
+        `verificação/login (${verificationCount}/${totalExecutions}). Reconecte as sessões.`
       );
     }
 
@@ -176,8 +176,8 @@ async function runHealthCheck(): Promise<void> {
 
     if (recentNotifications === 0 && totalExecutions >= THRESHOLDS.minExecutionsForAlert) {
       alerts.push(
-        `NOTIFICATION_DROP: Zero ad notifications sent in the last ` +
-        `${THRESHOLDS.notificationDropLookbackMin}min despite ${totalExecutions} executions`
+        `QUEDA_DE_NOTIFICAÇÕES: Nenhuma notificação de anúncio enviada nos últimos ` +
+        `${THRESHOLDS.notificationDropLookbackMin}min apesar de ${totalExecutions} execuções.`
       );
     }
 
@@ -197,8 +197,8 @@ async function runHealthCheck(): Promise<void> {
 
     if (prolongedNotifications === 0 && prolongedExecutions >= 10) {
       alerts.push(
-        `PROLONGED_SILENCE: Zero notifications in 4h despite ${prolongedExecutions} executions with ads. ` +
-        `Possible: all_duplicates, relevance_filter_too_strict, or dispatch failure.`
+        `SILÊNCIO_PROLONGADO: Nenhuma notificação em 4h apesar de ${prolongedExecutions} execuções com anúncios. ` +
+        `Possível causa: todos duplicados, filtro muito restritivo, ou falha no envio.`
       );
     }
 
@@ -223,8 +223,8 @@ async function runHealthCheck(): Promise<void> {
         if (deadPools.length > 0) {
           const sites = [...new Set(deadPools.map(([k]) => k.split(':')[1]))];
           alerts.push(
-            `ALL_SESSIONS_DEAD: ${deadPools.length} user/site pool(s) have zero active sessions. ` +
-            `Sites affected: ${sites.join(', ')}. Monitors are running but scraping nothing.`
+            `SESSÕES_MORTAS: ${deadPools.length} pool(s) usuário/site sem sessões ativas. ` +
+            `Sites afetados: ${sites.join(', ')}. Monitores rodando mas sem extrair dados.`
           );
         }
       }
@@ -300,9 +300,9 @@ async function sendWatchdogAlert(message: string): Promise<void> {
   if (adminChatId) {
     try {
       const htmlMessage =
-        `🚨 <b>RadarOne Watchdog Alert</b>\n\n` +
+        `🚨 <b>RadarOne — Alerta do Sistema</b>\n\n` +
         `<code>${TelegramService.escapeHtml(message)}</code>\n\n` +
-        `⏰ ${new Date().toISOString()}`;
+        `⏰ ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
 
       await TelegramService.sendMessage(adminChatId, htmlMessage);
     } catch (e: any) {

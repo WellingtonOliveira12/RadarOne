@@ -1407,6 +1407,27 @@ export class MonitorRunner {
           },
         });
 
+        // Record in notification_logs for observability and watchdog NOTIFICATION_DROP check
+        try {
+          const channel = hasTelegram ? 'TELEGRAM' : 'EMAIL';
+          const target = hasTelegram
+            ? `***${String(telegramChatId).slice(-4)}`
+            : `***@${(monitor.user.email || 'unknown').split('@')[1] || 'unknown'}`;
+
+          await prisma.notificationLog.create({
+            data: {
+              userId: monitor.userId,
+              channel,
+              title: `[AD] ${ad.title.substring(0, 60)}`,
+              message: `${ad.title} — ${ad.price ? `R$ ${ad.price}` : 'sem preço'} — ${ad.url}`,
+              target,
+              status: 'SUCCESS',
+            },
+          });
+        } catch {
+          // Best-effort — notification was already sent
+        }
+
         sentCount++;
       }
     }
