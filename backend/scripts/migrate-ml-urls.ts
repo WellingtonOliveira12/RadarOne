@@ -19,7 +19,11 @@
  * The script is idempotent: running it twice with --apply is safe.
  */
 
+import * as dotenv from 'dotenv';
+dotenv.config();
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
 const HACK_SEGMENTS = ['_PublishedToday_YES', '_NoIndex_True'];
 
@@ -36,17 +40,15 @@ function stripHackSegments(url: string): string {
 
 async function main() {
   const apply = process.argv.includes('--apply');
-  const prisma = new PrismaClient();
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
   console.log(`migrate-ml-urls — mode=${apply ? 'APPLY' : 'DRY_RUN'}`);
 
   const candidates = await prisma.monitor.findMany({
     where: {
       site: 'MERCADO_LIVRE',
-      searchUrl: {
-        not: null,
-        OR: HACK_SEGMENTS.map((seg) => ({ contains: seg })),
-      },
+      OR: HACK_SEGMENTS.map((seg) => ({ searchUrl: { contains: seg } })),
     },
     select: { id: true, userId: true, name: true, searchUrl: true },
   });
