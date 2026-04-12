@@ -188,6 +188,7 @@ export class MonitorRunner {
       // SESSION POOL VERIFICATION + FAILOVER
       // ═══════════════════════════════════════════════════════════════
       const siteRequiresAuth = userSessionService.siteRequiresAuth(monitor.site);
+      let useAnonymousFallback = false;
 
       if (siteRequiresAuth) {
         // Recover sessions whose cooldown expired (best-effort, non-blocking)
@@ -228,34 +229,52 @@ export class MonitorRunner {
           return { status: 'SKIPPED', reason: 'SESSION_REQUIRED' };
         }
 
-        // All sessions need action (none active) → SKIPPED + notify
+        // All sessions need action (none active)
         if (sessionStatus.needsAction) {
-          log.info('MONITOR_SKIPPED: Pool sem sessões ativas', {
-            monitorId: monitor.id,
-            site: monitor.site,
-            status: sessionStatus.status,
-            poolSize: sessionStatus.poolSize,
-            activeCount: sessionStatus.activeCount,
-            reason: 'SESSION_POOL_EMPTY',
-          });
+          // Check if this site supports anonymous scraping (cookies_optional)
+          // If so, proceed without session — the engine will use anonymous mode via proxy
+          const { getSiteConfig } = await import('../engine/site-registry');
+          const siteConfig = getSiteConfig(monitor.site);
+          const canScrapeAnonymous = siteConfig?.authMode === 'cookies_optional';
 
-          const { notified } = await userSessionService.markNeedsReauth(
-            monitor.userId,
-            monitor.site,
-            `Pool vazio — todas sessões ${sessionStatus.status}`
-          );
+          if (canScrapeAnonymous) {
+            log.info('SESSION_POOL_EMPTY_ANONYMOUS_FALLBACK', {
+              monitorId: monitor.id,
+              site: monitor.site,
+              poolSize: sessionStatus.poolSize,
+              activeCount: 0,
+              reason: 'Prosseguindo em modo anônimo (cookies_optional)',
+            });
+            useAnonymousFallback = true;
+            // Don't skip — fall through to scraping without session
+          } else {
+            log.info('MONITOR_SKIPPED: Pool sem sessões ativas', {
+              monitorId: monitor.id,
+              site: monitor.site,
+              status: sessionStatus.status,
+              poolSize: sessionStatus.poolSize,
+              activeCount: sessionStatus.activeCount,
+              reason: 'SESSION_POOL_EMPTY',
+            });
 
-          if (notified) {
-            await this.sendPoolDegradedNotification(monitor, sessionStatus.poolSize || 0, 0);
+            const { notified } = await userSessionService.markNeedsReauth(
+              monitor.userId,
+              monitor.site,
+              `Pool vazio — todas sessões ${sessionStatus.status}`
+            );
+
+            if (notified) {
+              await this.sendPoolDegradedNotification(monitor, sessionStatus.poolSize || 0, 0);
+            }
+
+            await this.logExecution(monitor.id, {
+              status: 'SKIPPED',
+              error: `SESSION_POOL_EMPTY: ${sessionStatus.poolSize} sessões, 0 ativas. Reconecte.`,
+              executionTime: Date.now() - startTime,
+            });
+
+            return { status: 'SKIPPED', reason: 'SESSION_POOL_EMPTY' };
           }
-
-          await this.logExecution(monitor.id, {
-            status: 'SKIPPED',
-            error: `SESSION_POOL_EMPTY: ${sessionStatus.poolSize} sessões, 0 ativas. Reconecte.`,
-            executionTime: Date.now() - startTime,
-          });
-
-          return { status: 'SKIPPED', reason: 'SESSION_POOL_EMPTY' };
         }
       }
       // ═══════════════════════════════════════════════════════════════
@@ -272,8 +291,8 @@ export class MonitorRunner {
 
       let ads: Ad[];
 
-      if (!siteRequiresAuth) {
-        // Non-auth sites: simple execution, no failover needed
+      if (!siteRequiresAuth || useAnonymousFallback) {
+        // Non-auth sites or anonymous fallback: simple execution, no failover needed
         ads = await circuitBreaker.execute(monitor.site, () => this.scrape(monitor));
       } else {
         // Auth sites: failover loop across session pool
