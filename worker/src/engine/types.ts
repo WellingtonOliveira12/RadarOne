@@ -170,6 +170,10 @@ export interface SiteConfig {
   externalIdExtractor: (url: string) => string;
   priceParser: (text: string) => number;
   urlNormalizer: (url: string) => string;
+  /** Optional preprocessor applied to the monitor's searchUrl BEFORE navigation.
+   *  Used to strip platform-specific hack fragments that stopped working
+   *  (e.g. ML `_PublishedToday_YES`, `_NoIndex_True`). Idempotent. */
+  searchUrlPreprocessor?: (url: string) => string;
   noResultsPatterns: string[];
   loginPatterns: string[];
   checkpointPatterns?: string[];

@@ -1,5 +1,6 @@
 import { SiteConfig, AuthContextResult } from '../types';
 import { getMLAuthenticatedContext } from '../../utils/ml-auth-provider';
+import { stripMlHackSegments } from '../../utils/ml-url-normalizer';
 
 /**
  * Parse Brazilian price format: "2.350,00" -> 2350.00, "25000" -> 25000
@@ -128,6 +129,7 @@ export const mercadoLivreConfig: SiteConfig = {
   priceParser: parseBrazilianPrice,
   urlNormalizer: (url: string) =>
     url.startsWith('http') ? url : `https://www.mercadolivre.com.br${url}`,
+  searchUrlPreprocessor: stripMlHackSegments,
   noResultsPatterns: [
     'não encontramos',
     'nao encontramos',

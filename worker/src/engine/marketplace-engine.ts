@@ -45,6 +45,19 @@ export class MarketplaceEngine {
    * Main entry point: scrapes a monitor URL and returns structured results.
    */
   async scrape(monitor: MonitorWithFilters): Promise<ExtractionResult> {
+    // 0. Site-specific search URL preprocessing (e.g. strip ML hack segments)
+    if (this.config.searchUrlPreprocessor && monitor.searchUrl) {
+      const original = monitor.searchUrl;
+      const processed = this.config.searchUrlPreprocessor(original);
+      if (processed !== original) {
+        console.log(
+          `SEARCH_URL_PREPROCESSED: ${this.config.site} monitorId=${monitor.id} ` +
+          `from=${original.slice(0, 120)} to=${processed.slice(0, 120)}`
+        );
+        monitor = { ...monitor, searchUrl: processed };
+      }
+    }
+
     // 1. Validate searchUrl against supportedUrlPatterns
     if (this.config.supportedUrlPatterns && monitor.searchUrl) {
       const isValid = this.config.supportedUrlPatterns.some((p) =>
