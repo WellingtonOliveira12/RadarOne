@@ -149,14 +149,6 @@ async function createAnonymousContext(
     ? getRandomViewport()
     : { width: 1920, height: 1080 };
 
-  // Resolve proxy for this site (per-platform or global fallback)
-  const { resolveProxyForSite } = await import('../utils/proxy-resolver');
-  const proxyResolution = resolveProxyForSite(site || 'UNKNOWN');
-  const proxyOpts = proxyResolution.proxy ? { proxy: proxyResolution.proxy } : {};
-  if (proxyResolution.source !== 'none') {
-    console.log(`PROXY_SELECTED: site=${site} source=${proxyResolution.source} endpoint=${proxyResolution.masked}`);
-  }
-
   // Use provided browser (from acquireContext) or fall back to getOrLaunch
   const { browserManager } = await import('./browser-manager');
   const resolvedBrowser = browser ?? await browserManager.getOrLaunch();
@@ -166,7 +158,6 @@ async function createAnonymousContext(
     locale: 'pt-BR',
     viewport,
     deviceScaleFactor: 1,
-    ...proxyOpts,
   });
 
   const page = await context.newPage();

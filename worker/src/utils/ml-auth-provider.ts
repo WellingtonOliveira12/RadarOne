@@ -436,19 +436,12 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
   const userAgent = randomUA();
   console.log(`ML_USER_AGENT: ${userAgent.slice(0, 60)}...`);
 
-  // Proxy configuration (Brazilian IP for ML geo-parity)
-  const { resolveProxyForSite } = await import('./proxy-resolver');
-  const proxyResolution = resolveProxyForSite('MERCADO_LIVRE');
-  const proxyConfig = proxyResolution.proxy ? { proxy: proxyResolution.proxy } : {};
-  console.log(`ML_PROXY: source=${proxyResolution.source} endpoint=${proxyResolution.masked}`);
-
   // Base context options shared across all auth paths
   const baseContextOpts = {
     userAgent,
     locale: 'pt-BR',
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 1,
-    ...proxyConfig,
   };
 
   let context: BrowserContext;
@@ -494,26 +487,6 @@ export async function getMLAuthenticatedContext(userId?: string): Promise<MLAuth
   await context.route('**/*.{mp4,mp3,avi,mov,webm}', route => route.abort());
 
   const page = await context.newPage();
-
-  // Geo-verify external IP when proxy is configured (best-effort, non-blocking)
-  if (proxyResolution.proxy) {
-    try {
-      const { verifyGeo } = await import('./proxy-resolver');
-      const geoPage = await context.newPage();
-      const geo = await verifyGeo(geoPage);
-      await geoPage.close();
-      if (geo) {
-        console.log(`ML_GEO_VERIFY: ip=${geo.ip} country=${geo.country} region=${geo.region || 'N/A'}`);
-        if (geo.country !== 'BR') {
-          console.warn(`ML_GEO_WARNING: IP fora do Brasil (${geo.country}). ML pode limitar resultados.`);
-        }
-      } else {
-        console.log(`ML_GEO_VERIFY: Verificação falhou (proxy pode estar offline)`);
-      }
-    } catch {
-      console.log(`ML_GEO_VERIFY: Verificação falhou`);
-    }
-  }
 
   return {
     browser,
