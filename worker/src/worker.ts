@@ -19,6 +19,7 @@ import { initSentry, captureException } from './monitoring/sentry';
 import { startHealthServer } from './health-server';
 import { browserManager } from './engine/browser-manager';
 import { startWatchdog, stopWatchdog } from './services/pipeline-watchdog';
+import { buildSiteFilterClause, readSiteFilterFromEnv } from './utils/site-filter';
 
 // Inicializa Sentry para monitoramento de erros
 initSentry();
@@ -68,6 +69,12 @@ class Worker {
     console.log(`   PLAYWRIGHT_BROWSERS_PATH: ${process.env.PLAYWRIGHT_BROWSERS_PATH || 'NOT SET'}`);
     console.log(`   SCHEDULER_CONCURRENCY: ${process.env.SCHEDULER_CONCURRENCY || '3 (default)'}`);
 
+    // Site sharding + watchdog flag (for multi-instance deploys)
+    const siteFilterSummary = buildSiteFilterClause(readSiteFilterFromEnv()).summary;
+    const watchdogEnabled = process.env.WATCHDOG_ENABLED !== 'false';
+    console.log(`   WORKER_SITE_FILTER: ${siteFilterSummary}`);
+    console.log(`   WATCHDOG_ENABLED: ${watchdogEnabled}`);
+
     // Testa conexão com o banco
     try {
       await prisma.$connect();
@@ -81,14 +88,20 @@ class Worker {
     // Start the resilient scheduler
     await this.scheduler.start();
 
-    // Start pipeline health watchdog (monitors EMPTY rates, session blocks, notification drops)
-    startWatchdog();
+    // Start pipeline health watchdog (monitors EMPTY rates, session blocks, notification drops).
+    // Disabled via WATCHDOG_ENABLED=false on secondary worker instances (e.g. ML-only shards)
+    // so only the primary instance emits system-wide alerts, avoiding duplicates.
+    if (process.env.WATCHDOG_ENABLED !== 'false') {
+      startWatchdog();
+    } else {
+      console.log('WATCHDOG_DISABLED: WATCHDOG_ENABLED=false — this instance will not emit system alerts');
+    }
   }
 
   async stop() {
     console.log('\nShutting down worker...');
 
-    // 1. Stop watchdog
+    // 1. Stop watchdog (no-op if it was never started)
     stopWatchdog();
 
     // 2. Stop scheduler (waits for active executions to drain)

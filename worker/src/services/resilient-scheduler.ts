@@ -17,6 +17,7 @@
 import { prisma } from '../lib/prisma';
 import { MonitorRunner, type MonitorRunResult } from './monitor-runner';
 import { captureException } from '../monitoring/sentry';
+import { buildSiteFilterClause, readSiteFilterFromEnv } from '../utils/site-filter';
 
 // ─── Configuration ──────────────────────────────────────────
 
@@ -286,8 +287,12 @@ export class ResilientScheduler {
   // ─── Discovery ──────────────────────────────────────────────
 
   private async discoverDueMonitors(now: Date): Promise<any[]> {
+    const siteFilter = buildSiteFilterClause(readSiteFilterFromEnv());
     const allMonitors = await prisma.monitor.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        ...(siteFilter.clause || {}),
+      },
       include: {
         user: {
           include: {

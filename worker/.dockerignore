@@ -1,0 +1,16 @@
+node_modules
+dist
+pw-browsers
+coverage
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.git
+.gitignore
+tests
+test-results
+playwright-report
+.vscode
+.idea

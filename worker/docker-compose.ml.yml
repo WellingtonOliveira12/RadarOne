@@ -1,0 +1,71 @@
+# ------------------------------------------------------------------------------
+# docker-compose.ml.yml — Mercado Livre shard of the RadarOne worker.
+#
+# Intended to run on a Brazilian VPS (e.g. Hostinger São Paulo) so the worker's
+# outbound IP matches the IP used when the user uploaded the ML session,
+# avoiding ML's anti-fraud /gz/account-verification redirect.
+#
+# Coexistence with other projects on the same host (e.g. PageOS):
+#   - custom project name `radarone-ml` (top-level `name:`) — own isolated scope
+#   - custom container name `radarone-ml-worker`
+#   - custom network `radarone_ml_net`
+#   - NO published ports (health is localhost-only inside the container)
+#   - no host volume mounts
+#   - log rotation to prevent disk fill
+#
+# Usage on the VPS (see docs/runbooks/deploy-worker-ml-hostinger.md for full steps):
+#   cd /opt/radarone-ml/worker
+#   cp .env.ml.example .env.ml && vi .env.ml    # fill secrets
+#   docker compose -f docker-compose.ml.yml --env-file .env.ml up -d --build
+#   docker compose -f docker-compose.ml.yml logs -f
+# ------------------------------------------------------------------------------
+
+name: radarone-ml
+
+services:
+  worker-ml:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    image: radarone-ml-worker:latest
+    container_name: radarone-ml-worker
+    restart: unless-stopped
+
+    # All runtime config comes from the env file. NEVER commit .env.ml to git.
+    env_file:
+      - .env.ml
+
+    # Hard-set the envs that define this shard's identity so the operator
+    # cannot accidentally forget them in .env.ml. These override anything.
+    environment:
+      WORKER_SITES_INCLUDE: MERCADO_LIVRE
+      WATCHDOG_ENABLED: "false"
+
+    # Internal healthcheck — the worker exposes GET /ping on 8090.
+    # Using wget from inside the container avoids publishing the port.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8090/ping || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+    # Sensible ceiling for a VPS co-hosting another project.
+    deploy:
+      resources:
+        limits:
+          memory: 900M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    networks:
+      - radarone_ml_net
+
+networks:
+  radarone_ml_net:
+    name: radarone_ml_net
+    driver: bridge
