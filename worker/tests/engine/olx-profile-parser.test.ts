@@ -4,7 +4,51 @@ import {
   countVerifications,
   yearsOnPlatform,
   emptyProfileSignals,
+  parseLastSeenMinutes,
 } from '../../src/engine/enrichment/olx-profile-parser';
+
+describe('parseLastSeenMinutes', () => {
+  it('returns null on empty/null/undefined', () => {
+    expect(parseLastSeenMinutes('')).toBeNull();
+    expect(parseLastSeenMinutes(null)).toBeNull();
+    expect(parseLastSeenMinutes(undefined)).toBeNull();
+  });
+
+  it('parses minutes', () => {
+    expect(parseLastSeenMinutes('39 min')).toBe(39);
+    expect(parseLastSeenMinutes('5 minutos')).toBe(5);
+  });
+
+  it('parses hours', () => {
+    expect(parseLastSeenMinutes('1 hora')).toBe(60);
+    expect(parseLastSeenMinutes('3 horas')).toBe(180);
+    expect(parseLastSeenMinutes('2 h')).toBe(120);
+  });
+
+  it('parses days', () => {
+    expect(parseLastSeenMinutes('1 dia')).toBe(60 * 24);
+    expect(parseLastSeenMinutes('7 dias')).toBe(60 * 24 * 7);
+  });
+
+  it('parses weeks', () => {
+    expect(parseLastSeenMinutes('2 semanas')).toBe(60 * 24 * 14);
+  });
+
+  it('parses months (approx 30 days)', () => {
+    expect(parseLastSeenMinutes('1 mês')).toBe(60 * 24 * 30);
+    expect(parseLastSeenMinutes('3 meses')).toBe(60 * 24 * 90);
+  });
+
+  it('parses years (approx 365 days)', () => {
+    expect(parseLastSeenMinutes('1 ano')).toBe(60 * 24 * 365);
+    expect(parseLastSeenMinutes('2 anos')).toBe(60 * 24 * 365 * 2);
+  });
+
+  it('returns null on junk', () => {
+    expect(parseLastSeenMinutes('não informado')).toBeNull();
+    expect(parseLastSeenMinutes('ontem')).toBeNull();
+  });
+});
 
 // Real text observed in production on a logged-in OLX ad detail page
 // (2026-04-13). Used as the authoritative parser fixture.
@@ -38,6 +82,7 @@ describe('parseOlxProfileText', () => {
     expect(s.yearJoined).toBe(2026);
     expect(s.monthJoined).toBe('abril');
     expect(s.lastSeenRaw).toBe('39 min');
+    expect(s.lastSeenMinutes).toBe(39);
     expect(s.hasVerificationsSection).toBe(true);
     expect(s.verifications.email).toBe(true);
     expect(s.verifications.phone).toBe(true);

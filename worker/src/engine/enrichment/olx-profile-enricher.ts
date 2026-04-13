@@ -2,31 +2,20 @@
  * OLX Profile Enricher — OPT-IN detail page navigation.
  *
  * ╔═══════════════════════════════════════════════════════════════════════╗
- * ║  WHY THIS IS OPT-IN AND CONSERVATIVE                                   ║
+ * ║  SAFETY LAYERS (all active when OLX_ENRICH_PROFILE=true)               ║
  * ╠═══════════════════════════════════════════════════════════════════════╣
- * ║                                                                        ║
- * ║  OLX aggressively anti-bots on detail pages:                           ║
- * ║  - Anonymous navigation → /gz/account-verification challenge           ║
- * ║  - HTTP curl → Cloudflare 5K-byte "blocked_why_detail" page            ║
- * ║  - Requires an ACTIVE logged-in session to resolve the real HTML       ║
- * ║                                                                        ║
- * ║  Each detail navigation consumes session budget and can burn the       ║
- * ║  session. Therefore this module:                                       ║
- * ║                                                                        ║
- * ║    1. Runs ONLY when process.env.OLX_ENRICH_PROFILE === 'true'         ║
- * ║    2. Runs ONLY on OLX site (the hook is registered in olx.config)     ║
- * ║    3. Runs ONLY on ads that already passed title+price+location        ║
- * ║    4. Hard-caps MAX_ENRICH_PER_RUN at 3 details per monitor execution  ║
- * ║    5. Short per-ad timeout (OLX_ENRICH_TIMEOUT_MS, default 10s)        ║
- * ║    6. Randomized inter-request delay to look human                     ║
- * ║    7. FULL failsafe: any error → ad returned WITHOUT enrichment        ║
- * ║    8. Reuses the SAME Playwright context that just loaded the listing  ║
- * ║       (no new browser, no extra session consumption)                   ║
- * ║                                                                        ║
+ * ║  1. Opt-in master switch      OLX_ENRICH_PROFILE=true                  ║
+ * ║  2. Per-run hard cap          OLX_ENRICH_MAX_PER_RUN       (default 3) ║
+ * ║  3. Per-monitor hourly cap    OLX_ENRICH_MAX_PER_MONITOR_HOUR (20)     ║
+ * ║  4. Global hourly cap         OLX_ENRICH_MAX_GLOBAL_HOUR   (default 60)║
+ * ║  5. Per-fetch timeout         OLX_ENRICH_TIMEOUT_MS        (default 10s)║
+ * ║  6. Dry-run mode              OLX_ENRICH_DRY_RUN=true — parse & log    ║
+ * ║                               but DO NOT attach signals to ads         ║
+ * ║  7. Challenge/blocked URL detection → silent abort, no retry           ║
+ * ║  8. Full try/catch around every fetch — ads return without enrichment  ║
+ * ║  9. Humanized inter-fetch delay (1.5–3.5 s randomized)                 ║
+ * ║ 10. Reuses SAME BrowserContext as the main scrape (no extra session)   ║
  * ╚═══════════════════════════════════════════════════════════════════════╝
- *
- * Returns nothing; mutates ScrapedAd in place with `profileSignals` and
- * `confidence`. Never throws.
  */
 
 import type { BrowserContext } from 'playwright';
@@ -34,6 +23,12 @@ import type { ScrapedAd } from '../../types/scraper';
 import { logger } from '../../utils/logger';
 import { parseOlxProfileText, type OlxProfileSignals } from './olx-profile-parser';
 import { computeOlxConfidence } from './olx-confidence';
+import {
+  canEnrichNow,
+  recordEnrichHit,
+  limiterSnapshot,
+  logLimiterBlocked,
+} from './olx-enrich-limiter';
 
 const DEFAULT_MAX_PER_RUN = 3;
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -46,8 +41,22 @@ export interface EnrichOptions {
   monitorId: string;
 }
 
+// Cumulative counters (process lifetime) — complement per-run logs.
+const processCounters = {
+  runs: 0,
+  enriched: 0,
+  failed: 0,
+  rateLimited: 0,
+  challengeAborts: 0,
+  totalDurationMs: 0,
+};
+
 function isEnabled(): boolean {
   return process.env.OLX_ENRICH_PROFILE === 'true';
+}
+
+function isDryRun(): boolean {
+  return process.env.OLX_ENRICH_DRY_RUN === 'true';
 }
 
 function maxPerRun(): number {
@@ -67,23 +76,24 @@ function randomInterDelayMs(): number {
   );
 }
 
-/**
- * Enriches at most N OLX ads with profile signals and a confidence tier.
- * Opt-in, fail-safe. Mutates `ads` in place — callers must still treat
- * the ads as normally-scraped (enrichment is additive and optional).
- */
 export async function enrichOlxAdsWithProfile(opts: EnrichOptions): Promise<void> {
   if (!isEnabled()) return;
 
   const { context, ads, monitorId } = opts;
   if (!ads || ads.length === 0) return;
 
+  const dryRun = isDryRun();
   const cap = maxPerRun();
   const candidates = ads.slice(0, cap);
   const perTimeout = timeoutMs();
   const startedAt = Date.now();
   let enriched = 0;
   let failed = 0;
+  let rateLimited = 0;
+  let challengeAborts = 0;
+  const durations: number[] = [];
+
+  processCounters.runs += 1;
 
   logger.info(
     {
@@ -91,33 +101,74 @@ export async function enrichOlxAdsWithProfile(opts: EnrichOptions): Promise<void
       candidates: candidates.length,
       cap,
       timeoutMs: perTimeout,
+      dryRun,
+      limiterSnapshot: limiterSnapshot(),
     },
     'OLX_PROFILE_ENRICH_START',
   );
 
   for (let i = 0; i < candidates.length; i++) {
     const ad = candidates[i];
+
+    // ── Rate limit check (per-monitor hour + global hour) ─────────────────
+    const gate = canEnrichNow(monitorId);
+    if (!gate.allowed) {
+      rateLimited++;
+      processCounters.rateLimited++;
+      logLimiterBlocked(monitorId, gate.reason ?? 'unknown', gate.usage);
+      // Stop here — further ads in this run are guaranteed to hit the same
+      // ceiling, so we avoid burning inter-fetch delays for no reason.
+      break;
+    }
+
     if (i > 0) {
       // Human-ish pacing between detail pages within the same run.
       await new Promise((r) => setTimeout(r, randomInterDelayMs()));
     }
 
+    const fetchStart = Date.now();
     try {
-      const signals = await fetchProfileSignals(context, ad.url, perTimeout);
-      if (!signals) {
-        failed++;
+      const result = await fetchProfileSignals(context, ad.url, perTimeout);
+      recordEnrichHit(monitorId);
+      const fetchMs = Date.now() - fetchStart;
+      durations.push(fetchMs);
+
+      if (result === 'challenge') {
+        challengeAborts++;
+        processCounters.challengeAborts++;
+        logger.warn(
+          { monitorId, externalId: ad.externalId, fetchMs },
+          'OLX_PROFILE_ENRICH_CHALLENGE',
+        );
         continue;
       }
+
+      if (!result) {
+        failed++;
+        processCounters.failed++;
+        continue;
+      }
+
+      const signals = result;
       const confidence = computeOlxConfidence(signals);
-      ad.profileSignals = signals;
-      ad.confidence = confidence;
       enriched++;
+      processCounters.enriched++;
+
+      // Dry-run mode: log everything but DO NOT mutate the ad.
+      // This lets the operator observe behavior in production for N days
+      // before allowing the tier to influence the notification payload.
+      if (!dryRun) {
+        ad.profileSignals = signals;
+        ad.confidence = confidence;
+      }
+
       logger.info(
         {
           monitorId,
           externalId: ad.externalId,
           yearJoined: signals.yearJoined,
-          lastSeen: signals.lastSeenRaw,
+          lastSeenRaw: signals.lastSeenRaw,
+          lastSeenMinutes: signals.lastSeenMinutes,
           verifCount:
             (signals.verifications.email ? 1 : 0) +
             (signals.verifications.phone ? 1 : 0) +
@@ -125,11 +176,16 @@ export async function enrichOlxAdsWithProfile(opts: EnrichOptions): Promise<void
             (signals.verifications.identity ? 1 : 0),
           tier: confidence.tier,
           reasons: confidence.reasons,
+          fetchMs,
+          dryRun,
         },
-        'OLX_PROFILE_ENRICH_OK',
+        dryRun ? 'OLX_PROFILE_ENRICH_DRY_RUN' : 'OLX_PROFILE_ENRICH_OK',
       );
     } catch (error: any) {
       failed++;
+      processCounters.failed++;
+      recordEnrichHit(monitorId); // failure consumes budget too
+      durations.push(Date.now() - fetchStart);
       logger.warn(
         {
           monitorId,
@@ -138,9 +194,15 @@ export async function enrichOlxAdsWithProfile(opts: EnrichOptions): Promise<void
         },
         'OLX_PROFILE_ENRICH_FAIL',
       );
-      // Continue with next ad — never throw from here.
     }
   }
+
+  const durationMs = Date.now() - startedAt;
+  processCounters.totalDurationMs += durationMs;
+  const avgFetchMs =
+    durations.length > 0
+      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+      : 0;
 
   logger.info(
     {
@@ -148,7 +210,13 @@ export async function enrichOlxAdsWithProfile(opts: EnrichOptions): Promise<void
       candidates: candidates.length,
       enriched,
       failed,
-      durationMs: Date.now() - startedAt,
+      rateLimited,
+      challengeAborts,
+      durationMs,
+      avgFetchMs,
+      dryRun,
+      processTotals: { ...processCounters },
+      limiterSnapshot: limiterSnapshot(),
     },
     'OLX_PROFILE_ENRICH_END',
   );
@@ -156,34 +224,29 @@ export async function enrichOlxAdsWithProfile(opts: EnrichOptions): Promise<void
 
 /**
  * Navigates a fresh short-lived page to the OLX ad detail URL, extracts
- * the rendered innerText, and parses the stable signals. All errors are
- * caught and surfaced as `null` to the caller.
+ * the rendered innerText, and parses stable signals. Returns:
+ *   - signals object     on success
+ *   - 'challenge'        on anti-bot redirect (no retry, no escalation)
+ *   - null               on empty page / navigation failure
  */
 async function fetchProfileSignals(
   context: BrowserContext,
   adUrl: string,
   timeoutMsVal: number,
-): Promise<OlxProfileSignals | null> {
+): Promise<OlxProfileSignals | 'challenge' | null> {
   const page = await context.newPage();
   try {
-    // domcontentloaded is sufficient — we only need the rendered text of the
-    // already-hydrated sections ("Informações verificadas", "Na OLX desde").
     const response = await page.goto(adUrl, {
       waitUntil: 'domcontentloaded',
       timeout: timeoutMsVal,
     });
-
     if (!response) return null;
 
-    // Detect anti-bot / challenge redirect. We bail out silently — no retry,
-    // no escalation, no session burn.
     const finalUrl = page.url();
     if (/account-verification|desafio|challenge|blocked/i.test(finalUrl)) {
-      return null;
+      return 'challenge';
     }
 
-    // Cheap, resilient: use innerText of body instead of chasing fragile
-    // CSS selectors. The parser works off rendered text.
     const bodyText = await page.evaluate(() => document.body?.innerText || '');
     if (!bodyText || bodyText.length < 100) {
       return null;

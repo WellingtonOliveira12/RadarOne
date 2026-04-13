@@ -38,12 +38,45 @@ export interface OlxProfileSignals {
   monthJoined: string | null;
   /** Last-seen text as shown ("39 min", "2 dias", "1 hora"). */
   lastSeenRaw: string | null;
+  /** Normalized last-seen in whole minutes, or null if unparseable. */
+  lastSeenMinutes: number | null;
   /** Verified communication channels exposed by the seller. */
   verifications: OlxVerifications;
   /** The "Informações verificadas" section is present on the page. */
   hasVerificationsSection: boolean;
   /** The seller has at least one rating on the platform. */
   hasRatings: boolean;
+}
+
+/**
+ * Parses an OLX "Último acesso há X" raw string into whole minutes.
+ *
+ * Known shapes (observed in prod):
+ *   "39 min"           → 39
+ *   "2 horas"          → 120
+ *   "1 hora"           → 60
+ *   "3 dias"           → 4320
+ *   "1 mês" / "2 meses"→ ~43200 / ~86400
+ *   "ano" or "anos"    → ≥ 525600
+ *
+ * Returns null when the shape does not match — the caller treats null
+ * as "unknown", never as zero.
+ */
+export function parseLastSeenMinutes(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const cleaned = raw.trim().toLowerCase();
+  const m = cleaned.match(/(\d+)\s*(min|minut\w*|hora?s?|h\b|dias?|d\b|semanas?|m[êe]s(?:es)?|anos?)/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  if (!Number.isFinite(n)) return null;
+  const unit = m[2];
+  if (/^min/.test(unit) || unit === 'm') return n;
+  if (/^hora?s?$/.test(unit) || unit === 'h') return n * 60;
+  if (/^dias?$/.test(unit) || unit === 'd') return n * 60 * 24;
+  if (/^semanas?$/.test(unit)) return n * 60 * 24 * 7;
+  if (/^m[êe]s(?:es)?$/.test(unit)) return n * 60 * 24 * 30;
+  if (/^anos?$/.test(unit)) return n * 60 * 24 * 365;
+  return null;
 }
 
 const VERIFICATIONS_SECTION_LABEL = 'Informações verificadas';
@@ -58,6 +91,7 @@ export function emptyProfileSignals(): OlxProfileSignals {
     yearJoined: null,
     monthJoined: null,
     lastSeenRaw: null,
+    lastSeenMinutes: null,
     verifications: emptyVerifications(),
     hasVerificationsSection: false,
     hasRatings: false,
@@ -85,6 +119,7 @@ export function parseOlxProfileText(bodyText: string | null | undefined): OlxPro
   const lastSeen = text.match(/[ÚU]ltimo\s+acesso\s+(?:h[áa])\s+([^\n|]+?)(?:\n|\||$)/i);
   if (lastSeen) {
     out.lastSeenRaw = lastSeen[1].trim();
+    out.lastSeenMinutes = parseLastSeenMinutes(out.lastSeenRaw);
   }
 
   // "Informações verificadas" block — inspect the next ~400 chars for labels.

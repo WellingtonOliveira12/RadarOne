@@ -58,8 +58,24 @@ Cada navegação extra consome quota da sessão. Por isso o módulo:
 | Var | Default | Função |
 |---|---|---|
 | `OLX_ENRICH_PROFILE` | `false` | Master switch. Sem isto, o hook é no-op. |
-| `OLX_ENRICH_MAX_PER_RUN` | `3` | Teto de detail fetches por execução. |
+| `OLX_ENRICH_DRY_RUN` | `false` | **Safety mode recomendado para validação.** Enriquecimento executa, logs mostram os sinais e o tier calculado, mas **não anexa** `profileSignals/confidence` ao anúncio — o pipeline de notificação permanece idêntico ao comportamento pré-feature. |
+| `OLX_ENRICH_MAX_PER_RUN` | `3` | Teto de detail fetches por execução de um monitor. |
+| `OLX_ENRICH_MAX_PER_MONITOR_HOUR` | `20` | Teto rolling 60 min por monitor. |
+| `OLX_ENRICH_MAX_GLOBAL_HOUR` | `60` | Teto rolling 60 min para o processo todo. |
 | `OLX_ENRICH_TIMEOUT_MS` | `10000` | Timeout por detail page. |
+
+**Recomendação de rollout:**
+
+1. Começar com `OLX_ENRICH_PROFILE=true` + `OLX_ENRICH_DRY_RUN=true`.
+   Nenhuma mudança visível no que é notificado. Logs mostram o que
+   **teria** acontecido.
+2. Acompanhar por 2–3 dias: taxa de sucesso, challenge aborts, tempo
+   médio por fetch, distribuição de tiers.
+3. Se estiver estável, remover `OLX_ENRICH_DRY_RUN`. A partir daí os
+   campos `profileSignals` e `confidence` começam a ser anexados
+   aos anúncios e passam a estar disponíveis para o pipeline de
+   notificação (embora o orchestrator de score ainda não os consuma —
+   isso é iteração futura).
 
 ## Como ligar em produção (apenas no worker que roda OLX)
 
@@ -75,12 +91,26 @@ Hostinger SP roda apenas ML via `WORKER_SITES_INCLUDE=MERCADO_LIVRE`).
 ## Logs para acompanhar
 
 ```
-OLX_PROFILE_ENRICH_START  monitorId=... candidates=3 cap=3
-OLX_PROFILE_ENRICH_OK     externalId=OLX-... yearJoined=2021 tier=HIGH reasons=[veteran_5y,verif_3]
-OLX_PROFILE_ENRICH_OK     externalId=OLX-... yearJoined=2026 tier=LOW reasons=[new_account,no_verifications]
-OLX_PROFILE_ENRICH_FAIL   externalId=OLX-... error="Timeout ..."
-OLX_PROFILE_ENRICH_END    candidates=3 enriched=2 failed=1 durationMs=14321
+OLX_PROFILE_ENRICH_START   monitorId=... candidates=3 cap=3 dryRun=true
+                            limiterSnapshot={global:5,monitors:{mon1:2},budgets:{...}}
+OLX_PROFILE_ENRICH_OK      externalId=OLX-... yearJoined=2021 lastSeenMinutes=12
+                            tier=HIGH reasons=[veteran_5y,verif_3,fresh_12m] fetchMs=3420
+OLX_PROFILE_ENRICH_DRY_RUN externalId=OLX-... tier=MEDIUM (not applied to ad)
+OLX_PROFILE_ENRICH_CHALLENGE externalId=OLX-... fetchMs=1820
+OLX_PROFILE_ENRICH_FAIL    externalId=OLX-... error="Timeout ..."
+OLX_ENRICH_RATE_LIMITED    reason=per_monitor_hour_exceeded usageMonitor=20 budgetPerMonitor=20
+OLX_PROFILE_ENRICH_END     candidates=3 enriched=2 failed=0 rateLimited=1
+                            challengeAborts=0 durationMs=14321 avgFetchMs=3500
+                            processTotals={runs:42,enriched:110,failed:5,...}
 ```
+
+**Métricas de ouro** para acompanhar:
+- `processTotals.challengeAborts` — se subir rápido, desligar imediatamente.
+- `processTotals.failed / processTotals.enriched` — razão de falha por run.
+- `avgFetchMs` — se crescer para > 8s, risco de timeout no scheduler.
+- `OLX_ENRICH_RATE_LIMITED` — se aparece com frequência, o limite está
+  fazendo seu trabalho; considere aumentar só depois de confirmar que
+  não há regressão em FB/ML.
 
 Qualquer `OLX_PROFILE_ENRICH_FAIL` recorrente é sinal para **desligar**
 a feature (`OLX_ENRICH_PROFILE=false` no Render, deploy, investigar).
