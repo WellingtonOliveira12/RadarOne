@@ -284,7 +284,11 @@ describe('extractAds', () => {
     expect(result.skippedReasons).toHaveProperty('price_above_max', 1);
   });
 
-  it('should pass ads with price=0 through price filter (unparseable price)', async () => {
+  it('should reject ads with unparseable price when a price filter is configured', async () => {
+    // POLICY CHANGE: previous behavior (fail-open) let price=0 ads bypass the
+    // min/max check, which leaked thousands of ads per day on ML monitors with
+    // a configured range. New behavior (fail-closed): when any bound is set
+    // and the price could not be parsed, the ad is rejected as 'price_unparsed'.
     const elements = [
       createElement({
         tagName: 'A',
@@ -300,7 +304,26 @@ describe('extractAds', () => {
     const monitorWithPrice = { ...testMonitor, priceMin: 100, priceMax: 5000 };
     const result = await extractAds(page, 'a[href*="/marketplace/item/"]', testConfig, monitorWithPrice);
 
-    // price=0 bypasses both min and max checks (guard: price > 0)
+    expect(result.ads).toHaveLength(0);
+    expect(result.skippedReasons).toHaveProperty('price_unparsed', 1);
+  });
+
+  it('should accept ads with price=0 when NO price filter is configured', async () => {
+    const elements = [
+      createElement({
+        tagName: 'A',
+        href: '/marketplace/item/301/',
+        childSelectors: {
+          'span[dir="auto"]': { textContent: 'Doação livre' },
+          'span[class*="x193iq5w"]': { textContent: 'Grátis' },
+        },
+      }),
+    ];
+
+    const page = createMockPage(elements);
+    // No priceMin/priceMax → price filter not active → price=0 is fine.
+    const result = await extractAds(page, 'a[href*="/marketplace/item/"]', testConfig, testMonitor);
+
     expect(result.ads).toHaveLength(1);
     expect(result.ads[0].price).toBe(0);
   });

@@ -2,6 +2,7 @@ import { Page } from 'playwright';
 import { ScrapedAd, SiteConfig, MonitorWithFilters } from './types';
 import { findSelector } from './container-waiter';
 import { matchLocation } from './location-matcher';
+import { resolvePriceRange } from './price-range-resolver';
 
 /**
  * Extracts ads from the page using the site config selectors.
@@ -172,6 +173,20 @@ export async function extractAds(
   const olxTargetCity = isOlxSite && monitor.city ? normalizeForComparison(monitor.city) : '';
   const olxRequiresLocation = isOlxSite && (!!olxTargetState || !!olxTargetCity);
 
+  // Resolve effective price range from ALL sources (filtersJson, top-level
+  // columns, URL). The previous implementation only read monitor.priceMin/Max,
+  // which silently ignored ranges configured via filtersJson or embedded in
+  // the search URL (ML PriceRange, OLX ps/pe). Consolidated here so the skip
+  // loop below has a single source of truth.
+  const priceRange = resolvePriceRange(monitor as any);
+  const hasPriceFilter = priceRange.min !== null || priceRange.max !== null;
+  if (rawAds.length > 0) {
+    console.log(
+      `AD_EXTRACTOR_PRICE_RANGE: site=${config.site} monitorId=${monitor.id} ` +
+      `min=${priceRange.min ?? 'null'} max=${priceRange.max ?? 'null'} source=${priceRange.source}`
+    );
+  }
+
   if (isOlxSite && rawAds.length > 0) {
     console.log(
       `OLX_LOCATION_RULE: mode=STRICT scope=${olxTargetCity ? 'city' : olxTargetState ? 'state' : 'country'} ` +
@@ -211,14 +226,24 @@ export async function extractAds(
     // Parse price
     const price = config.priceParser(raw.priceText);
 
-    // Apply price filters
-    if (monitor.priceMin && price > 0 && price < monitor.priceMin) {
-      skip('price_below_min');
-      continue;
-    }
-    if (monitor.priceMax && price > 0 && price > monitor.priceMax) {
-      skip('price_above_max');
-      continue;
+    // Apply price filters using the resolved effective range.
+    // If the monitor configured any bound, an ad with an unparseable price
+    // (price === 0) is REJECTED — we can't prove it fits the range, so
+    // "fail closed" protects the user from noise. Previous behavior was
+    // fail-open, which leaked thousands of ads/day on ML.
+    if (hasPriceFilter) {
+      if (price <= 0) {
+        skip('price_unparsed');
+        continue;
+      }
+      if (priceRange.min !== null && price < priceRange.min) {
+        skip('price_below_min');
+        continue;
+      }
+      if (priceRange.max !== null && price > priceRange.max) {
+        skip('price_above_max');
+        continue;
+      }
     }
 
     // Location filter — strategy depends on site

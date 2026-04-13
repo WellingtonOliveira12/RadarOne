@@ -339,9 +339,13 @@ export class MonitorRunner {
           });
         }
       } else {
-        // Explicit keywords → apply relevance filter normally
+        // Explicit keywords → apply relevance filter in STRICT mode so that
+        // numeric model identifiers (e.g. "iphone 13") must match exactly —
+        // prevents iPhone 11/12/14 leaking into an iPhone 13 monitor.
         for (const ad of allNewAds) {
-          const relevance = checkRelevance(ad.title, monitor.name, monitorKeywords);
+          const relevance = checkRelevance(ad.title, monitor.name, monitorKeywords, {
+            keywordsSource: 'explicit',
+          });
           if (relevance.relevant) {
             newAds.push(ad);
           } else {

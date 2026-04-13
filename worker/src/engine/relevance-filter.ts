@@ -37,29 +37,83 @@ function detectMonitorCategory(monitorName: string, keywords: string): MonitorCa
 
 // ─── Keyword Matching ───────────────────────────────────────────────────────
 
-/**
- * Extracts significant words (4+ chars) from a keyword string.
- */
-function extractSignificantWords(keywords: string): string[] {
-  return keywords
-    .toLowerCase()
-    .replace(/[^\w\sÀ-ú]/g, '')
-    .replace(/([a-zÀ-ú])(\d)/g, '$1 $2') // "ipad10" → "ipad 10"
-    .split(/[\s_]+/)
-    .filter(w => w.length >= 4);
+interface Tokens {
+  /** Alphabetic tokens with 4+ chars (iphone, samsung, galaxy, notebook). */
+  alpha: string[];
+  /** Numeric tokens of ANY length (13, 12, 2024). Model identifiers. */
+  numeric: string[];
 }
 
 /**
- * Checks if at least one significant keyword exists in the title.
+ * Splits a keyword string into alpha (≥4 chars) and numeric tokens.
+ *
+ * Numeric tokens are preserved regardless of length because they often
+ * carry the model identifier (iPhone **13**, PS**5**, Galaxy S**24**).
+ * Dropping them silently turns "iphone 13" into "iphone", which then
+ * matches iPhone 11, 12, 14, 15, etc.
  */
-function hasKeywordMatch(title: string, keywords: string): boolean {
+function tokenize(keywords: string): Tokens {
+  const raw = keywords
+    .toLowerCase()
+    .replace(/[^\w\sÀ-ú]/g, ' ')
+    .replace(/([a-zÀ-ú])(\d)/g, '$1 $2') // "ipad10" → "ipad 10"
+    .replace(/(\d)([a-zÀ-ú])/g, '$1 $2') // "13pro"  → "13 pro"
+    .split(/[\s_]+/)
+    .filter(Boolean);
+
+  const alpha: string[] = [];
+  const numeric: string[] = [];
+  for (const t of raw) {
+    if (/^\d+$/.test(t)) {
+      numeric.push(t);
+    } else if (t.length >= 4) {
+      alpha.push(t);
+    }
+  }
+  return { alpha, numeric };
+}
+
+/**
+ * Legacy permissive match — used when the keyword string came from the
+ * monitor name as a fallback. In that case the tokens are often noise
+ * (e.g. "01_IPHONE_GERAL_PG5") and enforcing anything strict would
+ * reject legitimate ads. Behavior: at least one alpha token (≥4 chars)
+ * must appear as a substring; numbers are ignored.
+ */
+function hasKeywordMatchLegacy(title: string, keywords: string): boolean {
   const titleLower = title.toLowerCase();
-  const significantWords = extractSignificantWords(keywords);
+  const { alpha } = tokenize(keywords);
+  if (alpha.length === 0) return true; // "TV 50" → no alpha, accept all
+  return alpha.some((w) => titleLower.includes(w));
+}
 
-  // If no significant words (e.g., keywords = "TV 50"), accept all
-  if (significantWords.length === 0) return true;
+/**
+ * Strict match — used when the keyword string was EXPLICITLY typed by
+ * the user (filtersJson.keywords). Applies a model-identifier rule so
+ * that "iphone 13" does NOT silently match iPhone 11/12/14:
+ *
+ *  - Every numeric token MUST appear in the title as a whole word —
+ *    `\b13\b` matches "iPhone 13" and "iPhone 13 Pro" but not "iPhone 130".
+ *  - At least one alpha token must appear as a substring (tolerance for
+ *    brand words — "iphone" matches "iPhone", "iPhoneX", etc.).
+ *  - No tokens at all → accept (degenerate case).
+ */
+function hasKeywordMatchStrict(title: string, keywords: string): boolean {
+  const titleLower = title.toLowerCase();
+  const { alpha, numeric } = tokenize(keywords);
 
-  return significantWords.some(word => titleLower.includes(word));
+  if (alpha.length === 0 && numeric.length === 0) return true;
+
+  for (const n of numeric) {
+    const re = new RegExp(`\\b${n}\\b`);
+    if (!re.test(titleLower)) return false;
+  }
+
+  if (alpha.length > 0 && !alpha.some((w) => titleLower.includes(w))) {
+    return false;
+  }
+
+  return true;
 }
 
 // ─── Main Filter ────────────────────────────────────────────────────────────
@@ -70,25 +124,39 @@ export interface RelevanceResult {
   score: number; // 0-100 relevance score
 }
 
+export interface RelevanceOptions {
+  /**
+   * Where the keyword string came from. When `explicit`, enforces the
+   * strict model-identifier rule (every numeric token must appear in
+   * the title as a whole word). When `name_fallback` (default), uses
+   * the legacy permissive behavior so monitors named e.g.
+   * "01_IPHONE_GERAL_PG5" still match legitimate iPhone ads.
+   */
+  keywordsSource?: 'explicit' | 'name_fallback';
+}
+
 /**
  * Checks if an ad is relevant to the monitor.
  *
  * @param adTitle - The ad title
  * @param monitorName - The monitor name
  * @param monitorKeywords - The monitor search keywords
- * @returns RelevanceResult with match status and reason
+ * @param options - See {@link RelevanceOptions}
  */
 export function checkRelevance(
   adTitle: string,
   monitorName: string,
   monitorKeywords: string,
+  options: RelevanceOptions = {},
 ): RelevanceResult {
   try {
     const keywords = monitorKeywords || monitorName;
     const category = detectMonitorCategory(monitorName, keywords);
+    const source = options.keywordsSource ?? 'name_fallback';
+    const matchFn = source === 'explicit' ? hasKeywordMatchStrict : hasKeywordMatchLegacy;
 
     // Rule 1: Main keyword must exist in title
-    if (!hasKeywordMatch(adTitle, keywords)) {
+    if (!matchFn(adTitle, keywords)) {
       return {
         relevant: false,
         reason: 'keyword_not_in_title',
@@ -113,16 +181,15 @@ export function checkRelevance(
       };
     }
 
-    // Rule 3: Compute relevance score (informational — not a gate)
-    // Rule 1 already ensures at least one keyword is in the title.
-    // The score is computed for observability but does NOT reject ads.
-    // Previous 30% threshold was too aggressive: monitors with 4+ keywords
-    // and ads matching only 1 keyword (e.g. 1/4=25%) were silently rejected.
+    // Rule 3: Compute relevance score (informational — not a gate).
+    // Rule 1 above is the real gate. This score is only for observability.
     const titleLower = adTitle.toLowerCase();
-    const significantWords = extractSignificantWords(keywords);
-    const matchedWords = significantWords.filter(w => titleLower.includes(w));
-    const matchRatio = significantWords.length > 0
-      ? matchedWords.length / significantWords.length
+    const { alpha, numeric } = tokenize(keywords);
+    const matchedAlpha = alpha.filter((w) => titleLower.includes(w));
+    const matchedNumeric = numeric.filter((n) => new RegExp(`\\b${n}\\b`).test(titleLower));
+    const totalTokens = alpha.length + numeric.length;
+    const matchRatio = totalTokens > 0
+      ? (matchedAlpha.length + matchedNumeric.length) / totalTokens
       : 1;
 
     const relevanceScore = Math.round(matchRatio * 100);
