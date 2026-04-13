@@ -11,7 +11,7 @@
 > - Render (EUA) → `WORKER_SITES_EXCLUDE=MERCADO_LIVRE` → FB, OLX, demais
 > - Hostinger (BR) → `WORKER_SITES_INCLUDE=MERCADO_LIVRE` → **apenas ML**
 >
-> **Coexistência com PageOS (ou qualquer outro projeto):** tudo do RadarOne
+> **Coexistência com n8n (ou qualquer outro projeto):** tudo do RadarOne
 > ML vive em `/opt/radarone-ml/`, com project name `radarone-ml`, container
 > `radarone-ml-worker`, rede `radarone_ml_net`, sem portas publicadas, sem
 > tocar em Nginx/firewall, sem sobrescrever nada existente.
@@ -36,42 +36,53 @@
 
 ---
 
-## 1. Pré-checagem da VPS (avaliar convivência com PageOS)
+## 1. Pré-checagem da VPS (inspeção segura, sem tocar no n8n)
 
-Antes de tocar em qualquer coisa, rode esta sequência inócua para entender o
-estado atual:
+A VPS alvo é uma Hostinger **Brasil — Campinas**, Ubuntu 24.04 LTS, 1 vCPU,
+4 GB RAM, 50 GB disco, já rodando **um container n8n**. Todos os comandos
+abaixo são **read-only** — nenhum deles modifica, reinicia ou desliga
+qualquer coisa existente.
 
 ```bash
-# uname, memória, disco
+# Identidade da máquina + IP público (precisa ser BR para resolver o
+# problema de IP mismatch do ML)
+curl -s https://ifconfig.me && echo
 uname -a
 free -h
 df -h /
 
-# docker está instalado?
-docker --version || echo "Docker NOT installed"
-docker compose version || echo "Docker Compose plugin NOT installed"
+# Docker disponível e versões
+docker --version
+docker compose version
 
-# o que está rodando?
-docker ps
+# Inventário completo do que já roda — ANOTE nomes e redes do n8n antes
+# de fazer qualquer coisa
+docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 docker network ls
-docker images | head -20
-
-# portas em uso (só para saber — não vamos publicar nenhuma)
-ss -tlnp 2>/dev/null | head -20
+docker volume ls
 ```
 
-**Checklist:**
+**Checklist de segurança ANTES de continuar:**
 
+- [ ] `curl ifconfig.me` retornou um IP brasileiro (ex.: começa com
+      `177.`, `179.`, `187.` etc. e o WHOIS é BR). **Se não for BR,
+      pare aqui** — a VPS errada não vai resolver o problema.
 - [ ] Docker Engine ≥ 24 e `docker compose` plugin ativos.
-- [ ] Nenhum container ou rede com o nome `radarone-ml-worker` /
-      `radarone_ml_net` / `radarone-ml_*` — se houver, é um deploy antigo
-      nosso e pode ser removido com segurança.
-- [ ] PageOS (ou qualquer outro projeto) usa os nomes dele, não os nossos.
-      Se houver colisão **real**, pare e me avise antes de continuar.
-- [ ] Memória livre ≥ 900 MB (este compose limita o container a 900 MB).
-- [ ] Disco livre ≥ 3 GB (imagem Playwright + node_modules ≈ 1.8 GB).
+- [ ] `docker ps` mostra o container do **n8n** rodando. **Anote o
+      nome exato** dele. Exemplo comum: `n8n`, `n8n-1`, `mangaverdebi-n8n`.
+- [ ] **Nenhum** container ou rede chamado `radarone-ml-worker`,
+      `radarone_ml_net` ou `radarone-ml_*`. Se houver, é deploy antigo
+      nosso e pode ser removido com `docker rm -f <nome>` / `docker network rm <nome>`.
+- [ ] `free -h` mostra ≥ 1 GB de memória livre (este compose limita o
+      container ML a 900 MB; o n8n fica com o restante).
+- [ ] `df -h /` mostra ≥ 5 GB livres (imagem Playwright ≈ 1.8 GB + build
+      cache + logs).
+- [ ] **Não vamos publicar nenhuma porta**, então não importa quais
+      portas o n8n usa (80/443/5678 etc.) — elas não entram em conflito
+      com o nosso kit.
 
-Se Docker não estiver instalado:
+Se Docker não estiver instalado (improvável nesta VPS, que tem o "Gerenciador
+Docker" da Hostinger habilitado):
 
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
@@ -234,8 +245,11 @@ docker compose -f docker-compose.ml.yml restart
 cd /opt/radarone-ml && git pull && cd worker
 docker compose -f docker-compose.ml.yml --env-file .env.ml up -d --build
 
-# health check manual (só de dentro do container — porta não é publicada)
-docker exec radarone-ml-worker wget -q -O- http://127.0.0.1:8090/health | head
+# health check manual (só de dentro do container — porta não é publicada).
+# Node é garantidamente presente na imagem Playwright (usamos ele porque
+# wget/curl não são garantidos em todas as variantes da base image).
+docker exec radarone-ml-worker node -e \
+  "require('http').get('http://127.0.0.1:8090/health',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>console.log(r.statusCode,d.slice(0,200)))})"
 ```
 
 ---
@@ -266,23 +280,40 @@ banco e não se importam com qual instância escreveu.
 
 ---
 
-## 9. Garantias de isolamento com PageOS
+## 9. Garantias de isolamento com n8n
 
-| Item | Nome do RadarOne ML | Por que não colide |
+| Item | Nome do RadarOne ML | Por que não colide com n8n |
 |---|---|---|
-| Docker project | `radarone-ml` | Próprio `name:` no compose file |
-| Container | `radarone-ml-worker` | Prefixo único do RadarOne |
+| Docker project | `radarone-ml` | `name:` explícito no compose — escopo isolado |
+| Container | `radarone-ml-worker` | Prefixo único |
 | Imagem | `radarone-ml-worker:latest` | Prefixo único |
-| Rede Docker | `radarone_ml_net` | Prefixo único |
-| Portas publicadas no host | **nenhuma** | Healthcheck é localhost interno |
-| Diretório no host | `/opt/radarone-ml/` | Pasta dedicada |
-| Env file | `/opt/radarone-ml/worker/.env.ml` | Fora do PATH de outros projetos |
-| Volumes | **nenhum mount de host** | Só volume interno implícito do Docker |
-| Nginx / firewall | **não tocado** | Worker não aceita tráfego inbound |
-| Memória | Limite 900 MB | Deixa folga pra PageOS |
+| Rede Docker | `radarone_ml_net` (bridge própria) | Não toca na rede do n8n |
+| Portas publicadas no host | **nenhuma** | O n8n pode ter 80/443/5678 — irrelevante |
+| Diretório no host | `/opt/radarone-ml/` | Pasta dedicada, fora do PATH do n8n |
+| Env file | `/opt/radarone-ml/worker/.env.ml` (`chmod 600`) | Isolado, sem leitura cruzada |
+| Volumes | **nenhum mount de host** | Não tocamos volumes/pastas do n8n |
+| Nginx / firewall / iptables | **NÃO TOCAMOS** | Worker é background job; sem inbound |
+| Memória | `mem_limit: 900m` | Deixa ≥ 2 GB pra n8n + sistema |
+| CPU | `cpus: 0.8` | n8n mantém 20% do vCPU garantido |
+| Rede do n8n | **Não referenciamos** | n8n fica na rede dele, nós na nossa |
 
-**Nada do RadarOne ML compete com nada do PageOS.** Se um dia você quiser
-subir outro serviço nosso nessa VPS, use prefixos `radarone_` idem.
+**Garantias operacionais:**
+
+- Em nenhum momento o deploy roda `docker stop`, `docker rm`, `docker network rm`
+  ou `docker volume rm` em nada que não comece com `radarone`.
+- Nunca altera `/etc/nginx`, `/etc/iptables`, `ufw`, `firewalld`.
+- Não reinicia o Docker daemon.
+- Não mexe em `systemd` units existentes.
+
+**Se você quiser validar com seus próprios olhos antes do `up`:**
+
+```bash
+# Tudo do n8n permanece inalterado se estes nomes NÃO aparecem como
+# "radarone-*":
+docker ps
+docker network ls
+docker volume ls
+```
 
 ---
 
@@ -318,13 +349,13 @@ subir outro serviço nosso nessa VPS, use prefixos `radarone_` idem.
   exatamente como antes.
 - Humanização, watchdog do Render, dedupe cross-monitor, notificações aos
   usuários.
-- PageOS (ou qualquer outro projeto na mesma VPS).
+- n8n (ou qualquer outro projeto na mesma VPS).
 
 ---
 
 ## 12. Checklist final
 
-- [ ] Pré-checagem da VPS passou, Docker OK, sem colisão com PageOS.
+- [ ] Pré-checagem da VPS passou, Docker OK, sem colisão com n8n.
 - [ ] `/opt/radarone-ml/` clonado com `git clone`.
 - [ ] `.env.ml` preenchido com `DATABASE_URL`, `SESSION_ENCRYPTION_KEY`,
       `TELEGRAM_BOT_TOKEN`, `chmod 600`.

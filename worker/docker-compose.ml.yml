@@ -42,19 +42,24 @@ services:
       WATCHDOG_ENABLED: "false"
 
     # Internal healthcheck — the worker exposes GET /ping on 8090.
-    # Using wget from inside the container avoids publishing the port.
+    # We use `node -e` (guaranteed present in the Playwright image) instead
+    # of wget/curl, which are not reliably available in every variant.
+    # The port is NOT published to the host; this check is container-local.
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8090/ping || exit 1"]
+      test:
+        - "CMD-SHELL"
+        - "node -e \"require('http').get('http://127.0.0.1:8090/ping',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 60s
+      start_period: 90s
 
-    # Sensible ceiling for a VPS co-hosting another project.
-    deploy:
-      resources:
-        limits:
-          memory: 900M
+    # Sensible ceiling for a 1 vCPU / 4 GB VPS co-hosting n8n.
+    # mem_limit + cpus are honored by Docker Compose v2 in non-swarm mode
+    # (deploy.resources.* only applies to swarm deployments).
+    mem_limit: 900m
+    mem_reservation: 400m
+    cpus: 0.8
 
     logging:
       driver: json-file

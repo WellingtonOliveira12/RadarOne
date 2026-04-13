@@ -20,7 +20,7 @@ FROM mcr.microsoft.com/playwright:v1.57.0-noble AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY tsconfig.json ./
@@ -28,8 +28,14 @@ COPY prisma ./prisma
 COPY src ./src
 COPY scripts ./scripts
 
+# Skip Playwright browser download — the base image already ships with a
+# compatible Chromium at /ms-playwright. We deliberately run only the two
+# build steps that are safe/needed (prisma + typescript) and skip
+# build:playwright and build:validate so the build does not touch the
+# pre-installed browsers or try to reach the network.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-RUN npx prisma generate && npx tsc
+RUN npm run build:prisma \
+ && npm run build:typescript
 
 RUN npm prune --omit=dev
 
@@ -46,7 +52,7 @@ COPY --from=builder /app/prisma ./prisma
 ENV NODE_ENV=production \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     HEALTH_CHECK_PORT=8090 \
-    NODE_OPTIONS=--max-old-space-size=640
+    NODE_OPTIONS=--max-old-space-size=512
 
 # Internal-only health port — not published at the compose level.
 EXPOSE 8090
