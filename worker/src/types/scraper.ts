@@ -11,6 +11,16 @@ export interface ScrapedAd {
   imageUrl?: string;
   location?: string;
   publishedAt?: Date;
+  /**
+   * Optional seller profile signals extracted from the site's ad detail page.
+   * Only populated by site-specific post-extraction enrichers (e.g. OLX
+   * profile enricher). Typed as `unknown` here to avoid coupling shared
+   * types to enrichment modules — consumers import their own structured
+   * type and cast.
+   */
+  profileSignals?: unknown;
+  /** Optional tiered confidence label produced by enrichers. */
+  confidence?: { tier: 'HIGH' | 'MEDIUM' | 'LOW'; reasons: string[] };
 }
 
 export interface MonitorWithFilters {

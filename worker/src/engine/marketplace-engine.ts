@@ -524,6 +524,29 @@ export class MarketplaceEngine {
         monitor
       );
 
+      // 8.5 OPTIONAL post-extraction enrichment (e.g. OLX seller profile).
+      // The hook is site-specific and opt-in inside its own implementation
+      // (typically gated by an env var). The engine wraps it in try/catch
+      // so any failure here is invisible to the caller — ads are still
+      // returned without enrichment.
+      if (
+        this.config.postExtractionEnrich &&
+        extractionResult.ads.length > 0
+      ) {
+        try {
+          await this.config.postExtractionEnrich({
+            context,
+            ads: extractionResult.ads,
+            monitorId: monitor.id,
+          });
+        } catch (enrichError: any) {
+          console.warn(
+            `POST_EXTRACTION_ENRICH_FAIL: ${this.config.site} monitorId=${monitor.id} ` +
+            `error=${String(enrichError?.message || enrichError).slice(0, 200)}`
+          );
+        }
+      }
+
       // 9. Report success to session pool
       if (authResult.sessionId) {
         await sessionPool.reportResult(authResult.sessionId, 'CONTENT');

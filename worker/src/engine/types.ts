@@ -174,6 +174,18 @@ export interface SiteConfig {
    *  Used to strip platform-specific hack fragments that stopped working
    *  (e.g. ML `_PublishedToday_YES`, `_NoIndex_True`). Idempotent. */
   searchUrlPreprocessor?: (url: string) => string;
+  /**
+   * Optional hook run AFTER `extractAds` returns and BEFORE the Playwright
+   * context is cleaned up. Intended for site-specific enrichment that needs
+   * to navigate additional pages using the same authenticated context
+   * (e.g. OLX seller profile signals). Opt-in, fail-safe: the engine wraps
+   * the call in try/catch and never lets it break the scrape result.
+   */
+  postExtractionEnrich?: (args: {
+    context: import('playwright').BrowserContext;
+    ads: ScrapedAd[];
+    monitorId: string;
+  }) => Promise<void>;
   noResultsPatterns: string[];
   loginPatterns: string[];
   checkpointPatterns?: string[];

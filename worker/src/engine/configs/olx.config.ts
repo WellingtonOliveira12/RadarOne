@@ -1,4 +1,5 @@
 import { SiteConfig } from '../types';
+import { enrichOlxAdsWithProfile } from '../enrichment/olx-profile-enricher';
 
 /** Patterns that indicate installment/invalid text, NOT a main price. */
 const INSTALLMENT_PATTERNS = /até|x de|parcela|sem juros|parcelamento/i;
@@ -185,5 +186,11 @@ export const olxConfig: SiteConfig = {
     'Upgrade-Insecure-Requests': '1',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
     'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+  },
+  // Optional seller-profile enrichment. The hook itself checks
+  // OLX_ENRICH_PROFILE=true before doing anything, so registering it here
+  // is safe: with the env var unset, it is an effective no-op.
+  postExtractionEnrich: async ({ context, ads, monitorId }) => {
+    await enrichOlxAdsWithProfile({ context, ads, monitorId });
   },
 };
