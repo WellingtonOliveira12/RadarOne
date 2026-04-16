@@ -88,6 +88,37 @@ describe('resolvePriceRange', () => {
     expect(r.max).toBeNull();
   });
 
+  it('extracts ML PriceRange with BRL currency suffix (new ML URL format)', () => {
+    const r = resolvePriceRange({
+      site: 'MERCADO_LIVRE',
+      searchUrl:
+        'https://lista.mercadolivre.com.br/celulares-telefones/celulares-smartphones/iphone/iphone_PriceRange_0BRL-7500BRL_PublishedToday_YES',
+    });
+    expect(r.min).toBeNull(); // 0 is not a meaningful lower bound
+    expect(r.max).toBe(7500);
+    expect(r.source).toMatch(/url\.max/);
+  });
+
+  it('extracts ML PriceRange with BRL suffix on both bounds', () => {
+    const r = resolvePriceRange({
+      site: 'MERCADO_LIVRE',
+      searchUrl:
+        'https://lista.mercadolivre.com.br/iphone_PriceRange_1000BRL-3000BRL',
+    });
+    expect(r.min).toBe(1000);
+    expect(r.max).toBe(3000);
+  });
+
+  it('still parses legacy ML PriceRange format without suffix', () => {
+    // Regression guard: legacy format must keep working after BRL relaxation.
+    const r = resolvePriceRange({
+      site: 'MERCADO_LIVRE',
+      searchUrl: 'https://lista.mercadolivre.com.br/iphone_PriceRange_500-2500',
+    });
+    expect(r.min).toBe(500);
+    expect(r.max).toBe(2500);
+  });
+
   it('handles malformed filtersJson gracefully', () => {
     const r = resolvePriceRange({
       site: 'MERCADO_LIVRE',

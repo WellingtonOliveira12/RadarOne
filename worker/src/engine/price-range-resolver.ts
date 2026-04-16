@@ -44,8 +44,11 @@ function readFilterJsonPrice(filtersJson: unknown): { min: number | null; max: n
 }
 
 function extractFromMercadoLivreUrl(url: string): { min: number | null; max: number | null } {
-  // URLs use segments like `_PriceRange_1000-2000`. The min may be 0.
-  const match = url.match(/_PriceRange_(\d+)-(\d+)/i);
+  // ML uses two formats for the PriceRange segment:
+  //   legacy: `_PriceRange_1000-2000`
+  //   new:    `_PriceRange_1000BRL-2000BRL` (currency suffix added by ML's own builder)
+  // The currency suffix is optional on either side; min may still be 0.
+  const match = url.match(/_PriceRange_(\d+)(?:BRL)?-(\d+)(?:BRL)?/i);
   if (!match) return { min: null, max: null };
   const min = parseInt(match[1], 10);
   const max = parseInt(match[2], 10);
